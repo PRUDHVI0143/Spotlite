@@ -16,13 +16,33 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Connect to MongoDB
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB successfully.'))
-  .catch(err => {
-    console.error('MongoDB connection error:', err);
-    console.log('Ensure MongoDB is running locally (e.g. net start MongoDB).');
-  });
+// Connect to MongoDB (serverless-safe cached connection)
+let isConnected = false;
+
+async function connectDB() {
+  if (isConnected) return;
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+    isConnected = true;
+    console.log('Connected to MongoDB successfully.');
+  } catch (err) {
+    console.error('MongoDB connection error:', err.message);
+    throw err;
+  }
+}
+
+// Middleware to ensure DB is connected on every request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ error: 'Database connection failed.' });
+  }
+});
 
 // --- MODELS ---
 
