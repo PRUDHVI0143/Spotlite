@@ -149,7 +149,10 @@
                 <input type="file" id="post-file-input" accept="image/*" style="display: none;">
                 
                 <p style="margin-top: 15px; font-size: 0.85rem;">Or paste an image URL:</p>
-                <input type="text" id="post-url-input" placeholder="https://example.com/image.jpg" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; color: var(--text-primary); width: 80%; font-size: 0.85rem;">
+                <div style="display: flex; gap: 8px; width: 80%; justify-content: center; margin-top: 5px;">
+                    <input type="text" id="post-url-input" placeholder="https://example.com/image.jpg" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; color: var(--text-primary); flex: 1; font-size: 0.85rem;">
+                    <button id="post-url-submit-btn" style="background: var(--spotlite-gradient); color: black; border: none; border-radius: 6px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 0.85rem;">Load</button>
+                </div>
             </div>
 
             <!-- Preview and Caption Area (Visible after selecting image) -->

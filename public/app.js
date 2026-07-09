@@ -421,7 +421,29 @@ function setupCreatePostModal() {
         }
     });
 
-    // Paste Image URL
+    // Paste / Load Image URL
+    const urlSubmitBtn = document.getElementById('post-url-submit-btn');
+
+    function loadUrlImage() {
+        const url = urlInput.value.trim();
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            handleImageSelected(url);
+        } else {
+            alert('Please enter a valid URL starting with http:// or https://');
+        }
+    }
+
+    if (urlSubmitBtn) {
+        urlSubmitBtn.addEventListener('click', loadUrlImage);
+    }
+
+    urlInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            loadUrlImage();
+        }
+    });
+
     urlInput.addEventListener('input', () => {
         const url = urlInput.value.trim();
         if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -1429,8 +1451,15 @@ async function openPostDetailModal(postId) {
         const commentInput = document.getElementById('detail-comment-input');
         const commentSubmit = document.getElementById('detail-comment-submit-btn');
 
-        // Use a named function to be able to remove the listener later if needed
-        commentSubmit.onclick = async () => {
+        // Reset submit button state
+        commentSubmit.classList.remove('active');
+        commentInput.value = '';
+
+        commentInput.oninput = () => {
+            commentSubmit.classList.toggle('active', commentInput.value.trim() !== '');
+        };
+
+        async function submitModalComment() {
             const text = commentInput.value.trim();
             if (text === '') return;
 
@@ -1445,6 +1474,7 @@ async function openPostDetailModal(postId) {
                 if (!response.ok) throw new Error(newComment.error);
 
                 commentInput.value = '';
+                commentSubmit.classList.remove('active');
 
                 // Append comment in modal view
                 const div = document.createElement('div');
@@ -1468,6 +1498,17 @@ async function openPostDetailModal(postId) {
                 }
             } catch (err) {
                 alert(err.message);
+            }
+        }
+
+        // Click to submit
+        commentSubmit.onclick = submitModalComment;
+
+        // Enter to submit
+        commentInput.onkeypress = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitModalComment();
             }
         };
 
