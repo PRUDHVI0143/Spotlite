@@ -511,8 +511,8 @@ function createPostCard(post) {
 
     likeBtn.addEventListener('click', toggleLike);
 
-    // Comment button opens detail
-    commentBtn.addEventListener('click', () => openPostDetailModal(post._id));
+    // Comment button focuses input
+    commentBtn.addEventListener('click', () => commentInput.focus());
 
     // Bookmark toggle
     bookmarkBtn.addEventListener('click', () => {
@@ -547,7 +547,26 @@ function createPostCard(post) {
 
             // Update comment count
             const countEl = card.querySelector(`#comment-btn-${post._id} .action-count`);
-            if (countEl) countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+            let newCount = 1;
+            if (countEl) {
+                newCount = parseInt(countEl.textContent || 0) + 1;
+                countEl.textContent = newCount;
+            }
+
+            // Update or create "View all comments" button dynamically
+            let previewBtn = card.querySelector('.comments-preview-btn');
+            if (previewBtn) {
+                previewBtn.textContent = `View all ${newCount} comment${newCount !== 1 ? 's' : ''}`;
+            } else {
+                const wrapper = card.querySelector('.comment-input-wrapper');
+                if (wrapper) {
+                    previewBtn = document.createElement('button');
+                    previewBtn.className = 'comments-preview-btn';
+                    previewBtn.onclick = () => openPostDetailModal(post._id);
+                    previewBtn.textContent = `View all ${newCount} comment${newCount !== 1 ? 's' : ''}`;
+                    wrapper.parentNode.insertBefore(previewBtn, wrapper);
+                }
+            }
         } catch (err) {
             alert(err.message);
         }
