@@ -23,12 +23,13 @@ async function seedAdmin() {
   try {
     const adminUsername = 'admin';
     const adminEmail = 'admin@spotlite.com';
-    const adminPassword = 'adminpassword123';
+    const adminPassword = 'prudhvi';
+
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     const existingAdmin = await User.findOne({ username: adminUsername });
     if (!existingAdmin) {
-      const bcrypt = require('bcryptjs');
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
       const adminUser = new User({
         username: adminUsername,
         email: adminEmail,
@@ -38,6 +39,12 @@ async function seedAdmin() {
       });
       await adminUser.save();
       console.log('Default administrator account created successfully.');
+    } else {
+      // Ensure the admin account has isAdmin set to true and update the password
+      existingAdmin.password = hashedPassword;
+      existingAdmin.isAdmin = true;
+      await existingAdmin.save();
+      console.log('Administrator account credentials updated successfully.');
     }
   } catch (err) {
     console.error('Failed to seed admin account:', err.message);
