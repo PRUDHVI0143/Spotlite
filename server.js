@@ -652,6 +652,97 @@ app.put('/api/users/change-password', authenticateToken, async (req, res) => {
   }
 });
 
+// 18. Delete Post
+app.delete('/api/posts/:id', authenticateToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    // Verify ownership
+    if (post.author.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to delete this post.' });
+    }
+
+    await Post.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Post deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete post.' });
+  }
+});
+
+// 19. Edit Post Caption
+app.put('/api/posts/:id', authenticateToken, async (req, res) => {
+  try {
+    const { caption } = req.body;
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    // Verify ownership
+    if (post.author.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to edit this post.' });
+    }
+
+    post.caption = caption || '';
+    await post.save();
+    
+    const populatedPost = await post.populate('author', 'username avatar');
+    res.json(populatedPost);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to edit post.' });
+  }
+});
+
+// 20. Delete Comment
+app.delete('/api/posts/:postId/comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ error: 'Comment not found.' });
+
+    // Authorized if user is the comment author OR the post owner
+    if (comment.user.toString() !== req.user.id && post.author.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to delete this comment.' });
+    }
+
+    post.comments.pull(req.params.commentId);
+    await post.save();
+
+    res.json({ message: 'Comment deleted successfully.', commentsCount: post.comments.length });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete comment.' });
+  }
+});
+
+// 21. Edit Comment
+app.put('/api/posts/:postId/comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || text.trim() === '') {
+      return res.status(400).json({ error: 'Comment text is required.' });
+    }
+
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ error: 'Comment not found.' });
+
+    // Only comment author can edit comment
+    if (comment.user.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to edit this comment.' });
+    }
+
+    comment.text = text.trim();
+    await post.save();
+
+    res.json({ message: 'Comment updated successfully.', comment });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to edit comment.' });
+  }
+});
+
 // Front-end SPA support - Serve HTML files dynamically or fallback
 app.use((req, res) => {
   // If request is for an API route that wasn't matched, send JSON 404

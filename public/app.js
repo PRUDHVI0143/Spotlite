@@ -61,6 +61,85 @@ function formatTime(dateString) {
     return `${diffDays}d ago`;
 }
 
+// Global Dynamic Action Menu Modal Helper
+function showActionMenu(options) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay active';
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:100000; display:flex; align-items:center; justify-content:center;';
+    
+    const menu = document.createElement('div');
+    menu.style.cssText = 'background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; width:90%; max-width:320px; display:flex; flex-direction:column; overflow:hidden; animation: bubblePop 0.2s ease-out;';
+    
+    options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.textContent = opt.label;
+        btn.style.cssText = `background:none; border:none; padding:14px; font-size:0.9rem; font-weight:600; cursor:pointer; text-align:center; transition:background 0.2s; border-bottom:${idx < options.length - 1 ? '1px solid var(--border-color)' : 'none'}; color:${opt.danger ? 'var(--accent-red)' : 'var(--text-primary)'};`;
+        btn.addEventListener('mouseenter', () => btn.style.backgroundColor = 'var(--bg-secondary)');
+        btn.addEventListener('mouseleave', () => btn.style.backgroundColor = 'transparent');
+        btn.addEventListener('click', () => {
+            overlay.remove();
+            opt.onClick();
+        });
+        menu.appendChild(btn);
+    });
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = 'background:none; border:none; padding:14px; font-size:0.9rem; font-weight:550; cursor:pointer; text-align:center; transition:background 0.2s; color:var(--text-muted); border-top:1px solid var(--border-color);';
+    cancelBtn.addEventListener('mouseenter', () => cancelBtn.style.backgroundColor = 'var(--bg-secondary)');
+    cancelBtn.addEventListener('mouseleave', () => cancelBtn.style.backgroundColor = 'transparent');
+    cancelBtn.addEventListener('click', () => overlay.remove());
+    menu.appendChild(cancelBtn);
+
+    overlay.appendChild(menu);
+    
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+
+    document.body.appendChild(overlay);
+}
+
+// Global Dynamic Prompt Text Modal Helper
+function showPromptModal(title, defaultValue, onSubmit) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay active';
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:100000; display:flex; align-items:center; justify-content:center;';
+
+    const content = document.createElement('div');
+    content.style.cssText = 'background:var(--bg-card); border:1px solid var(--border-color); border-radius:14px; padding:20px; width:90%; max-width:380px; display:flex; flex-direction:column; gap:14px; animation: bubblePop 0.2s ease-out;';
+    
+    content.innerHTML = `
+        <h3 style="font-size:1rem; font-weight:700; color:var(--text-primary); margin:0;">${title}</h3>
+        <textarea id="prompt-textarea" style="background-color:var(--bg-input); border:1px solid var(--border-color); border-radius:8px; padding:10px; color:var(--text-primary); font-size:0.9rem; min-height:80px; width:100%; box-sizing:border-box; outline:none; resize:vertical; font-family:inherit;"></textarea>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:5px;">
+            <button id="prompt-cancel-btn" style="background:none; border:1px solid var(--border-color); border-radius:6px; padding:8px 16px; color:var(--text-secondary); font-weight:600; cursor:pointer;">Cancel</button>
+            <button id="prompt-submit-btn" style="background:var(--spotlite-gradient); border:none; border-radius:6px; padding:8px 16px; color:black; font-weight:600; cursor:pointer;">Save</button>
+        </div>
+    `;
+
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    const textarea = content.querySelector('#prompt-textarea');
+    textarea.value = defaultValue;
+    textarea.focus();
+
+    content.querySelector('#prompt-cancel-btn').onclick = () => overlay.remove();
+    
+    content.querySelector('#prompt-submit-btn').onclick = () => {
+        const val = textarea.value.trim();
+        overlay.remove();
+        onSubmit(val);
+    };
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+
+    document.body.appendChild(overlay);
+}
+
 // Global Notification Service Variables & Helpers
 let isNotificationServiceStarted = false;
 let globalLastMessageTimes = {};
@@ -752,6 +831,76 @@ function createPostCard(post) {
         e.stopPropagation();
         openShareModal(post._id, post);
     });
+
+    // Options Menu Button (Three-dots)
+    const menuBtn = card.querySelector('.post-menu-btn');
+    if (menuBtn) {
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const menuOptions = [];
+            
+            const currentUser = JSON.parse(localStorage.getItem('user'));
+            const isOwner = currentUser && post.author && (post.author._id || post.author) === currentUser.id;
+
+            if (isOwner) {
+                menuOptions.push({
+                    label: 'Edit Post',
+                    onClick: () => {
+                        showPromptModal('Edit Caption', post.caption || '', async (newCaption) => {
+                            try {
+                                const res = await fetch(`${API_BASE}/posts/${post._id}`, {
+                                    method: 'PUT',
+                                    headers: getHeaders(),
+                                    body: JSON.stringify({ caption: newCaption })
+                                });
+                                const updatedPost = await res.json();
+                                if (!res.ok) throw new Error(updatedPost.error);
+                                
+                                const captionTextEl = card.querySelector(`#caption-text-${post._id}`);
+                                if (captionTextEl) captionTextEl.textContent = newCaption;
+                                post.caption = newCaption;
+                            } catch (err) {
+                                alert(err.message);
+                            }
+                        });
+                    }
+                });
+
+                menuOptions.push({
+                    label: 'Delete Post',
+                    danger: true,
+                    onClick: () => {
+                        if (confirm('Are you sure you want to delete this post?')) {
+                            (async () => {
+                                try {
+                                    const res = await fetch(`${API_BASE}/posts/${post._id}`, {
+                                        method: 'DELETE',
+                                        headers: getHeaders()
+                                    });
+                                    const data = await res.json();
+                                    if (!res.ok) throw new Error(data.error);
+                                    
+                                    card.remove();
+                                } catch (err) {
+                                    alert(err.message);
+                                }
+                            })();
+                        }
+                    }
+                });
+            } else {
+                menuOptions.push({
+                    label: 'Copy Profile Link',
+                    onClick: () => {
+                        navigator.clipboard.writeText(`${window.location.origin}/profile.html?u=${post.author.username}`);
+                        alert('Profile link copied to clipboard!');
+                    }
+                });
+            }
+
+            showActionMenu(menuOptions);
+        });
+    }
 
     // Comment submit
     commentInput.addEventListener('input', () => {
@@ -1520,19 +1669,90 @@ async function openPostDetailModal(postId) {
             targetPost.comments.forEach(c => {
                 const div = document.createElement('div');
                 div.className = 'comment-item';
-                // The backend now populates `c.user` with avatar and username.
+                div.style.position = 'relative';
+                
                 const author = c.user || { username: c.username }; // Fallback for old comments
                 const avatarSrc = author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${author.username}`;
+                
+                const commentUserObjectId = author._id || author.id || c.user;
+                const isCommentOwner = currentUser && (commentUserObjectId === currentUser.id);
+                const isPostOwner = currentUser && targetPost.author && ((targetPost.author._id || targetPost.author) === currentUser.id);
 
                 div.innerHTML = `
                     <img src="${avatarSrc}" class="comment-item-avatar" alt="">
-                    <div>
+                    <div style="flex: 1; padding-right: 24px;">
                         <span class="comment-username" onclick="window.location.href='profile.html?u=${author.username}'">${author.username}</span>
-                        <span class="comment-text">${escapeHtml(c.text)}</span>
+                        <span class="comment-text" id="comment-text-${c._id}">${escapeHtml(c.text)}</span>
                         <div style="font-size:0.75rem; color: var(--text-muted); margin-top: 4px;">${formatTime(c.createdAt || new Date())}</div>
                     </div>
+                    ${(isCommentOwner || isPostOwner) ? `
+                    <button class="comment-options-btn" style="position: absolute; right: 4px; top: 12px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.85rem; padding: 4px;" title="Comment Options">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                    </button>
+                    ` : ''}
                 `;
                 commentsList.appendChild(div);
+
+                const commOptionsBtn = div.querySelector('.comment-options-btn');
+                if (commOptionsBtn) {
+                    commOptionsBtn.onclick = () => {
+                        const commOptions = [];
+                        
+                        if (isCommentOwner) {
+                            commOptions.push({
+                                label: 'Edit Comment',
+                                onClick: () => {
+                                    showPromptModal('Edit Comment', c.text, async (newText) => {
+                                        if (newText === '') return;
+                                        try {
+                                            const res = await fetch(`${API_BASE}/posts/${postId}/comments/${c._id}`, {
+                                                method: 'PUT',
+                                                headers: getHeaders(),
+                                                body: JSON.stringify({ text: newText })
+                                            });
+                                            const data = await res.json();
+                                            if (!res.ok) throw new Error(data.error);
+                                            
+                                            const commentTextEl = div.querySelector(`#comment-text-${c._id}`);
+                                            if (commentTextEl) commentTextEl.textContent = newText;
+                                            c.text = newText;
+                                        } catch (err) {
+                                            alert(err.message);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        if (isCommentOwner || isPostOwner) {
+                            commOptions.push({
+                                label: 'Delete Comment',
+                                danger: true,
+                                onClick: () => {
+                                    if (confirm('Are you sure you want to delete this comment?')) {
+                                        (async () => {
+                                            try {
+                                                const res = await fetch(`${API_BASE}/posts/${postId}/comments/${c._id}`, {
+                                                    method: 'DELETE',
+                                                    headers: getHeaders()
+                                                });
+                                                const data = await res.json();
+                                                if (!res.ok) throw new Error(data.error);
+                                                
+                                                div.remove();
+                                                loadFeedPosts();
+                                            } catch (err) {
+                                                alert(err.message);
+                                            }
+                                        })();
+                                    }
+                                }
+                            });
+                        }
+
+                        showActionMenu(commOptions);
+                    };
+                }
             });
         } else if (!targetPost.caption) {
             commentsList.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No comments yet.</p>';
