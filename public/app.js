@@ -707,8 +707,8 @@ function createPostCard(post) {
 
     likeBtn.addEventListener('click', toggleLike);
 
-    // Comment button focuses input
-    commentBtn.addEventListener('click', () => commentInput.focus());
+    // Comment button opens detail modal to view/add comments
+    commentBtn.addEventListener('click', () => openPostDetailModal(post._id));
 
     // Bookmark toggle
     bookmarkBtn.addEventListener('click', () => {
@@ -867,6 +867,59 @@ function closeShareModal() {
     _shareSelected.clear();
     _shareCurrentPostId = null;
     _shareCurrentPost   = null;
+}
+
+// Render users into the share modal list, filtered by search query
+function renderShareUsers(query) {
+    const list = document.getElementById('share-users-list');
+    const sendBtn = document.getElementById('share-send-btn');
+    if (!list) return;
+
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    const filtered = _shareAllUsers.filter(u => {
+        if (currentUser && u._id === currentUser.id) return false; // hide self
+        return !query || u.username.toLowerCase().includes(query);
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-muted);padding:20px;text-align:center">No users found</p>';
+        return;
+    }
+
+    list.innerHTML = '';
+    filtered.forEach(user => {
+        const isSelected = _shareSelected.has(user._id);
+        const row = document.createElement('div');
+        row.className = `share-user-row${isSelected ? ' selected' : ''}`;
+        row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;transition:background 0.2s;border-radius:8px;';
+        row.innerHTML = `
+            <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}"
+                 style="width:42px;height:42px;border-radius:50%;object-fit:cover;" alt="">
+            <span style="flex:1;font-weight:500;color:var(--text-primary)">${user.username}</span>
+            <div style="
+                width:22px;height:22px;border-radius:50%;
+                border:2px solid ${isSelected ? 'var(--accent-gold)' : 'var(--border-color)'};
+                background:${isSelected ? 'var(--accent-gold)' : 'transparent'};
+                display:flex;align-items:center;justify-content:center;
+                transition:all 0.2s;
+            ">
+                ${isSelected ? '<svg viewBox="0 0 24 24" width="13" height="13" stroke="#000" stroke-width="3" fill="none"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+            </div>
+        `;
+        row.addEventListener('mouseenter', () => row.style.background = 'var(--bg-secondary)');
+        row.addEventListener('mouseleave', () => row.style.background = 'transparent');
+        row.addEventListener('click', () => {
+            if (_shareSelected.has(user._id)) {
+                _shareSelected.delete(user._id);
+            } else {
+                _shareSelected.add(user._id);
+            }
+            sendBtn.disabled = _shareSelected.size === 0;
+            sendBtn.textContent = _shareSelected.size > 0 ? `Send (${_shareSelected.size})` : 'Send';
+            renderShareUsers(document.getElementById('share-search-input')?.value.trim().toLowerCase() || '');
+        });
+        list.appendChild(row);
+    });
 }
 
 // Wire close buttons (once, on page load)
