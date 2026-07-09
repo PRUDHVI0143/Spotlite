@@ -2132,3 +2132,107 @@ input:checked+.slider:before {
 .story-avatar-wrapper--own .story-avatar {
     border: 2px solid var(--bg-primary);
 }
+
+/* =============================================================
+   SKELETON LOADING ANIMATIONS
+   ============================================================= */
+
+@keyframes skeleton-shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position: 600px 0; }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        #1a1a16 25%,
+        #28271f 50%,
+        #1a1a16 75%
+    );
+    background-size: 600px 100%;
+    animation: skeleton-shimmer 1.6s infinite linear;
+    border-radius: 6px;
+}
+
+/* --- Post Card Skeleton --- */
+.skeleton-post-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.skeleton-post-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.skeleton-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.skeleton-post-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    flex: 1;
+}
+
+.skeleton-line {
+    height: 12px;
+    border-radius: 6px;
+}
+
+.skeleton-line.w-60  { width: 60%; }
+.skeleton-line.w-40  { width: 40%; }
+.skeleton-line.w-90  { width: 90%; }
+.skeleton-line.w-70  { width: 70%; }
+.skeleton-line.w-30  { width: 30%; }
+
+.skeleton-post-image {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: 12px;
+}
+
+.skeleton-post-actions {
+    display: flex;
+    gap: 18px;
+}
+
+.skeleton-action {
+    width: 52px;
+    height: 24px;
+    border-radius: 6px;
+}
+
+/* --- Chat Inbox Skeleton --- */
+.skeleton-inbox-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.skeleton-inbox-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.skeleton-inbox-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}

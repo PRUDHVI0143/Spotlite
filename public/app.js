@@ -502,10 +502,35 @@ function loadCurrentUserCard() {
     if (bio) bio.textContent = user.bio ? (user.bio.length > 30 ? user.bio.substring(0, 30) + '...' : user.bio) : 'Spotlite user';
 }
 
+// Generate a single skeleton post card HTML string
+function skeletonPostCard() {
+    return `
+    <div class="skeleton-post-card">
+        <div class="skeleton-post-header">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton-post-meta">
+                <div class="skeleton skeleton-line w-60"></div>
+                <div class="skeleton skeleton-line w-40"></div>
+            </div>
+        </div>
+        <div class="skeleton skeleton-post-image"></div>
+        <div class="skeleton skeleton-line w-90"></div>
+        <div class="skeleton skeleton-line w-70"></div>
+        <div class="skeleton-post-actions">
+            <div class="skeleton skeleton-action"></div>
+            <div class="skeleton skeleton-action"></div>
+            <div class="skeleton skeleton-action"></div>
+        </div>
+    </div>`;
+}
+
 // Fetch and render posts stream
 async function loadFeedPosts() {
     const postsStream = document.getElementById('posts-stream');
     if (!postsStream) return;
+
+    // Show skeleton placeholders immediately
+    postsStream.innerHTML = Array(4).fill(skeletonPostCard()).join('');
 
     try {
         const response = await fetch(`${API_BASE}/posts`, {
@@ -1698,6 +1723,17 @@ async function initMessagesPage() {
 async function loadConversationsInbox() {
     const list = document.getElementById('conversations-inbox-list');
     if (!list) return;
+
+    // Show skeleton placeholders while loading
+    list.innerHTML = Array(5).fill(`
+        <div class="skeleton-inbox-item">
+            <div class="skeleton skeleton-inbox-avatar"></div>
+            <div class="skeleton-inbox-meta">
+                <div class="skeleton skeleton-line w-60"></div>
+                <div class="skeleton skeleton-line w-90"></div>
+            </div>
+        </div>
+    `).join('');
 
     try {
         const response = await fetch(`${API_BASE}/messages/conversations/list`, {
