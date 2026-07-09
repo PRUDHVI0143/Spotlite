@@ -266,7 +266,10 @@ app.put('/api/users/profile', authenticateToken, async (req, res) => {
 app.get('/api/users/profile/:username', async (req, res) => {
   try {
     const cleanUsername = req.params.username.toLowerCase();
-    const user = await User.findOne({ username: cleanUsername });
+    const user = await User.findOne({ username: cleanUsername })
+      .populate('followers', 'username avatar bio')
+      .populate('following', 'username avatar bio');
+      
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
     res.json({

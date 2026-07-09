@@ -107,8 +107,8 @@
                         <!-- Stats Row -->
                         <ul class="profile-stats-row">
                             <li><span class="stat-number" id="profile-post-count">0</span> posts</li>
-                            <li><span class="stat-number" id="profile-followers-count">0</span> followers</li>
-                            <li><span class="stat-number" id="profile-following-count">0</span> following</li>
+                            <li id="view-followers-btn" style="cursor: pointer;"><span class="stat-number" id="profile-followers-count">0</span> followers</li>
+                            <li id="view-following-btn" style="cursor: pointer;"><span class="stat-number" id="profile-following-count">0</span> following</li>
                         </ul>
 
                         <!-- Bio Row -->
@@ -303,6 +303,19 @@
             <div class="edit-profile-actions">
                 <button class="btn-secondary" id="close-settings-btn">Close</button>
                 <button class="btn-primary" id="save-settings-btn" style="margin-top: 0; padding: 10px 20px;">Update Password</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOLLOWERS / FOLLOWING LIST MODAL -->
+    <div class="modal-overlay" id="follow-list-modal-overlay">
+        <div class="modal-content follow-list-modal" style="max-width: 400px; max-height: 400px; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; width: 90%;">
+            <div class="follow-list-header" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+                <h3 id="follow-list-title" style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Followers</h3>
+                <button class="modal-close-btn" id="close-follow-list-modal" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.4rem; padding: 0; line-height: 1;">&times;</button>
+            </div>
+            <div class="follow-list-body" id="follow-list-container" style="flex: 1; overflow-y: auto; padding: 12px 18px; display: flex; flex-direction: column; gap: 12px;">
+                <!-- Dynamic user rows will go here -->
             </div>
         </div>
     </div>

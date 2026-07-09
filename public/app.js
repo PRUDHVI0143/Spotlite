@@ -1140,6 +1140,66 @@ async function loadProfileHeader(username) {
         const messageBtn   = document.getElementById('profile-message-btn');
         const addBtn       = document.getElementById('profile-add-btn');
 
+        // Setup followers / following popup handlers
+        const followListOverlay = document.getElementById('follow-list-modal-overlay');
+        const followListTitle = document.getElementById('follow-list-title');
+        const followListContainer = document.getElementById('follow-list-container');
+        const closeFollowListModal = document.getElementById('close-follow-list-modal');
+
+        function openFollowModal(type, usersList) {
+            if (!followListOverlay) return;
+            followListTitle.textContent = type === 'followers' ? 'Followers' : 'Following';
+            followListContainer.innerHTML = '';
+
+            if (!usersList || usersList.length === 0) {
+                followListContainer.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 20px 0;">No ${type} yet.</p>`;
+            } else {
+                usersList.forEach(user => {
+                    const row = document.createElement('div');
+                    row.className = 'follow-user-row';
+                    row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:8px 0;cursor:pointer;border-bottom:1px solid var(--border-color);';
+                    row.innerHTML = `
+                        <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}"
+                             style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="">
+                        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+                            <span style="font-weight:600;color:var(--text-primary);font-size:0.88rem;">${user.username}</span>
+                            ${user.bio ? `<span style="font-size:0.75rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">${escapeHtml(user.bio)}</span>` : ''}
+                        </div>
+                    `;
+                    row.onclick = () => {
+                        followListOverlay.classList.remove('active');
+                        window.location.href = `profile.html?u=${user.username}`;
+                    };
+                    followListContainer.appendChild(row);
+                });
+            }
+
+            followListOverlay.classList.add('active');
+        }
+
+        const followersBtn = document.getElementById('view-followers-btn');
+        const followingBtn = document.getElementById('view-following-btn');
+
+        if (followersBtn) {
+            followersBtn.onclick = () => openFollowModal('followers', data.followers);
+        }
+        if (followingBtn) {
+            followingBtn.onclick = () => openFollowModal('following', data.following);
+        }
+
+        if (closeFollowListModal) {
+            closeFollowListModal.onclick = () => {
+                followListOverlay.classList.remove('active');
+            };
+        }
+        if (followListOverlay) {
+            followListOverlay.onclick = (e) => {
+                if (e.target === followListOverlay) {
+                    followListOverlay.classList.remove('active');
+                }
+            };
+        }
+
         if (currentUser && currentUser.username === username.toLowerCase()) {
             // OWN profile – show edit button only
             editBtn.style.display = 'block';
@@ -1152,7 +1212,7 @@ async function loadProfileHeader(username) {
             actionsRow.style.display = 'flex';
 
             // Check if currently following
-            const isFollowing = data.followers && data.followers.includes(currentUser ? currentUser.id : '');
+            const isFollowing = data.followers && data.followers.some(f => (f._id || f) === (currentUser ? currentUser.id : ''));
 
             function setFollowState(following) {
                 if (following) {
