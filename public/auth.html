@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotlite • Login / Signup</title>
+    <link rel="icon" type="image/png" href="spotlite.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <!-- Login Card -->
+        <div class="auth-card" id="login-card">
+            <div class="logo-container">
+                <div class="brand-header-container" style="justify-content: center; margin-bottom: 10px;">
+                    <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img" style="width: 40px; height: 40px;">
+                    <span class="insta-logo-text" style="font-size: 2.2rem;">Spotlite</span>
+                </div>
+            </div>
+            <form class="auth-form" id="login-form">
+                <div class="input-wrapper">
+                    <input type="text" id="login-username" placeholder="Username" required autocomplete="username">
+                </div>
+                <div class="input-wrapper">
+                    <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password">
+                </div>
+                <div class="error-message" id="login-error">Error message placeholder</div>
+                <button type="submit" class="btn-primary">Log In</button>
+            </form>
+            <div class="auth-switch">
+                Don't have an account? <a href="#" id="show-signup-btn">Sign up</a>
+            </div>
+        </div>
+
+        <!-- Signup Card (hidden by default) -->
+        <div class="auth-card" id="signup-card" style="display: none;">
+            <div class="logo-container">
+                <div class="brand-header-container" style="justify-content: center; margin-bottom: 10px;">
+                    <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img" style="width: 40px; height: 40px;">
+                    <span class="insta-logo-text" style="font-size: 2.2rem;">Spotlite</span>
+                </div>
+            </div>
+            <form class="auth-form" id="signup-form">
+                <div class="input-wrapper">
+                    <input type="email" id="signup-email" placeholder="Email address" required autocomplete="email">
+                </div>
+                <div class="input-wrapper">
+                    <input type="text" id="signup-username" placeholder="Username" required autocomplete="username">
+                </div>
+                <div class="input-wrapper">
+                    <input type="password" id="signup-password" placeholder="Password" required autocomplete="new-password">
+                </div>
+                <div class="error-message" id="signup-error">Error message placeholder</div>
+                <button type="submit" class="btn-primary">Sign Up</button>
+            </form>
+            <div class="auth-switch">
+                Have an account? <a href="#" id="show-login-btn">Log in</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Inline toggle between Login & Signup cards
+        const loginCard = document.getElementById('login-card');
+        const signupCard = document.getElementById('signup-card');
+        const showSignupBtn = document.getElementById('show-signup-btn');
+        const showLoginBtn = document.getElementById('show-login-btn');
+
+        showSignupBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginCard.style.display = 'none';
+            signupCard.style.display = 'block';
+        });
+
+        showLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            signupCard.style.display = 'none';
+            loginCard.style.display = 'block';
+        });
+
+        // Initialize Authentication Handlers (defined in app.js)
+        document.addEventListener('DOMContentLoaded', () => {
+            initAuthPage();
+        });
+    </script>
+</body>
+</html>

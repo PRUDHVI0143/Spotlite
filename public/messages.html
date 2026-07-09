@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotlite • Chats</title>
+    <link rel="icon" type="image/png" href="spotlite.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar Navigation (Desktop & Tablet) -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <a href="index.html" class="brand-header-container">
+                    <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img">
+                    <span class="insta-logo-text">Spotlite</span>
+                </a>
+            </div>
+            <ul class="sidebar-menu">
+                <li class="menu-item">
+                    <a href="index.html">
+                        <svg viewBox="0 0 24 24"><path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A3 3 0 0 1 15 16.545V22h-5.995v-5.455Z" fill="none"/><path d="M12 .726a1 1 0 0 0-1.28.053l-8.995 8.16A1 1 0 0 0 2.414 10.5H5v10.5a1 1 0 0 0 1 1h4v-5.455a2 2 0 0 1 2-2 2 2 0 0 1 2 2V22h4a1 1 0 0 0 1-1V10.5h2.586a1 1 0 0 0 .689-1.56l-8.995-8.161A1 1 0 0 0 12 .726Z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                        <span>Home</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <button id="sidebar-search-btn">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke-width="2"/></svg>
+                        <span>Search</span>
+                    </button>
+                </li>
+                <li class="menu-item active">
+                    <a href="messages.html">
+                        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2"/></svg>
+                        <span>Messages</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <button id="open-create-btn">
+                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="16" stroke-width="2"/><line x1="8" y1="12" x2="16" y2="12" stroke-width="2"/></svg>
+                        <span>Create</span>
+                    </button>
+                </li>
+                <li class="menu-item">
+                    <a href="#" id="sidebar-profile-link">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke-width="2"/><path d="M6 19.5c1-2.5 3-4.5 6-4.5s5 2 6 4.5" stroke-width="2"/></svg>
+                        <span>Profile</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <button id="open-settings-btn">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="2" fill="none"/></svg>
+                        <span>Settings</span>
+                    </button>
+                </li>
+                <li class="menu-item" style="margin-top: auto;">
+                    <button id="logout-btn">
+                        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2" stroke-linecap="round"/><polyline points="16 17 21 12 16 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke-width="2" stroke-linecap="round"/></svg>
+                        <span>Log Out</span>
+                    </button>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Bottom Navigation (Mobile Only) -->
+        <nav class="bottom-nav">
+            <ul class="bottom-nav-menu">
+                <li>
+                    <a href="index.html">
+                        <svg viewBox="0 0 24 24"><path d="M12 .726a1 1 0 0 0-1.28.053l-8.995 8.16A1 1 0 0 0 2.414 10.5H5v10.5a1 1 0 0 0 1 1h4v-5.455a2 2 0 0 1 2-2 2 2 0 0 1 2 2V22h4a1 1 0 0 0 1-1V10.5h2.586a1 1 0 0 0 .689-1.56l-8.995-8.161A1 1 0 0 0 12 .726Z" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    </a>
+                </li>
+                <li>
+                    <button id="mobile-open-create-btn">
+                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="16" stroke-width="2"/><line x1="8" y1="12" x2="16" y2="12" stroke-width="2"/></svg>
+                    </button>
+                </li>
+                <li>
+                    <a href="#" id="mobile-profile-link">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke-width="2"/><path d="M6 19.5c1-2.5 3-4.5 6-4.5s5 2 6 4.5" stroke-width="2"/></svg>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content" style="padding-top: 30px; padding-bottom: 30px; display: flex; align-items: center; justify-content: center;">
+            <!-- Messages Container Box -->
+            <div class="messages-layout">
+                <!-- Contacts Panel -->
+                <div class="messages-inbox">
+                    <div class="inbox-header">
+                        <h2>Messages</h2>
+                        <button id="inbox-new-chat-btn" style="color: var(--accent-gold); font-weight: 600; font-size: 0.9rem;">New Chat</button>
+                    </div>
+                    <div class="inbox-list" id="conversations-inbox-list">
+                        <!-- Dynamic active conversations loaded by app.js -->
+                    </div>
+                </div>
+
+                <!-- Chat Area Panel -->
+                <div class="messages-chat-window" id="chat-window-area">
+                    <!-- Default Empty State -->
+                    <div class="chat-empty-state" id="chat-empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <h3>Your Messages</h3>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Send private photos and messages to a friend or group.</p>
+                        <button class="btn-primary" id="empty-state-new-chat-btn" style="margin-top: 10px; padding: 10px 24px;">Send Message</button>
+                    </div>
+
+                    <!-- Active Chat (hidden by default) -->
+                    <div class="chat-window-active" id="chat-window-active" style="display: none; flex-direction: column; height: 100%;">
+                        <div class="chat-header">
+                            <img src="" alt="Avatar" class="chat-header-avatar" id="active-chat-avatar">
+                            <span class="chat-header-username" id="active-chat-username">username</span>
+                        </div>
+                        
+                        <div class="chat-thread" id="active-chat-thread">
+                            <!-- Dynamic messages loaded here -->
+                        </div>
+                        
+                        <div class="chat-input-wrapper">
+                            <button class="chat-input-icon-btn" id="chat-quick-heart-btn" title="Send Heart">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="heart-svg"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            </button>
+                            <input type="text" class="chat-input" id="chat-text-input" placeholder="Message...">
+                            <button class="chat-send-btn" id="chat-send-btn">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- CREATE POST MODAL -->
+    <div class="modal-overlay" id="create-post-modal-overlay">
+        <div class="modal-content create-post-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Create new post</h3>
+                <button class="modal-close-btn" id="close-create-modal">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <button class="modal-next-btn" id="submit-post-btn">Share</button>
+            </div>
+            
+            <div class="drag-drop-area" id="drop-area">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <p>Drag photos here or click to upload</p>
+                <label for="post-file-input" style="color: var(--accent-blue); font-weight: 600; cursor: pointer;">Select from computer</label>
+                <input type="file" id="post-file-input" accept="image/*" style="display: none;">
+                
+                <p style="margin-top: 15px; font-size: 0.85rem;">Or paste an image URL:</p>
+                <input type="text" id="post-url-input" placeholder="https://example.com/image.jpg" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; color: var(--text-primary); width: 80%; font-size: 0.85rem;">
+            </div>
+
+            <div class="preview-container" id="image-preview-container">
+                <img src="" alt="Preview" class="preview-image" id="preview-img-element">
+                <button class="remove-preview-btn" id="remove-preview-btn">&times;</button>
+            </div>
+
+            <div class="modal-caption-area" id="caption-area" style="display: none;">
+                <textarea class="caption-textarea" id="post-caption-input" placeholder="Write a caption..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEARCH PANEL SLIDEOUT -->
+    <div class="search-slider-panel" id="search-slider-panel">
+        <h2 class="search-header">Search</h2>
+        <div class="search-input-wrapper">
+            <input type="text" id="search-users-input" placeholder="Search accounts...">
+        </div>
+        <div class="search-results-list" id="search-results-list">
+            <!-- Dynamic search results loaded here -->
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settings-modal-overlay">
+        <div class="modal-content settings-modal">
+            <h2 class="settings-tab-title">Settings</h2>
+            
+            <!-- Privacy Section -->
+            <div class="privacy-toggle-wrapper">
+                <div class="privacy-label">
+                    <span class="privacy-title">Private Account</span>
+                    <span class="privacy-desc">Only people you approve can see your photos.</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="privacy-toggle-input">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Password Reset Section -->
+            <div class="form-group" style="margin-top: 10px;">
+                <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 8px;">Change Password</h3>
+                <label for="settings-old-password">Current Password</label>
+                <input type="password" id="settings-old-password" placeholder="Current password">
+            </div>
+            <div class="form-group">
+                <label for="settings-new-password">New Password</label>
+                <input type="password" id="settings-new-password" placeholder="New password">
+            </div>
+            
+            <div class="error-message" id="settings-error" style="color: var(--accent-red); font-size: 0.85rem; display: none;"></div>
+            <div class="success-message" id="settings-success" style="color: #27ae60; font-size: 0.85rem; display: none; font-weight: 600;"></div>
+
+            <div class="edit-profile-actions">
+                <button class="btn-secondary" id="close-settings-btn">Close</button>
+                <button class="btn-primary" id="save-settings-btn" style="margin-top: 0; padding: 10px 20px;">Update Password</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initMessagesPage();
+        });
+    </script>
+</body>
+</html>
