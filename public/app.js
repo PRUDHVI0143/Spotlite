@@ -834,7 +834,11 @@ async function sendShare() {
             await fetch(`${API_BASE}/messages`, {
                 method: 'POST',
                 headers: getHeaders(),
-                body: JSON.stringify({ receiverId: uid, text: msg })
+                body: JSON.stringify({ 
+                    receiverId: uid, 
+                    text: msg,
+                    sharedPostId: _shareCurrentPostId
+                })
             });
         } catch (e) { /* ignore individual failures */ }
     }
@@ -1885,11 +1889,32 @@ async function loadMessagesHistory() {
         messages.forEach(msg => {
             const isMe = msg.sender === currentUser.id;
             const bubble = document.createElement('div');
-            bubble.className = `message-bubble ${isMe ? 'me' : 'other'}`;
-            bubble.innerHTML = `
-                ${escapeHtml(msg.text)}
-                <span class="message-time">${formatTime(msg.createdAt)}</span>
-            `;
+            
+            if (msg.sharedPostId) {
+                bubble.className = `message-bubble ${isMe ? 'me' : 'other'} shared-post-bubble`;
+                const post = msg.sharedPostId;
+                const authorUsername = post.author ? post.author.username : 'user';
+                const authorAvatar = post.author && post.author.avatar ? post.author.avatar : `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${authorUsername}`;
+                const postCaption = post.caption ? (post.caption.length > 60 ? post.caption.substring(0, 60) + '...' : post.caption) : '';
+                
+                bubble.innerHTML = `
+                    <div class="shared-post-card" onclick="openPostDetailModal('${post._id}')">
+                        <div class="shared-post-header">
+                            <img src="${authorAvatar}" class="shared-post-avatar" alt="">
+                            <span class="shared-post-username">${authorUsername}</span>
+                        </div>
+                        <img src="${post.image}" class="shared-post-image" alt="">
+                        ${postCaption ? `<p class="shared-post-caption">${escapeHtml(postCaption)}</p>` : ''}
+                    </div>
+                    <span class="message-time">${formatTime(msg.createdAt)}</span>
+                `;
+            } else {
+                bubble.className = `message-bubble ${isMe ? 'me' : 'other'}`;
+                bubble.innerHTML = `
+                    ${escapeHtml(msg.text)}
+                    <span class="message-time">${formatTime(msg.createdAt)}</span>
+                `;
+            }
             thread.appendChild(bubble);
         });
 

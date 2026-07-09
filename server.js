@@ -80,7 +80,8 @@ const Post = mongoose.model('Post', PostSchema);
 const MessageSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  text: { type: String, required: true }
+  text: { type: String, required: true },
+  sharedPostId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' }
 }, { timestamps: true });
 
 const Message = mongoose.model('Message', MessageSchema);
@@ -529,14 +530,15 @@ app.get('/api/users/search', authenticateToken, async (req, res) => {
 // 14. Send Direct Message
 app.post('/api/messages', authenticateToken, async (req, res) => {
   try {
-    const { receiverId, text } = req.body;
-    if (!receiverId || !text || text.trim() === '') {
-      return res.status(400).json({ error: 'Receiver and text are required.' });
+    const { receiverId, text, sharedPostId } = req.body;
+    if (!receiverId || (!text && !sharedPostId)) {
+      return res.status(400).json({ error: 'Receiver and message content are required.' });
     }
     const message = new Message({
       sender: req.user.id,
       receiver: receiverId,
-      text: text.trim()
+      text: text ? text.trim() : '📸 Shared a post',
+      sharedPostId: sharedPostId || undefined
     });
     await message.save();
     res.status(201).json(message);
@@ -555,7 +557,12 @@ app.get('/api/messages/:userId', authenticateToken, async (req, res) => {
         { sender: currentUserId, receiver: otherUserId },
         { sender: otherUserId, receiver: currentUserId }
       ]
-    }).sort({ createdAt: 1 });
+    })
+    .populate({
+      path: 'sharedPostId',
+      populate: { path: 'author', select: 'username avatar' }
+    })
+    .sort({ createdAt: 1 });
     res.json(messages);
   } catch (error) {
     res.status(500).json({ error: 'Failed to get messages.' });

@@ -2236,3 +2236,59 @@ input:checked+.slider:before {
     gap: 8px;
     flex: 1;
 }
+
+/* --- Shared Post in Chat Message --- */
+.message-bubble.shared-post-bubble {
+    padding: 8px;
+    max-width: 280px;
+    border-radius: 14px;
+}
+
+.shared-post-card {
+    background: #0a0a0a;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.shared-post-card:hover {
+    transform: scale(1.02);
+    border-color: var(--accent-gold);
+}
+
+.shared-post-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.shared-post-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.shared-post-username {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.shared-post-image {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+}
+
+.shared-post-caption {
+    font-size: 0.8rem;
+    padding: 8px 10px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.3;
+}

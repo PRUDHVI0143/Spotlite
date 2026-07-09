@@ -214,6 +214,48 @@
         </div>
     </div>
 
+    <!-- POST DETAIL MODAL (GRID ITEM CLICKED) -->
+    <div class="modal-overlay" id="post-detail-modal-overlay">
+        <div class="modal-content detail-modal" id="post-detail-modal-content">
+            <!-- Left Side: Image -->
+            <div class="detail-image-side">
+                <img src="" alt="Post Image" id="detail-post-img">
+            </div>
+            
+            <!-- Right Side: Metadata, Likes, comments list -->
+            <div class="detail-comment-side">
+                <!-- Header -->
+                <div class="post-header" style="border-bottom: 1px solid var(--border-color);">
+                    <div class="post-author-info" id="detail-author-nav">
+                        <img src="" alt="Avatar" class="post-avatar" id="detail-post-avatar">
+                        <span class="post-username" id="detail-post-username">username</span>
+                    </div>
+                </div>
+
+                <!-- Comments Area -->
+                <div class="detail-comments-box" id="detail-comments-list">
+                    <!-- Post caption followed by replies -->
+                </div>
+
+                <!-- Action Bar -->
+                <div class="post-actions" style="border-top: 1px solid var(--border-color);">
+                    <div class="post-actions-left">
+                        <button class="action-btn" id="detail-like-btn">
+                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="post-likes-count" id="detail-likes-count">0 likes</div>
+                
+                <!-- Comment Input -->
+                <div class="comment-input-wrapper">
+                    <input type="text" class="comment-input" id="detail-comment-input" placeholder="Add a comment...">
+                    <button class="comment-submit-btn" id="detail-comment-submit-btn">Post</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
