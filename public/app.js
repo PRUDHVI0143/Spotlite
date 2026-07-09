@@ -61,12 +61,183 @@ function formatTime(dateString) {
     return `${diffDays}d ago`;
 }
 
+// Global Notification Service Variables & Helpers
+let isNotificationServiceStarted = false;
+let globalLastMessageTimes = {};
+
+function playNotificationSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        
+        // Premium two-tone chime
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(880, now); // A5
+        gain1.gain.setValueAtTime(0.08, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.15);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(659.25, now + 0.08); // E5
+        gain2.gain.setValueAtTime(0.1, now + 0.08);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.08);
+        osc2.stop(now + 0.4);
+    } catch (e) {
+        console.warn('AudioContext failed:', e);
+    }
+}
+
+function showInAppNotification(title, body, avatarUrl) {
+    let container = document.getElementById('toast-notification-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-notification-container';
+        container.style.position = 'fixed';
+        container.style.top = '25px';
+        container.style.right = '25px';
+        container.style.zIndex = '99999';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.gap = '12px';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '12px';
+    toast.style.background = 'rgba(18, 18, 18, 0.95)';
+    toast.style.backdropFilter = 'blur(12px)';
+    toast.style.border = '1px solid rgba(255, 215, 0, 0.25)'; // Gold border
+    toast.style.color = '#ffffff';
+    toast.style.padding = '12px 16px';
+    toast.style.borderRadius = '12px';
+    toast.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
+    toast.style.transform = 'translateX(130%)';
+    toast.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    toast.style.maxWidth = '320px';
+    toast.style.cursor = 'pointer';
+
+    // Click on toast takes user to messages page
+    toast.addEventListener('click', () => {
+        window.location.href = `messages.html?u=${title}`;
+    });
+
+    const img = document.createElement('img');
+    img.src = avatarUrl || 'spotlite.png';
+    img.style.width = '40px';
+    img.style.height = '40px';
+    img.style.borderRadius = '50%';
+    img.style.objectFit = 'cover';
+    img.style.border = '1px solid rgba(255, 215, 0, 0.2)';
+
+    const info = document.createElement('div');
+    info.style.display = 'flex';
+    info.style.flexDirection = 'column';
+    info.style.overflow = 'hidden';
+
+    const sender = document.createElement('span');
+    sender.textContent = title;
+    sender.style.fontWeight = '700';
+    sender.style.fontSize = '0.9rem';
+    sender.style.color = '#ffd700'; // Spotlite Gold
+
+    const msgPreview = document.createElement('span');
+    msgPreview.textContent = body;
+    msgPreview.style.fontSize = '0.82rem';
+    msgPreview.style.color = '#cccccc';
+    msgPreview.style.whiteSpace = 'nowrap';
+    msgPreview.style.overflow = 'hidden';
+    msgPreview.style.textOverflow = 'ellipsis';
+
+    info.appendChild(sender);
+    info.appendChild(msgPreview);
+    toast.appendChild(img);
+    toast.appendChild(info);
+    container.appendChild(toast);
+
+    // Slide in
+    setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+    }, 100);
+
+    // Slide out
+    setTimeout(() => {
+        toast.style.transform = 'translateX(130%)';
+        setTimeout(() => toast.remove(), 400);
+    }, 4500);
+}
+
+function setupGlobalNotificationService() {
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    if (!currentUser) return;
+
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
+    checkNewMessages(true);
+    // Poll for new messages list every 4 seconds
+    setInterval(() => checkNewMessages(false), 4000);
+}
+
+async function checkNewMessages(isInitial = false) {
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    if (!currentUser) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/messages/conversations/list`, {
+            headers: getHeaders()
+        });
+        const conversations = await response.json();
+        if (!response.ok) return;
+
+        conversations.forEach(c => {
+            const userId = c.user._id;
+            const lastMsgTime = new Date(c.lastMessageTime).getTime();
+
+            // If we have a tracked timestamp, and the new message is newer than what we recorded
+            if (globalLastMessageTimes[userId] && lastMsgTime > globalLastMessageTimes[userId]) {
+                const isCurrentActiveChat = (window.location.pathname.includes('messages.html') && typeof activeChatReceiverId !== 'undefined' && activeChatReceiverId === userId);
+
+                if (!isCurrentActiveChat) {
+                    showInAppNotification(c.user.username, c.lastMessage, c.user.avatar);
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification(c.user.username, {
+                            body: c.lastMessage,
+                            icon: c.user.avatar || 'spotlite.png'
+                        });
+                    }
+                    playNotificationSound();
+                }
+            }
+            globalLastMessageTimes[userId] = lastMsgTime;
+        });
+    } catch (err) {
+        console.error('Notification service error:', err);
+    }
+}
+
 // Check auth status
 function checkAuth() {
     const token = localStorage.getItem('token');
     if (!token && !window.location.pathname.includes('auth.html')) {
         window.location.href = 'auth.html';
         return false;
+    }
+    if (token && !isNotificationServiceStarted) {
+        isNotificationServiceStarted = true;
+        setupGlobalNotificationService();
     }
     return true;
 }
