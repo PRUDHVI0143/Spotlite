@@ -363,6 +363,16 @@ function setupCreatePostModal() {
     const submitBtn = document.getElementById('submit-post-btn');
     const captionInput = document.getElementById('post-caption-input');
 
+    if (previewImg) {
+        previewImg.onerror = () => {
+            const currentSrc = previewImg.getAttribute('src');
+            if (currentSrc && currentSrc !== '') {
+                alert("Failed to load post image preview. Please make sure the URL is a direct link to an image (e.g. ending in .jpg, .png) and is publicly accessible.");
+                resetModal();
+            }
+        };
+    }
+
     if (!modal) return;
 
     function openModal() {
@@ -1380,6 +1390,27 @@ function setupEditProfileModal() {
             }
         }
     });
+
+    // Update preview when typing/pasting URL
+    avatarUrlInput.addEventListener('input', () => {
+        const url = avatarUrlInput.value.trim();
+        if (url) {
+            avatarPreview.src = url;
+            localBase64Avatar = ''; // Reset file selection
+        }
+    });
+
+    if (avatarPreview) {
+        avatarPreview.onerror = () => {
+            const currentSrc = avatarPreview.getAttribute('src');
+            if (currentSrc && currentSrc !== '' && !currentSrc.includes('dicebear.com')) {
+                alert("Failed to load avatar image. Please enter a valid, public direct image URL (e.g. ending in .jpg, .png).");
+                avatarPreview.src = `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=default`;
+                avatarUrlInput.value = '';
+                localBase64Avatar = '';
+            }
+        };
+    }
 
     // Save profile changes
     saveBtn.addEventListener('click', async () => {
