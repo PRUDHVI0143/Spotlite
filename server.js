@@ -19,6 +19,31 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Connect to MongoDB (serverless-safe cached connection)
 let isConnected = false;
 
+async function seedAdmin() {
+  try {
+    const adminUsername = 'admin';
+    const adminEmail = 'admin@spotlite.com';
+    const adminPassword = 'adminpassword123';
+
+    const existingAdmin = await User.findOne({ username: adminUsername });
+    if (!existingAdmin) {
+      const bcrypt = require('bcryptjs');
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      const adminUser = new User({
+        username: adminUsername,
+        email: adminEmail,
+        password: hashedPassword,
+        bio: 'Spotlite Administrator',
+        isAdmin: true
+      });
+      await adminUser.save();
+      console.log('Default administrator account created successfully.');
+    }
+  } catch (err) {
+    console.error('Failed to seed admin account:', err.message);
+  }
+}
+
 async function connectDB() {
   if (isConnected) return;
   try {
@@ -28,6 +53,7 @@ async function connectDB() {
     });
     isConnected = true;
     console.log('Connected to MongoDB successfully.');
+    await seedAdmin();
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
     throw err;
@@ -53,6 +79,7 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   avatar: { type: String, default: '' }, // base64 or url
   bio: { type: String, default: '' },
+  isAdmin: { type: Boolean, default: false },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, { timestamps: true });
@@ -149,6 +176,7 @@ app.post('/api/auth/register', async (req, res) => {
         email: user.email,
         avatar: user.avatar,
         bio: user.bio,
+        isAdmin: user.isAdmin,
         followersCount: 0,
         followingCount: 0
       }
@@ -180,7 +208,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid username or password.' });
     }
 
-    const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id, username: user.username, isAdmin: user.isAdmin }, JWT_SECRET, { expiresIn: '7d' });
 
     res.json({
       token,
@@ -190,6 +218,7 @@ app.post('/api/auth/login', async (req, res) => {
         email: user.email,
         avatar: user.avatar,
         bio: user.bio,
+        isAdmin: user.isAdmin,
         followersCount: user.followers.length,
         followingCount: user.following.length
       }
@@ -212,6 +241,7 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
       email: user.email,
       avatar: user.avatar,
       bio: user.bio,
+      isAdmin: user.isAdmin,
       followersCount: user.followers.length,
       followingCount: user.following.length,
       following: user.following
@@ -658,8 +688,8 @@ app.delete('/api/posts/:id', authenticateToken, async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ error: 'Post not found.' });
 
-    // Verify ownership
-    if (post.author.toString() !== req.user.id) {
+    // Verify ownership or admin access
+    if (post.author.toString() !== req.user.id && !req.user.isAdmin) {
       return res.status(403).json({ error: 'Unauthorized to delete this post.' });
     }
 
@@ -701,8 +731,8 @@ app.delete('/api/posts/:postId/comments/:commentId', authenticateToken, async (r
     const comment = post.comments.id(req.params.commentId);
     if (!comment) return res.status(404).json({ error: 'Comment not found.' });
 
-    // Authorized if user is the comment author OR the post owner
-    if (comment.user.toString() !== req.user.id && post.author.toString() !== req.user.id) {
+    // Authorized if user is the comment author, post owner, or admin
+    if (comment.user.toString() !== req.user.id && post.author.toString() !== req.user.id && !req.user.isAdmin) {
       return res.status(403).json({ error: 'Unauthorized to delete this comment.' });
     }
 
@@ -712,6 +742,30 @@ app.delete('/api/posts/:postId/comments/:commentId', authenticateToken, async (r
     res.json({ message: 'Comment deleted successfully.', commentsCount: post.comments.length });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete comment.' });
+  }
+});
+
+// 22. Delete User Account (Admin Only)
+app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required.' });
+    }
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) return res.status(404).json({ error: 'User not found.' });
+    if (targetUser.username === 'admin') {
+      return res.status(400).json({ error: 'Cannot delete the main admin account.' });
+    }
+    
+    // Delete all posts by this user
+    await Post.deleteMany({ author: req.params.id });
+    
+    // Remove user account
+    await User.findByIdAndDelete(req.params.id);
+    
+    res.json({ message: 'User account and all associated posts deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete user account.' });
   }
 });
 

@@ -841,30 +841,33 @@ function createPostCard(post) {
             
             const currentUser = JSON.parse(localStorage.getItem('user'));
             const isOwner = currentUser && post.author && (post.author._id || post.author) === currentUser.id;
+            const isAdmin = currentUser && currentUser.isAdmin;
 
-            if (isOwner) {
-                menuOptions.push({
-                    label: 'Edit Post',
-                    onClick: () => {
-                        showPromptModal('Edit Caption', post.caption || '', async (newCaption) => {
-                            try {
-                                const res = await fetch(`${API_BASE}/posts/${post._id}`, {
-                                    method: 'PUT',
-                                    headers: getHeaders(),
-                                    body: JSON.stringify({ caption: newCaption })
-                                });
-                                const updatedPost = await res.json();
-                                if (!res.ok) throw new Error(updatedPost.error);
-                                
-                                const captionTextEl = card.querySelector(`#caption-text-${post._id}`);
-                                if (captionTextEl) captionTextEl.textContent = newCaption;
-                                post.caption = newCaption;
-                            } catch (err) {
-                                alert(err.message);
-                            }
-                        });
-                    }
-                });
+            if (isOwner || isAdmin) {
+                if (isOwner) {
+                    menuOptions.push({
+                        label: 'Edit Post',
+                        onClick: () => {
+                            showPromptModal('Edit Caption', post.caption || '', async (newCaption) => {
+                                try {
+                                    const res = await fetch(`${API_BASE}/posts/${post._id}`, {
+                                        method: 'PUT',
+                                        headers: getHeaders(),
+                                        body: JSON.stringify({ caption: newCaption })
+                                    });
+                                    const updatedPost = await res.json();
+                                    if (!res.ok) throw new Error(updatedPost.error);
+                                    
+                                    const captionTextEl = card.querySelector(`#caption-text-${post._id}`);
+                                    if (captionTextEl) captionTextEl.textContent = newCaption;
+                                    post.caption = newCaption;
+                                } catch (err) {
+                                    alert(err.message);
+                                }
+                            });
+                        }
+                    });
+                }
 
                 menuOptions.push({
                     label: 'Delete Post',
@@ -1359,6 +1362,38 @@ async function loadProfileHeader(username) {
             };
         }
 
+        // Setup Admin action row visibility and trigger
+        const adminActionsRow = document.getElementById('admin-actions-row');
+        const adminDeleteBtn = document.getElementById('admin-delete-user-btn');
+
+        if (adminActionsRow && adminDeleteBtn) {
+            const isAdmin = currentUser && currentUser.isAdmin;
+            const isOwnProfile = currentUser && currentUser.username === username.toLowerCase();
+
+            if (isAdmin && !isOwnProfile) {
+                adminActionsRow.style.display = 'block';
+                adminDeleteBtn.onclick = async () => {
+                    if (confirm(`ADMIN WARNING: Are you sure you want to delete the user account "${data.username}" and all of their posts? This action CANNOT be undone.`)) {
+                        try {
+                            const res = await fetch(`${API_BASE}/users/${data.id}`, {
+                                method: 'DELETE',
+                                headers: getHeaders()
+                            });
+                            const resData = await res.json();
+                            if (!res.ok) throw new Error(resData.error);
+
+                            alert('User account deleted successfully!');
+                            window.location.href = 'index.html';
+                        } catch (err) {
+                            alert(err.message);
+                        }
+                    }
+                };
+            } else {
+                adminActionsRow.style.display = 'none';
+            }
+        }
+
         if (currentUser && currentUser.username === username.toLowerCase()) {
             // OWN profile – show edit button only
             editBtn.style.display = 'block';
@@ -1677,6 +1712,7 @@ async function openPostDetailModal(postId) {
                 const commentUserObjectId = author._id || author.id || c.user;
                 const isCommentOwner = currentUser && (commentUserObjectId === currentUser.id);
                 const isPostOwner = currentUser && targetPost.author && ((targetPost.author._id || targetPost.author) === currentUser.id);
+                const isAdmin = currentUser && currentUser.isAdmin;
 
                 div.innerHTML = `
                     <img src="${avatarSrc}" class="comment-item-avatar" alt="">
@@ -1685,7 +1721,7 @@ async function openPostDetailModal(postId) {
                         <span class="comment-text" id="comment-text-${c._id}">${escapeHtml(c.text)}</span>
                         <div style="font-size:0.75rem; color: var(--text-muted); margin-top: 4px;">${formatTime(c.createdAt || new Date())}</div>
                     </div>
-                    ${(isCommentOwner || isPostOwner) ? `
+                    ${(isCommentOwner || isPostOwner || isAdmin) ? `
                     <button class="comment-options-btn" style="position: absolute; right: 4px; top: 12px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.85rem; padding: 4px;" title="Comment Options">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
                     </button>
@@ -1724,7 +1760,7 @@ async function openPostDetailModal(postId) {
                             });
                         }
 
-                        if (isCommentOwner || isPostOwner) {
+                        if (isCommentOwner || isPostOwner || isAdmin) {
                             commOptions.push({
                                 label: 'Delete Comment',
                                 danger: true,
