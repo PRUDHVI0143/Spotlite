@@ -45,6 +45,44 @@ function fileToBase64(file) {
     });
 }
 
+// Utility: Compress image on client side using canvas
+function compressImage(file, maxWidth = 1080, maxHeight = 1080, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                resolve(compressedBase64);
+            };
+            img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+    });
+}
+
 // Utility: Format timestamp (e.g. "3 hours ago" or "2 days ago")
 function formatTime(dateString) {
     const date = new Date(dateString);
@@ -268,6 +306,10 @@ function setupGlobalNotificationService() {
     checkNewMessages(true);
     // Poll for new messages list every 4 seconds
     setInterval(() => checkNewMessages(false), 4000);
+
+    checkNotifications();
+    // Poll for notifications every 10 seconds
+    setInterval(checkNotifications, 10000);
 }
 
 async function checkNewMessages(isInitial = false) {
@@ -305,6 +347,150 @@ async function checkNewMessages(isInitial = false) {
     } catch (err) {
         console.error('Notification service error:', err);
     }
+}
+
+let globalLastNotificationTime = 0;
+
+function getNotificationText(n) {
+    switch (n.type) {
+        case 'like': return 'liked your post';
+        case 'comment': return 'commented on your post';
+        case 'follow': return 'started following you';
+        case 'mention': return 'mentioned you in a comment';
+        default: return 'sent you a notification';
+    }
+}
+
+async function checkNotifications() {
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    if (!currentUser) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/notifications`, {
+            headers: getHeaders()
+        });
+        const notifications = await response.json();
+        if (!response.ok) return;
+
+        const unread = notifications.filter(n => !n.isRead);
+        const count = unread.length;
+
+        const badge = document.getElementById('notif-count-badge');
+        const mobBadge = document.getElementById('mobile-notif-count-badge');
+
+        if (badge) {
+            badge.style.display = count > 0 ? 'inline-block' : 'none';
+            badge.textContent = count;
+        }
+        if (mobBadge) {
+            mobBadge.style.display = count > 0 ? 'inline-block' : 'none';
+            mobBadge.textContent = count;
+        }
+
+        if (notifications.length > 0) {
+            const latest = notifications[0];
+            const latestTime = new Date(latest.createdAt).getTime();
+
+            if (globalLastNotificationTime > 0 && latestTime > globalLastNotificationTime) {
+                if (!latest.isRead) {
+                    showInAppNotification(latest.sender.username, getNotificationText(latest), latest.sender.avatar);
+                    playNotificationSound();
+                }
+            }
+            globalLastNotificationTime = Math.max(globalLastNotificationTime, latestTime);
+        }
+    } catch (e) {
+        console.error('Notifications check error:', e);
+    }
+}
+
+function setupNotificationsSliderPanel() {
+    const sidebarBtn = document.getElementById('sidebar-notifications-btn');
+    const mobileBtn = document.getElementById('mobile-notifications-btn');
+    const panel = document.getElementById('notifications-slider-panel');
+    const list = document.getElementById('notifications-list');
+
+    if (!panel || !list) return;
+
+    async function openPanel() {
+        panel.classList.add('active');
+        const searchPanel = document.getElementById('search-slider-panel');
+        if (searchPanel) searchPanel.classList.remove('active');
+
+        list.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding: 20px;">Loading...</p>';
+        try {
+            const res = await fetch(`${API_BASE}/notifications`, {
+                headers: getHeaders()
+            });
+            const notifications = await res.json();
+            if (!res.ok) throw new Error(notifications.error);
+
+            if (notifications.length === 0) {
+                list.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">No notifications yet.</div>`;
+                return;
+            }
+
+            list.innerHTML = '';
+            notifications.forEach(n => {
+                const row = document.createElement('div');
+                row.className = `notification-item ${n.isRead ? '' : 'unread'}`;
+                row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border-color);cursor:pointer;';
+                
+                const relativeTime = formatTime(n.createdAt);
+                const text = getNotificationText(n);
+                
+                row.innerHTML = `
+                    <img src="${n.sender.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${n.sender.username}`}"
+                         style="width:42px;height:42px;border-radius:50%;object-fit:cover;" alt="">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+                        <span style="font-size:0.88rem;color:var(--text-primary);">
+                            <strong style="font-weight:600;" onclick="window.location.href='profile.html?u=${n.sender.username}'">${n.sender.username}</strong> ${text}
+                        </span>
+                        <span style="font-size:0.75rem;color:var(--text-muted);">${relativeTime}</span>
+                    </div>
+                `;
+
+                if (n.type === 'like' || n.type === 'comment' || n.type === 'mention') {
+                    row.onclick = (e) => {
+                        if (e.target.tagName !== 'STRONG') {
+                            if (n.post) openPostDetailModal(n.post._id || n.post);
+                        }
+                    };
+                } else if (n.type === 'follow') {
+                    row.onclick = (e) => {
+                        if (e.target.tagName !== 'STRONG') {
+                            window.location.href = `profile.html?u=${n.sender.username}`;
+                        }
+                    };
+                }
+
+                list.appendChild(row);
+            });
+
+            // Mark notifications as read
+            fetch(`${API_BASE}/notifications/mark-read`, {
+                method: 'POST',
+                headers: getHeaders()
+            }).then(() => checkNotifications());
+
+        } catch (err) {
+            console.error('Error loading panel notifications:', err);
+            list.innerHTML = '<p style="color:var(--accent-red); text-align:center; padding: 20px;">Could not load notifications</p>';
+        }
+    }
+
+    function closePanel() {
+        panel.classList.remove('active');
+    }
+
+    if (sidebarBtn) sidebarBtn.onclick = (e) => { e.stopPropagation(); openPanel(); };
+    if (mobileBtn) mobileBtn.onclick = (e) => { e.stopPropagation(); openPanel(); };
+
+    document.addEventListener('click', (e) => {
+        if (panel.classList.contains('active') && !panel.contains(e.target) && e.target !== sidebarBtn && e.target !== mobileBtn) {
+            closePanel();
+        }
+    });
 }
 
 // Check auth status
@@ -349,6 +535,8 @@ function setupNavigationLinks() {
             window.location.href = `profile.html?u=${currentUser.username}`;
         });
     }
+
+    setupNotificationsSliderPanel();
 }
 
 // =============================================================
@@ -357,8 +545,20 @@ function setupNavigationLinks() {
 function initAuthPage() {
     const loginForm = document.getElementById('login-form');
     const signupForm = document.getElementById('signup-form');
+    const verifyForm = document.getElementById('verify-form');
+
     const loginError = document.getElementById('login-error');
     const signupError = document.getElementById('signup-error');
+    const verifyError = document.getElementById('verify-error');
+    const verifySuccess = document.getElementById('verify-success');
+
+    const verifyCodeInput = document.getElementById('verify-code');
+    const verifyEmailHidden = document.getElementById('verify-email-hidden');
+    const resendBtn = document.getElementById('resend-verify-btn');
+
+    const loginCard = document.getElementById('login-card');
+    const signupCard = document.getElementById('signup-card');
+    const verifyCard = document.getElementById('verify-card');
 
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
@@ -377,6 +577,19 @@ function initAuthPage() {
 
                 const data = await response.json();
                 if (!response.ok) {
+                    // Redirect unverified users to verify card
+                    if (data.emailUnverified) {
+                        if (verifyEmailHidden) verifyEmailHidden.value = data.email;
+                        if (loginCard) loginCard.style.display = 'none';
+                        if (signupCard) signupCard.style.display = 'none';
+                        if (verifyCard) verifyCard.style.display = 'block';
+                        if (verifyError) {
+                            verifyError.textContent = data.error;
+                            verifyError.style.display = 'block';
+                        }
+                        if (verifySuccess) verifySuccess.style.display = 'none';
+                        return;
+                    }
                     throw new Error(data.error || 'Login failed.');
                 }
 
@@ -411,12 +624,101 @@ function initAuthPage() {
                     throw new Error(data.error || 'Signup failed.');
                 }
 
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
-                window.location.href = 'index.html';
+                // Redirect to verify code screen
+                if (verifyEmailHidden) verifyEmailHidden.value = data.email;
+                if (signupCard) signupCard.style.display = 'none';
+                if (loginCard) loginCard.style.display = 'none';
+                if (verifyCard) verifyCard.style.display = 'block';
+                if (verifyError) verifyError.style.display = 'none';
+                if (verifySuccess) {
+                    verifySuccess.textContent = 'Registration successful! A verification code has been sent to your email.';
+                    verifySuccess.style.display = 'block';
+                }
             } catch (err) {
                 signupError.textContent = err.message;
                 signupError.style.display = 'block';
+            }
+        });
+    }
+
+    if (verifyForm) {
+        verifyForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (verifyError) verifyError.style.display = 'none';
+            if (verifySuccess) verifySuccess.style.display = 'none';
+
+            const email = verifyEmailHidden.value;
+            const code = verifyCodeInput.value.trim();
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/verify-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Verification failed.');
+                }
+
+                if (verifySuccess) {
+                    verifySuccess.textContent = 'Account verified successfully! Redirecting...';
+                    verifySuccess.style.display = 'block';
+                }
+
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1500);
+
+            } catch (err) {
+                if (verifyError) {
+                    verifyError.textContent = err.message;
+                    verifyError.style.display = 'block';
+                }
+            }
+        });
+    }
+
+    if (resendBtn) {
+        resendBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (verifyError) verifyError.style.display = 'none';
+            if (verifySuccess) verifySuccess.style.display = 'none';
+
+            const email = verifyEmailHidden.value;
+            if (!email) {
+                alert('Email address not found. Please try logging in again.');
+                return;
+            }
+
+            try {
+                resendBtn.textContent = 'Resending...';
+                const response = await fetch(`${API_BASE}/auth/resend-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Resend code failed.');
+                }
+
+                if (verifySuccess) {
+                    verifySuccess.textContent = data.message || 'Verification code resent successfully!';
+                    verifySuccess.style.display = 'block';
+                }
+            } catch (err) {
+                if (verifyError) {
+                    verifyError.textContent = err.message;
+                    verifyError.style.display = 'block';
+                }
+            } finally {
+                resendBtn.textContent = 'Resend Verification Code';
             }
         });
     }
@@ -470,6 +772,8 @@ function setupCreatePostModal() {
         urlInput.value = '';
         previewImg.src = '';
         captionInput.value = '';
+        const moodSelect = document.getElementById('post-mood-select');
+        if (moodSelect) moodSelect.value = '';
         
         dropArea.style.display = 'flex';
         previewContainer.style.display = 'none';
@@ -497,15 +801,15 @@ function setupCreatePostModal() {
         if (e.target === modal) closeModal();
     });
 
-    // File selection
+    // File selection with client-side canvas compression
     fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
             try {
-                const base64 = await fileToBase64(file);
-                handleImageSelected(base64);
+                const compressedBase64 = await compressImage(file);
+                handleImageSelected(compressedBase64);
             } catch (err) {
-                alert('Error reading file. Please try again.');
+                alert('Error reading or compressing file. Please try again.');
             }
         }
     });
@@ -545,11 +849,59 @@ function setupCreatePostModal() {
         resetModal();
     });
 
+    // Hook AI Caption Generator
+    const aiBtn = document.getElementById('ai-generate-caption-btn');
+    if (aiBtn) {
+        aiBtn.addEventListener('click', () => {
+            const moodSelect = document.getElementById('post-mood-select');
+            const selectedMood = moodSelect ? moodSelect.value : '';
+            
+            const mockCaptions = {
+                '': [
+                    "Living life in high resolution. 📸 #spotlite #lifestyle",
+                    "Moments like these. ✨ #spotlite #vibes",
+                    "Capturing memories one frame at a time. #memory #spotlite"
+                ],
+                'Happy': [
+                    "Good vibes only! 😊 Smiling through it all. #happy #positive #goodvibes #spotlite",
+                    "Find joy in the ordinary. ✨ #joyful #happiness #smile #spotlite",
+                    "Happy mind, happy life. 🌟 #happy #spotlite #positivevibes"
+                ],
+                'Travel': [
+                    "Wanderlust and city dust. ✈️ Exploring new horizons. #travel #adventure #explore #spotlite",
+                    "Travel more, worry less. 🌍 #wanderlust #travelgram #spotlite #explorer",
+                    "Collecting moments, not things. 🗺️ #traveling #scenic #spotlite"
+                ],
+                'Study': [
+                    "Chasing dreams and deadlines. 📚 Knowledge is power. #study #learning #focused #spotlite",
+                    "Deep work session in progress. 🧠 #studymode #motivation #spotlite #education",
+                    "Success is the sum of small efforts. 📖 #studying #growth #spotlite"
+                ],
+                'Fitness': [
+                    "No excuses, just results. 💪 Sweat today, shine tomorrow. #fitness #workout #healthy #spotlite",
+                    "Push your limits. 🏃‍♂️💨 #fitlife #exercise #active #spotlite #gym",
+                    "Consistency is key. 🏋️‍♀️ #health #gymmotivation #spotlite"
+                ],
+                'Coding': [
+                    "Code runs, bugs cry. 💻 Refactoring the world one line at a time. #coding #developer #javascript #spotlite",
+                    "Eat, Sleep, Code, Repeat. 🧠⚙️ #programming #softwareengineer #tech #spotlite",
+                    "Configuring dreams into code. 🚀 #webdev #programmer #buildinpublic #spotlite"
+                ]
+            };
+            
+            const list = mockCaptions[selectedMood] || mockCaptions[''];
+            const randomCaption = list[Math.floor(Math.random() * list.length)];
+            captionInput.value = randomCaption;
+        });
+    }
+
     // Submit / Share Post
     submitBtn.addEventListener('click', async () => {
         if (!selectedPostImageBase64) return;
 
         const caption = captionInput.value;
+        const moodSelect = document.getElementById('post-mood-select');
+        const mood = moodSelect ? moodSelect.value : '';
 
         try {
             submitBtn.textContent = 'Sharing...';
@@ -560,7 +912,8 @@ function setupCreatePostModal() {
                 headers: getHeaders(),
                 body: JSON.stringify({
                     image: selectedPostImageBase64,
-                    caption
+                    caption,
+                    mood
                 })
             });
 
@@ -570,7 +923,8 @@ function setupCreatePostModal() {
             closeModal();
             // Refresh feed or user profile grid
             if (window.location.pathname.includes('profile.html')) {
-                loadProfileGrid();
+                const params = new URLSearchParams(window.location.search);
+                loadProfileGrid(params.get('u'));
             } else {
                 loadFeedPosts();
             }
@@ -594,6 +948,7 @@ async function initFeedPage() {
     setupSearchPanel();
     setupSettingsModal();
     loadCurrentUserCard();
+    setupMoodFilters();
     loadFeedPosts();
     loadSuggestions();
     loadStoriesBar();
@@ -635,6 +990,23 @@ function skeletonPostCard() {
     </div>`;
 }
 
+let activeMoodFilter = 'all';
+
+function setupMoodFilters() {
+    const container = document.getElementById('feed-mood-filter-bar');
+    if (!container) return;
+
+    const btns = container.querySelectorAll('.mood-filter-btn');
+    btns.forEach(btn => {
+        btn.onclick = () => {
+            btns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeMoodFilter = btn.dataset.mood;
+            loadFeedPosts();
+        };
+    });
+}
+
 // Fetch and render posts stream
 async function loadFeedPosts() {
     const postsStream = document.getElementById('posts-stream');
@@ -651,19 +1023,24 @@ async function loadFeedPosts() {
         const posts = await response.json();
         if (!response.ok) throw new Error(posts.error || 'Failed to load posts');
 
-        if (posts.length === 0) {
+        let filteredPosts = posts;
+        if (activeMoodFilter !== 'all') {
+            filteredPosts = posts.filter(post => post.mood === activeMoodFilter);
+        }
+
+        if (filteredPosts.length === 0) {
             postsStream.innerHTML = `
-                <div style="text-align: center; padding: 60px 20px; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-secondary);">
+                <div style="text-align: center; padding: 60px 20px; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-secondary); width: 100%;">
                     <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--text-secondary)" stroke-width="1.5" fill="none" style="margin-bottom: 12px;"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3"/><path d="M19 5L17 5"/></svg>
-                    <h3>No posts yet</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 6px;">Follow others or create your first post to populate your feed!</p>
+                    <h3>No posts in mood "${activeMoodFilter}"</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 6px;">Try filtering other moods or create a post with this mood tag!</p>
                 </div>
             `;
             return;
         }
 
         postsStream.innerHTML = '';
-        posts.forEach(post => {
+        filteredPosts.forEach(post => {
             const card = createPostCard(post);
             postsStream.appendChild(card);
         });
@@ -698,7 +1075,10 @@ function createPostCard(post) {
                     <img src="${post.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${post.author.username}`}" alt="Avatar" class="post-avatar">
                 </div>
                 <div class="post-header-meta">
-                    <span class="post-username">${post.author.username}</span>
+                    <span class="post-username" style="display: inline-flex; align-items: center;">
+                        ${post.author.username}
+                        ${post.isPinned ? '<span class="pin-indicator" title="Pinned Post" style="margin-left: 6px; color: var(--accent-gold); font-size: 0.8rem;">📌</span>' : ''}
+                    </span>
                     <span class="post-time-sub">${formatTime(post.createdAt)}</span>
                 </div>
             </div>
@@ -749,6 +1129,7 @@ function createPostCard(post) {
 
         <!-- Caption & Comments -->
         <div class="post-caption-wrapper">
+            ${post.mood ? `<span class="post-mood-tag">${post.mood}</span>` : ''}
             <span class="caption-username" onclick="window.location.href='profile.html?u=${post.author.username}'">${post.author.username}</span>
             <span class="caption-text" id="caption-text-${post._id}">${captionShort}</span>
             ${hasTruncation ? `<button class="caption-more-btn" data-full="${encodeURIComponent(caption)}" data-post="${post._id}">more</button>` : ''}
@@ -845,6 +1226,30 @@ function createPostCard(post) {
 
             if (isOwner || isAdmin) {
                 if (isOwner) {
+                    menuOptions.push({
+                        label: post.isPinned ? 'Unpin Post' : 'Pin Post',
+                        onClick: async () => {
+                            try {
+                                const res = await fetch(`${API_BASE}/posts/${post._id}/pin`, {
+                                    method: 'POST',
+                                    headers: getHeaders()
+                                });
+                                const data = await res.json();
+                                if (!res.ok) throw new Error(data.error);
+
+                                alert(data.isPinned ? 'Post pinned successfully!' : 'Post unpinned successfully!');
+                                if (window.location.pathname.includes('profile.html')) {
+                                    const params = new URLSearchParams(window.location.search);
+                                    loadProfileGrid(params.get('u'));
+                                } else {
+                                    loadFeedPosts();
+                                }
+                            } catch (e) {
+                                alert(e.message);
+                            }
+                        }
+                    });
+
                     menuOptions.push({
                         label: 'Edit Post',
                         onClick: () => {
@@ -1271,6 +1676,249 @@ async function initProfilePage() {
     await loadProfileGrid(usernameParam);
 }
 
+let currentProfileUser = null; // Stores currently loaded profile data
+
+// Helper: Animate count-up of numbers
+function animateNumber(elementId, targetNumber) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    
+    const duration = 800; // ms
+    const startTime = performance.now();
+    const startValue = 0;
+    
+    function update(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Easing: outQuad
+        const eased = progress * (2 - progress);
+        const currentValue = Math.floor(startValue + eased * (targetNumber - startValue));
+        el.textContent = currentValue;
+        
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        } else {
+            el.textContent = targetNumber;
+        }
+    }
+    
+    requestAnimationFrame(update);
+}
+
+// Helper: Render profile badges next to username
+function renderProfileBadges(user) {
+    const container = document.getElementById('profile-badges-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    // Admin badge
+    if (user.isAdmin) {
+        const badge = document.createElement('span');
+        badge.className = 'profile-badge admin';
+        badge.textContent = 'Admin';
+        container.appendChild(badge);
+    }
+    
+    // Developer badge (either explicit user.badge == 'developer' or user has techStack items)
+    if (user.badge === 'developer' || (user.techStack && user.techStack.length > 0)) {
+        const badge = document.createElement('span');
+        badge.className = 'profile-badge developer';
+        badge.textContent = 'Developer';
+        container.appendChild(badge);
+    } else if (user.badge) {
+        const badge = document.createElement('span');
+        badge.className = 'profile-badge creator';
+        badge.textContent = user.badge;
+        container.appendChild(badge);
+    }
+}
+
+// Helper: Setup profile tabs
+function setupProfileTabs() {
+    const btnPosts = document.getElementById('tab-posts-btn');
+    const btnDev = document.getElementById('tab-dev-info-btn');
+    const btnQA = document.getElementById('tab-qa-btn');
+
+    const panelPosts = document.getElementById('profile-posts-grid');
+    const panelDev = document.getElementById('profile-dev-container');
+    const panelQA = document.getElementById('profile-qa-container');
+
+    if (!btnPosts) return;
+
+    function switchTab(activeBtn, activePanel) {
+        [btnPosts, btnDev, btnQA].forEach(btn => {
+            if (btn) btn.classList.remove('active');
+        });
+        [panelPosts, panelDev, panelQA].forEach(panel => {
+            if (panel) panel.style.display = 'none';
+        });
+
+        activeBtn.classList.add('active');
+        activePanel.style.display = activePanel === panelPosts ? 'grid' : 'block';
+    }
+
+    btnPosts.onclick = () => switchTab(btnPosts, panelPosts);
+    
+    btnDev.onclick = () => {
+        switchTab(btnDev, panelDev);
+        const githubWrapper = document.getElementById('dev-github-link-wrapper');
+        const githubLink = document.getElementById('profile-github-link');
+        const techStackContainer = document.getElementById('profile-tech-stack');
+
+        if (currentProfileUser) {
+            if (currentProfileUser.githubUrl) {
+                githubLink.href = currentProfileUser.githubUrl;
+                githubWrapper.style.display = 'block';
+            } else {
+                githubWrapper.style.display = 'none';
+            }
+
+            techStackContainer.innerHTML = '';
+            if (currentProfileUser.techStack && currentProfileUser.techStack.length > 0) {
+                currentProfileUser.techStack.forEach(tech => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tech-tag';
+                    tag.textContent = tech;
+                    techStackContainer.appendChild(tag);
+                });
+            } else {
+                techStackContainer.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">No tech stack skills configured yet.</p>';
+            }
+        }
+    };
+    
+    btnQA.onclick = () => {
+        switchTab(btnQA, panelQA);
+        loadQA(profileUserObjectId);
+        setupQASubmission(profileUserObjectId);
+    };
+}
+
+// Helper: Load Anonymous QA questions list
+async function loadQA(userId) {
+    const list = document.getElementById('profile-qa-list');
+    if (!list) return;
+    list.innerHTML = '<p style="color:var(--text-secondary)">Loading Q&A...</p>';
+
+    try {
+        const response = await fetch(`${API_BASE}/qa/${userId}`, {
+            headers: getHeaders()
+        });
+        const questions = await response.json();
+        if (!response.ok) throw new Error(questions.error);
+
+        if (questions.length === 0) {
+            list.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px 0;">No questions yet.</p>`;
+            return;
+        }
+
+        list.innerHTML = '';
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+        const isOwner = currentUser && currentUser.id === userId;
+
+        questions.forEach(q => {
+            const card = document.createElement('div');
+            card.className = 'qa-card';
+            
+            let answerHtml = '';
+            if (q.isAnswered) {
+                answerHtml = `
+                    <div class="qa-answer-box">
+                        <span class="qa-answer-label">Answer</span>
+                        ${escapeHtml(q.answer)}
+                    </div>
+                `;
+            } else if (isOwner) {
+                answerHtml = `
+                    <div class="qa-answer-input-wrapper">
+                        <input type="text" class="qa-answer-input" id="answer-input-${q._id}" placeholder="Type your answer...">
+                        <button class="qa-answer-btn" id="answer-btn-${q._id}">Reply</button>
+                    </div>
+                `;
+            }
+
+            card.innerHTML = `
+                <div class="qa-question-text">
+                    ${escapeHtml(q.text)}
+                </div>
+                ${answerHtml}
+            `;
+
+            list.appendChild(card);
+
+            if (!q.isAnswered && isOwner) {
+                const answerBtn = card.querySelector(`#answer-btn-${q._id}`);
+                const answerInput = card.querySelector(`#answer-input-${q._id}`);
+                answerBtn.onclick = async () => {
+                    const answerText = answerInput.value.trim();
+                    if (!answerText) return;
+                    try {
+                        answerBtn.textContent = '...';
+                        const res = await fetch(`${API_BASE}/qa/answer/${q._id}`, {
+                            method: 'POST',
+                            headers: getHeaders(),
+                            body: JSON.stringify({ answer: answerText })
+                        });
+                        const resData = await res.json();
+                        if (!res.ok) throw new Error(resData.error);
+
+                        loadQA(userId);
+                    } catch (e) {
+                        alert(e.message);
+                        answerBtn.textContent = 'Reply';
+                    }
+                };
+            }
+        });
+    } catch (err) {
+        console.error('QA load error:', err);
+        list.innerHTML = '<p style="color:var(--accent-red)">Error loading Q&A.</p>';
+    }
+}
+
+// Helper: Setup QA Submission for guests
+function setupQASubmission(userId) {
+    const askBox = document.getElementById('qa-ask-box-wrapper');
+    const submitBtn = document.getElementById('qa-submit-question-btn');
+    const input = document.getElementById('qa-question-input');
+    if (!submitBtn || !input) return;
+
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    if (currentUser && currentUser.id === userId) {
+        if (askBox) askBox.style.display = 'none';
+        return;
+    } else {
+        if (askBox) askBox.style.display = 'flex';
+    }
+
+    submitBtn.onclick = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        try {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+            const res = await fetch(`${API_BASE}/qa/ask/${userId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text })
+            });
+            const resData = await res.json();
+            if (!res.ok) throw new Error(resData.error);
+
+            input.value = '';
+            alert('Your anonymous question has been sent successfully!');
+            loadQA(userId);
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Ask Anonymously';
+        }
+    };
+}
+
 // Loads profile header details
 async function loadProfileHeader(username) {
     try {
@@ -1282,14 +1930,45 @@ async function loadProfileHeader(username) {
         if (!response.ok) throw new Error(data.error || 'Profile not found.');
 
         profileUserObjectId = data.id;
+        currentProfileUser = data;
 
         // Populate elements
         document.getElementById('profile-user-avatar').src = data.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${data.username}`;
         document.getElementById('profile-username-heading').textContent = data.username;
-        document.getElementById('profile-followers-count').textContent = data.followersCount;
-        document.getElementById('profile-following-count').textContent = data.followingCount;
         document.getElementById('profile-fullname').textContent = data.username;
         document.getElementById('profile-bio-text').textContent = data.bio || 'No bio description.';
+
+        // Animate stats
+        animateNumber('profile-followers-count', data.followersCount);
+        animateNumber('profile-following-count', data.followingCount);
+
+        // Render badges
+        renderProfileBadges(data);
+
+        // Bio link
+        const bioLinkWrapper = document.getElementById('profile-bio-link-wrapper');
+        const bioLinkEl = document.getElementById('profile-bio-link');
+        if (bioLinkWrapper && bioLinkEl) {
+            if (data.bioLink) {
+                let displayLink = data.bioLink;
+                if (displayLink.startsWith('http://')) displayLink = displayLink.substring(7);
+                if (displayLink.startsWith('https://')) displayLink = displayLink.substring(8);
+                if (displayLink.length > 30) displayLink = displayLink.substring(0, 30) + '...';
+                
+                let href = data.bioLink;
+                if (!href.startsWith('http://') && !href.startsWith('https://')) {
+                    href = 'https://' + href;
+                }
+                
+                bioLinkEl.href = href;
+                bioLinkEl.textContent = displayLink;
+                bioLinkWrapper.style.display = 'block';
+            } else {
+                bioLinkWrapper.style.display = 'none';
+            }
+        }
+
+        setupProfileTabs();
 
         // Determine if it is my profile or someone else's
         const currentUser = JSON.parse(localStorage.getItem('user'));
@@ -1530,6 +2209,10 @@ function setupEditProfileModal() {
     const fileInput = document.getElementById('edit-avatar-file-input');
     const avatarUrlInput = document.getElementById('edit-avatar-url');
     const bioTextarea = document.getElementById('edit-bio');
+    const bioLinkInput = document.getElementById('edit-bio-link');
+    const githubUrlInput = document.getElementById('edit-github-url');
+    const techStackInput = document.getElementById('edit-tech-stack');
+    const spotlightModeInput = document.getElementById('edit-spotlight-mode');
     const avatarPreview = document.getElementById('edit-avatar-preview');
     const saveBtn = document.getElementById('save-profile-btn');
     const errorMsg = document.getElementById('edit-profile-error');
@@ -1550,6 +2233,13 @@ function setupEditProfileModal() {
         avatarPreview.src = currentAvatar;
         bioTextarea.value = currentBio === 'No bio description.' ? '' : currentBio;
         avatarUrlInput.value = currentAvatar.startsWith('data:image') ? '' : currentAvatar;
+
+        if (currentProfileUser) {
+            if (bioLinkInput) bioLinkInput.value = currentProfileUser.bioLink || '';
+            if (githubUrlInput) githubUrlInput.value = currentProfileUser.githubUrl || '';
+            if (techStackInput) techStackInput.value = currentProfileUser.techStack ? currentProfileUser.techStack.join(', ') : '';
+            if (spotlightModeInput) spotlightModeInput.checked = currentProfileUser.spotlightMode || false;
+        }
     });
 
     function closeModal() {
@@ -1561,16 +2251,16 @@ function setupEditProfileModal() {
     // Click label to trigger file input
     fileLabel.addEventListener('click', () => fileInput.click());
 
-    // File change
+    // File change with compression
     fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
             try {
-                const base64 = await fileToBase64(file);
-                localBase64Avatar = base64;
-                avatarPreview.src = base64;
+                const compressedBase64 = await compressImage(file, 400, 400, 0.7);
+                localBase64Avatar = compressedBase64;
+                avatarPreview.src = compressedBase64;
             } catch (err) {
-                alert('Error uploading file');
+                alert('Error uploading/compressing file');
             }
         }
     });
@@ -1600,6 +2290,11 @@ function setupEditProfileModal() {
     saveBtn.addEventListener('click', async () => {
         const avatar = localBase64Avatar || avatarUrlInput.value.trim() || undefined;
         const bio = bioTextarea.value.trim();
+        const bioLink = bioLinkInput ? bioLinkInput.value.trim() : '';
+        const githubUrl = githubUrlInput ? githubUrlInput.value.trim() : '';
+        const techStackRaw = techStackInput ? techStackInput.value.trim() : '';
+        const techStack = techStackRaw ? techStackRaw.split(',').map(s => s.trim()).filter(s => s !== '') : [];
+        const spotlightMode = spotlightModeInput ? spotlightModeInput.checked : false;
 
         try {
             saveBtn.textContent = 'Saving...';
@@ -1608,7 +2303,7 @@ function setupEditProfileModal() {
             const response = await fetch(`${API_BASE}/users/profile`, {
                 method: 'PUT',
                 headers: getHeaders(),
-                body: JSON.stringify({ avatar, bio })
+                body: JSON.stringify({ avatar, bio, bioLink, githubUrl, techStack, spotlightMode })
             });
 
             const data = await response.json();
@@ -1619,6 +2314,10 @@ function setupEditProfileModal() {
             if (cachedUser) {
                 cachedUser.avatar = data.avatar;
                 cachedUser.bio = data.bio;
+                cachedUser.bioLink = data.bioLink;
+                cachedUser.githubUrl = data.githubUrl;
+                cachedUser.techStack = data.techStack;
+                cachedUser.spotlightMode = data.spotlightMode;
                 localStorage.setItem('user', JSON.stringify(cachedUser));
             }
 

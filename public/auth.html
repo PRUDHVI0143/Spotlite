@@ -57,25 +57,66 @@
                 Have an account? <a href="#" id="show-login-btn">Log in</a>
             </div>
         </div>
+
+        <!-- Verification Card (hidden by default) -->
+        <div class="auth-card" id="verify-card" style="display: none;">
+            <div class="logo-container">
+                <div class="brand-header-container" style="justify-content: center; margin-bottom: 10px;">
+                    <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img" style="width: 40px; height: 40px;">
+                    <span class="insta-logo-text" style="font-size: 2.2rem;">Spotlite</span>
+                </div>
+            </div>
+            <h3 style="text-align: center; color: var(--text-primary); margin-bottom: 10px; font-weight: 600; font-size: 1.1rem;">Verify Your Email</h3>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; margin-bottom: 15px; line-height: 1.4; padding: 0 10px;">
+                A 6-digit verification code has been sent to your email address. Please enter it below to activate your account.
+            </p>
+            <form class="auth-form" id="verify-form">
+                <input type="hidden" id="verify-email-hidden">
+                <div class="input-wrapper">
+                    <input type="text" id="verify-code" placeholder="6-digit Code" required pattern="[0-9]{6}" maxlength="6" style="text-align: center; font-size: 1.25rem; letter-spacing: 4px; font-weight: 700;">
+                </div>
+                <div class="error-message" id="verify-error">Error message placeholder</div>
+                <div class="success-message" id="verify-success" style="color: #27ae60; font-size: 0.85rem; display: none; font-weight: 600; text-align: center; margin-bottom: 10px;">Success! Redirecting...</div>
+                <button type="submit" class="btn-primary">Verify & Log In</button>
+            </form>
+            <div style="text-align: center; margin-top: 15px; font-size: 0.82rem;">
+                <a href="#" id="resend-verify-btn" style="color: var(--accent-gold); font-weight: 600; text-decoration: none;">Resend Verification Code</a>
+            </div>
+            <div class="auth-switch" style="margin-top: 20px;">
+                Back to <a href="#" id="verify-back-to-login-btn">Log in</a>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
     <script>
-        // Inline toggle between Login & Signup cards
+        // Inline toggle between Login, Signup and Verification cards
         const loginCard = document.getElementById('login-card');
         const signupCard = document.getElementById('signup-card');
+        const verifyCard = document.getElementById('verify-card');
+
         const showSignupBtn = document.getElementById('show-signup-btn');
         const showLoginBtn = document.getElementById('show-login-btn');
+        const verifyBackToLoginBtn = document.getElementById('verify-back-to-login-btn');
 
         showSignupBtn.addEventListener('click', (e) => {
             e.preventDefault();
             loginCard.style.display = 'none';
+            verifyCard.style.display = 'none';
             signupCard.style.display = 'block';
         });
 
         showLoginBtn.addEventListener('click', (e) => {
             e.preventDefault();
             signupCard.style.display = 'none';
+            verifyCard.style.display = 'none';
+            loginCard.style.display = 'block';
+        });
+
+        verifyBackToLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            signupCard.style.display = 'none';
+            verifyCard.style.display = 'none';
             loginCard.style.display = 'block';
         });
 

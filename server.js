@@ -35,7 +35,8 @@ async function seedAdmin() {
         email: adminEmail,
         password: hashedPassword,
         bio: 'Spotlite Administrator',
-        isAdmin: true
+        isAdmin: true,
+        isVerified: true
       });
       await adminUser.save();
       console.log('Default administrator account created successfully.');
@@ -43,6 +44,7 @@ async function seedAdmin() {
       // Ensure the admin account has isAdmin set to true and update the password
       existingAdmin.password = hashedPassword;
       existingAdmin.isAdmin = true;
+      existingAdmin.isVerified = true;
       await existingAdmin.save();
       console.log('Administrator account credentials updated successfully.');
     }
@@ -88,7 +90,16 @@ const UserSchema = new mongoose.Schema({
   bio: { type: String, default: '' },
   isAdmin: { type: Boolean, default: false },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  githubUrl: { type: String, default: '' },
+  techStack: [{ type: String }],
+  spotlightMode: { type: Boolean, default: false },
+  badge: { type: String, default: '' },
+  refreshToken: { type: String, default: '' },
+  bioLink: { type: String, default: '' },
+  isVerified: { type: Boolean, default: false },
+  verificationCode: { type: String, default: '' },
+  verificationCodeExpires: { type: Date }
 }, { timestamps: true });
 
 const User = mongoose.model('User', UserSchema);
@@ -105,7 +116,10 @@ const PostSchema = new mongoose.Schema({
     username: { type: String, required: true },
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now }
-  }]
+  }],
+  mood: { type: String, default: '' }, // Happy, Travel, Study, Fitness, Coding
+  isPinned: { type: Boolean, default: false },
+  hashtags: [{ type: String }]
 }, { timestamps: true });
 
 const Post = mongoose.model('Post', PostSchema);
@@ -119,6 +133,28 @@ const MessageSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const Message = mongoose.model('Message', MessageSchema);
+
+// Notification Schema
+const NotificationSchema = new mongoose.Schema({
+  recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  type: { type: String, required: true }, // 'like', 'comment', 'follow', 'mention', 'message', 'qa'
+  post: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' },
+  text: { type: String, default: '' },
+  isRead: { type: Boolean, default: false }
+}, { timestamps: true });
+
+const Notification = mongoose.model('Notification', NotificationSchema);
+
+// Anonymous Q&A Schema
+const QuestionSchema = new mongoose.Schema({
+  profileOwner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  text: { type: String, required: true },
+  answer: { type: String, default: '' },
+  isAnswered: { type: Boolean, default: false }
+}, { timestamps: true });
+
+const Question = mongoose.model('Question', QuestionSchema);
 
 // --- AUTH MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
@@ -136,8 +172,88 @@ const authenticateToken = (req, res, next) => {
 
 // --- ROUTES ---
 
+// Rate limiting map & middleware
+const authLimiterMap = new Map();
+const rateLimiter = (req, res, next) => {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const now = Date.now();
+  const limitWindow = 15 * 60 * 1000; // 15 mins
+  const maxRequests = 100; // max 100 attempts in 15 mins
+
+  if (!authLimiterMap.has(ip)) {
+    authLimiterMap.set(ip, []);
+  }
+
+  const timestamps = authLimiterMap.get(ip).filter(t => now - t < limitWindow);
+  if (timestamps.length >= maxRequests) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
+  timestamps.push(now);
+  authLimiterMap.set(ip, timestamps);
+  next();
+};
+
+// Helper to send verification email via nodemailer/SMTP or fallback to Console logging
+async function sendVerificationEmail(email, code) {
+  console.log(`\n======================================================`);
+  console.log(`[MAIL VERIFICATION] To: ${email}`);
+  console.log(`[MAIL VERIFICATION] Code: ${code}`);
+  console.log(`======================================================\n`);
+
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_PORT === '465',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+
+      await transporter.sendMail({
+        from: `"Spotlite Support" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+        to: email,
+        subject: "Verify your Spotlite Account",
+        text: `Your Spotlite verification code is: ${code}. It expires in 15 minutes.`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ffd700; border-radius: 12px; background-color: #121212; color: #ffffff;">
+            <h2 style="color: #ffd700; text-align: center;">Spotlite Account Verification</h2>
+            <p>Welcome to Spotlite! Please use the verification code below to verify your email address and activate your account:</p>
+            <div style="font-size: 24px; font-weight: bold; letter-spacing: 4px; text-align: center; padding: 15px; margin: 20px 0; background-color: #1a1a1a; border-radius: 8px; border: 1px dashed #ffd700; color: #ffd700;">
+              ${code}
+            </div>
+            <p style="font-size: 12px; color: #888888;">This code will expire in 15 minutes. If you did not register for a Spotlite account, please ignore this email.</p>
+          </div>
+        `
+      });
+      console.log(`Verification email sent to ${email} successfully via SMTP.`);
+    } catch (err) {
+      console.error('Failed to send verification email via SMTP:', err.message);
+    }
+  }
+}
+
+// Helper to generate access and refresh tokens
+function generateTokens(user) {
+  const accessToken = jwt.sign(
+    { id: user._id, username: user.username, isAdmin: user.isAdmin },
+    JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+  const refreshToken = jwt.sign(
+    { id: user._id },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  return { accessToken, refreshToken };
+}
+
 // 1. Register
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', rateLimiter, async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
@@ -154,7 +270,12 @@ app.post('/api/auth/register', async (req, res) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({ error: 'Username or email already in use.' });
+      if (!existingUser.isVerified) {
+        // Delete the unverified user to release the username/email
+        await User.deleteOne({ _id: existingUser._id });
+      } else {
+        return res.status(400).json({ error: 'Username or email already in use.' });
+      }
     }
 
     // Hash password
@@ -163,30 +284,28 @@ app.post('/api/auth/register', async (req, res) => {
 
     const defaultAvatar = `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${cleanUsername}`;
 
+    // Generate a 6-digit random code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCodeExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
     const user = new User({
       username: cleanUsername,
       email: cleanEmail,
       password: hashedPassword,
-      avatar: defaultAvatar
+      avatar: defaultAvatar,
+      isVerified: false,
+      verificationCode,
+      verificationCodeExpires
     });
 
     await user.save();
 
-    // Generate Token
-    const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    // Send verification email asynchronously
+    sendVerificationEmail(cleanEmail, verificationCode);
 
     res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        avatar: user.avatar,
-        bio: user.bio,
-        isAdmin: user.isAdmin,
-        followersCount: 0,
-        followingCount: 0
-      }
+      message: 'Verification code sent to your email.',
+      email: cleanEmail
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -195,7 +314,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // 2. Login
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', rateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -215,10 +334,30 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid username or password.' });
     }
 
-    const token = jwt.sign({ id: user._id, username: user.username, isAdmin: user.isAdmin }, JWT_SECRET, { expiresIn: '7d' });
+    if (!user.isVerified) {
+      // Re-generate code for unverified login attempt
+      const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+      user.verificationCode = newCode;
+      user.verificationCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
+      await user.save();
+
+      // Send code
+      sendVerificationEmail(user.email, newCode);
+
+      return res.status(400).json({
+        error: 'Your email address is not verified. A new verification code has been sent to your email.',
+        emailUnverified: true,
+        email: user.email
+      });
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user);
+    user.refreshToken = refreshToken;
+    await user.save();
 
     res.json({
-      token,
+      token: accessToken,
+      refreshToken,
       user: {
         id: user._id,
         username: user.username,
@@ -227,12 +366,147 @@ app.post('/api/auth/login', async (req, res) => {
         bio: user.bio,
         isAdmin: user.isAdmin,
         followersCount: user.followers.length,
-        followingCount: user.following.length
+        followingCount: user.following.length,
+        githubUrl: user.githubUrl,
+        techStack: user.techStack,
+        spotlightMode: user.spotlightMode,
+        badge: user.badge,
+        bioLink: user.bioLink
       }
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error during login.' });
+  }
+});
+
+// 2a. Verify Email
+app.post('/api/auth/verify-email', rateLimiter, async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and verification code are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+
+    if (!user) {
+      return res.status(400).json({ error: 'User with this email address does not exist.' });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ error: 'This account is already verified. Please log in.' });
+    }
+
+    // Verify code and expiry
+    if (!user.verificationCode || user.verificationCode !== code.trim()) {
+      return res.status(400).json({ error: 'Invalid verification code.' });
+    }
+
+    if (new Date() > user.verificationCodeExpires) {
+      return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+    }
+
+    // Mark as verified
+    user.isVerified = true;
+    user.verificationCode = '';
+    user.verificationCodeExpires = undefined;
+
+    const { accessToken, refreshToken } = generateTokens(user);
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    res.json({
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        bio: user.bio,
+        isAdmin: user.isAdmin,
+        followersCount: user.followers.length,
+        followingCount: user.following.length,
+        githubUrl: user.githubUrl,
+        techStack: user.techStack,
+        spotlightMode: user.spotlightMode,
+        badge: user.badge,
+        bioLink: user.bioLink
+      }
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ error: 'Internal server error during verification.' });
+  }
+});
+
+// 2b. Resend Verification Code
+app.post('/api/auth/resend-code', rateLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+
+    if (!user) {
+      return res.status(400).json({ error: 'User with this email address does not exist.' });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ error: 'This account is already verified. Please log in.' });
+    }
+
+    // Generate new code
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verificationCode = newCode;
+    user.verificationCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    // Send email
+    sendVerificationEmail(cleanEmail, newCode);
+
+    res.json({ message: 'A new verification code has been sent to your email.' });
+  } catch (error) {
+    console.error('Resend verification code error:', error);
+    res.status(500).json({ error: 'Internal server error during resending.' });
+  }
+});
+
+// 2c. Refresh Token
+app.post('/api/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token is required.' });
+    }
+
+    jwt.verify(refreshToken, JWT_SECRET, async (err, decoded) => {
+      if (err) return res.status(403).json({ error: 'Invalid or expired refresh token.' });
+
+      const user = await User.findById(decoded.id);
+      if (!user || user.refreshToken !== refreshToken) {
+        return res.status(403).json({ error: 'Invalid refresh token.' });
+      }
+
+      const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
+      user.refreshToken = newRefreshToken;
+      await user.save();
+
+      res.json({
+        token: accessToken,
+        refreshToken: newRefreshToken
+      });
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ error: 'Internal server error during token refresh.' });
   }
 });
 
@@ -251,7 +525,12 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
       isAdmin: user.isAdmin,
       followersCount: user.followers.length,
       followingCount: user.following.length,
-      following: user.following
+      following: user.following,
+      githubUrl: user.githubUrl,
+      techStack: user.techStack,
+      spotlightMode: user.spotlightMode,
+      badge: user.badge,
+      bioLink: user.bioLink
     });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching user profile.' });
@@ -261,11 +540,16 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
 // 4. Update Profile
 app.put('/api/users/profile', authenticateToken, async (req, res) => {
   try {
-    const { bio, avatar, username } = req.body;
+    const { bio, avatar, username, githubUrl, techStack, spotlightMode, badge, bioLink } = req.body;
     const updateData = {};
 
     if (bio !== undefined) updateData.bio = bio;
     if (avatar !== undefined) updateData.avatar = avatar;
+    if (githubUrl !== undefined) updateData.githubUrl = githubUrl;
+    if (techStack !== undefined) updateData.techStack = techStack;
+    if (spotlightMode !== undefined) updateData.spotlightMode = spotlightMode;
+    if (badge !== undefined) updateData.badge = badge;
+    if (bioLink !== undefined) updateData.bioLink = bioLink;
 
     if (username) {
       const cleanUsername = username.trim().toLowerCase();
@@ -291,7 +575,12 @@ app.put('/api/users/profile', authenticateToken, async (req, res) => {
       avatar: updatedUser.avatar,
       bio: updatedUser.bio,
       followersCount: updatedUser.followers.length,
-      followingCount: updatedUser.following.length
+      followingCount: updatedUser.following.length,
+      githubUrl: updatedUser.githubUrl,
+      techStack: updatedUser.techStack,
+      spotlightMode: updatedUser.spotlightMode,
+      badge: updatedUser.badge,
+      bioLink: updatedUser.bioLink
     });
   } catch (error) {
     console.error('Profile update error:', error);
@@ -317,7 +606,12 @@ app.get('/api/users/profile/:username', async (req, res) => {
       followersCount: user.followers.length,
       followingCount: user.following.length,
       followers: user.followers,
-      following: user.following
+      following: user.following,
+      githubUrl: user.githubUrl,
+      techStack: user.techStack,
+      spotlightMode: user.spotlightMode,
+      badge: user.badge,
+      bioLink: user.bioLink
     });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching profile.' });
@@ -351,6 +645,15 @@ app.post('/api/users/:id/follow', authenticateToken, async (req, res) => {
       // Follow
       currentUser.following.push(targetUserId);
       targetUser.followers.push(currentUserId);
+
+      // Create notification
+      const notif = new Notification({
+        recipient: targetUserId,
+        sender: currentUserId,
+        type: 'follow',
+        text: 'started following you'
+      });
+      await notif.save();
     }
 
     await currentUser.save();
@@ -370,7 +673,6 @@ app.post('/api/users/:id/follow', authenticateToken, async (req, res) => {
 app.get('/api/users', authenticateToken, async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    // Suggest users that are not the current user and not followed by current user
     const currentUser = await User.findById(currentUserId);
     const suggestions = await User.find({
       _id: { $ne: currentUserId, $nin: currentUser.following }
@@ -397,27 +699,72 @@ app.get('/api/users/all', authenticateToken, async (req, res) => {
   }
 });
 
-
 // 8. Create Post
 app.post('/api/posts', authenticateToken, async (req, res) => {
   try {
-    const { image, caption } = req.body;
+    const { image, caption, mood } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image is required.' });
     }
 
+    const currentUser = await User.findById(req.user.id);
+    if (currentUser.spotlightMode) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0,0,0,0);
+      const postsToday = await Post.countDocuments({
+        author: req.user.id,
+        createdAt: { $gte: startOfToday }
+      });
+      if (postsToday >= 1) {
+        return res.status(400).json({ error: 'Spotlight Mode is active. You can only share 1 post per day!' });
+      }
+    }
+
+    // Parse hashtags
+    const hashtags = [];
+    if (caption) {
+      const foundTags = caption.match(/#(\w+)/g);
+      if (foundTags) {
+        foundTags.forEach(t => {
+          const tag = t.replace('#', '').toLowerCase();
+          if (!hashtags.includes(tag)) hashtags.push(tag);
+        });
+      }
+    }
+
     const post = new Post({
       author: req.user.id,
       image,
-      caption: caption || ''
+      caption: caption || '',
+      mood: mood || '',
+      hashtags
     });
 
     await post.save();
     
-    // Populate author info before returning
-    const populatedPost = await post.populate('author', 'username avatar');
+    // Create notifications for mentions
+    if (caption) {
+      const mentions = caption.match(/@(\w+)/g);
+      if (mentions) {
+        for (let mention of mentions) {
+          const mentionedUsername = mention.replace('@', '').toLowerCase();
+          const mentionedUser = await User.findOne({ username: mentionedUsername });
+          if (mentionedUser && mentionedUser._id.toString() !== req.user.id) {
+            const notif = new Notification({
+              recipient: mentionedUser._id,
+              sender: req.user.id,
+              type: 'mention',
+              post: post._id,
+              text: 'mentioned you in a post'
+            });
+            await notif.save();
+          }
+        }
+      }
+    }
 
+    const populatedPost = await post.populate('author', 'username avatar');
     res.status(201).json(populatedPost);
   } catch (error) {
     console.error('Post creation error:', error);
@@ -457,7 +804,7 @@ app.get('/api/posts/user/:username', async (req, res) => {
 
     const posts = await Post.find({ author: user._id })
       .populate('author', 'username avatar')
-      .sort({ createdAt: -1 });
+      .sort({ isPinned: -1, createdAt: -1 });
 
     res.json(posts);
   } catch (error) {
@@ -495,6 +842,17 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
       post.likes.pull(userId);
     } else {
       post.likes.push(userId);
+      // Notify post author
+      if (post.author.toString() !== userId) {
+        const notif = new Notification({
+          recipient: post.author,
+          sender: userId,
+          type: 'like',
+          post: post._id,
+          text: 'liked your post'
+        });
+        await notif.save();
+      }
     }
 
     await post.save();
@@ -544,6 +902,37 @@ app.post('/api/posts/:id/comment', authenticateToken, async (req, res) => {
     post.comments.push(comment);
     await post.save();
 
+    // Notify post author
+    if (post.author.toString() !== req.user.id) {
+      const notif = new Notification({
+        recipient: post.author,
+        sender: req.user.id,
+        type: 'comment',
+        post: post._id,
+        text: `commented: "${text.trim().substring(0, 30)}${text.trim().length > 30 ? '...' : ''}"`
+      });
+      await notif.save();
+    }
+
+    // Parse mentions
+    const mentions = text.match(/@(\w+)/g);
+    if (mentions) {
+      for (let mention of mentions) {
+        const mentionedUsername = mention.replace('@', '').toLowerCase();
+        const mentionedUser = await User.findOne({ username: mentionedUsername });
+        if (mentionedUser && mentionedUser._id.toString() !== req.user.id) {
+          const notif = new Notification({
+            recipient: mentionedUser._id,
+            sender: req.user.id,
+            type: 'mention',
+            post: post._id,
+            text: 'mentioned you in a comment'
+          });
+          await notif.save();
+        }
+      }
+    }
+
     res.status(201).json(comment);
   } catch (error) {
     res.status(500).json({ error: 'Error adding comment.' });
@@ -581,6 +970,16 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
       sharedPostId: sharedPostId || undefined
     });
     await message.save();
+
+    // Create notification
+    const notif = new Notification({
+      recipient: receiverId,
+      sender: req.user.id,
+      type: 'message',
+      text: text ? `sent you a message: "${text.trim().substring(0, 30)}${text.trim().length > 30 ? '...' : ''}"` : 'shared a post with you'
+    });
+    await notif.save();
+
     res.status(201).json(message);
   } catch (error) {
     res.status(500).json({ error: 'Failed to send message.' });
@@ -801,6 +1200,184 @@ app.put('/api/posts/:postId/comments/:commentId', authenticateToken, async (req,
     res.json({ message: 'Comment updated successfully.', comment });
   } catch (error) {
     res.status(500).json({ error: 'Failed to edit comment.' });
+  }
+});
+
+// --- NEW ENDPOINTS ---
+
+// A. Get notifications for the logged-in user
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ recipient: req.user.id })
+      .populate('sender', 'username avatar')
+      .populate('post', '_id image')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json(notifications);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch notifications.' });
+  }
+});
+
+// B. Get unread notifications count
+app.get('/api/notifications/unread-count', authenticateToken, async (req, res) => {
+  try {
+    const count = await Notification.countDocuments({ recipient: req.user.id, isRead: false });
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch unread notifications count.' });
+  }
+});
+
+// C. Mark notifications as read
+app.post('/api/notifications/mark-read', authenticateToken, async (req, res) => {
+  try {
+    await Notification.updateMany({ recipient: req.user.id, isRead: false }, { $set: { isRead: true } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to mark notifications as read.' });
+  }
+});
+
+// D. Send anonymous question to user
+app.post('/api/qa/ask/:userId', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || text.trim() === '') {
+      return res.status(400).json({ error: 'Question text is required.' });
+    }
+
+    const question = new Question({
+      profileOwner: req.params.userId,
+      text: text.trim()
+    });
+    await question.save();
+
+    // Notify the profile owner (use themselves as sender placeholder)
+    const notif = new Notification({
+      recipient: req.params.userId,
+      sender: req.params.userId, 
+      type: 'qa',
+      text: 'received an anonymous question'
+    });
+    await notif.save();
+
+    res.status(201).json(question);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to ask question.' });
+  }
+});
+
+// E. Get questions for a user
+app.get('/api/qa/:userId', async (req, res) => {
+  try {
+    let isOwner = false;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.id === req.params.userId) {
+          isOwner = true;
+        }
+      } catch (e) {}
+    }
+
+    let query = { profileOwner: req.params.userId };
+    if (!isOwner) {
+      query.isAnswered = true;
+    }
+
+    const questions = await Question.find(query).sort({ createdAt: -1 });
+    res.json(questions);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve questions.' });
+  }
+});
+
+// F. Answer a question (Profile owner only)
+app.post('/api/qa/answer/:questionId', authenticateToken, async (req, res) => {
+  try {
+    const { answer } = req.body;
+    if (!answer || answer.trim() === '') {
+      return res.status(400).json({ error: 'Answer is required.' });
+    }
+
+    const question = await Question.findById(req.params.questionId);
+    if (!question) return res.status(404).json({ error: 'Question not found.' });
+
+    if (question.profileOwner.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to answer this question.' });
+    }
+
+    question.answer = answer.trim();
+    question.isAnswered = true;
+    await question.save();
+
+    res.json(question);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to answer question.' });
+  }
+});
+
+// G. Pin/Unpin Post (Post owner only)
+app.post('/api/posts/:id/pin', authenticateToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    if (post.author.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to pin this post.' });
+    }
+
+    if (!post.isPinned) {
+      const pinnedCount = await Post.countDocuments({ author: req.user.id, isPinned: true });
+      if (pinnedCount >= 3) {
+        return res.status(400).json({ error: 'You can only pin up to 3 posts.' });
+      }
+    }
+
+    post.isPinned = !post.isPinned;
+    await post.save();
+
+    res.json({ isPinned: post.isPinned });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to pin post.' });
+  }
+});
+
+// H. Get posts by hashtag
+app.get('/api/posts/hashtag/:hashtag', authenticateToken, async (req, res) => {
+  try {
+    const tag = req.params.hashtag.toLowerCase().trim();
+    const posts = await Post.find({ hashtags: tag })
+      .populate('author', 'username avatar')
+      .sort({ createdAt: -1 });
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch posts for hashtag.' });
+  }
+});
+
+// I. Get trending hashtags
+app.get('/api/posts/trending-tags', authenticateToken, async (req, res) => {
+  try {
+    const posts = await Post.find({ hashtags: { $exists: true, $ne: [] } }).select('hashtags');
+    const tagCounts = {};
+    posts.forEach(post => {
+      post.hashtags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      });
+    });
+
+    const trending = Object.keys(tagCounts)
+      .map(tag => ({ tag, count: tagCounts[tag] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    res.json(trending);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch trending tags.' });
   }
 });
 

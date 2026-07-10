@@ -31,6 +31,13 @@
                     </button>
                 </li>
                 <li class="menu-item">
+                    <button id="sidebar-notifications-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        <span>Notifications</span>
+                        <span class="unread-badge" id="notif-count-badge" style="display: none;">0</span>
+                    </button>
+                </li>
+                <li class="menu-item">
                     <a href="messages.html">
                         <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2" fill="none"/></svg>
                         <span>Messages</span>
@@ -77,6 +84,12 @@
                     </button>
                 </li>
                 <li>
+                    <button id="mobile-notifications-btn" style="background: none; border: none; color: inherit; position: relative; padding: 0;">
+                        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        <span class="unread-badge" id="mobile-notif-count-badge" style="display: none;">0</span>
+                    </button>
+                </li>
+                <li>
                     <a href="#" id="mobile-profile-link">
                         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke-width="2"/><path d="M6 19.5c1-2.5 3-4.5 6-4.5s5 2 6 4.5" stroke-width="2"/></svg>
                     </a>
@@ -92,6 +105,16 @@
                     <!-- Stories Bar (populated dynamically from real users) -->
                     <div class="stories-container" id="stories-container">
                         <!-- Real user stories loaded by app.js -->
+                    </div>
+
+                    <!-- Mood Filter Bar -->
+                    <div class="mood-filter-bar" id="mood-filter-bar">
+                        <button class="mood-pill active" data-mood="all">All</button>
+                        <button class="mood-pill" data-mood="Happy">Happy 😊</button>
+                        <button class="mood-pill" data-mood="Travel">Travel ✈️</button>
+                        <button class="mood-pill" data-mood="Study">Study 📚</button>
+                        <button class="mood-pill" data-mood="Fitness">Fitness 💪</button>
+                        <button class="mood-pill" data-mood="Coding">Coding 💻</button>
                     </div>
 
                     <!-- Posts Stream -->
@@ -163,6 +186,23 @@
 
             <div class="modal-caption-area" id="caption-area" style="display: none;">
                 <textarea class="caption-textarea" id="post-caption-input" placeholder="Write a caption..."></textarea>
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <label for="post-mood-select" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 550;">Post Mood:</label>
+                        <select id="post-mood-select" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-size: 0.8rem;">
+                            <option value="">None</option>
+                            <option value="Happy">Happy 😊</option>
+                            <option value="Travel">Travel ✈️</option>
+                            <option value="Study">Study 📚</option>
+                            <option value="Fitness">Fitness 💪</option>
+                            <option value="Coding">Coding 💻</option>
+                        </select>
+                    </div>
+                    <button type="button" class="ai-caption-btn" id="ai-generate-caption-btn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 4px;"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
+                        Generate AI Caption & Tags
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -175,6 +215,16 @@
         </div>
         <div class="search-results-list" id="search-results-list">
             <!-- Dynamic search results loaded here -->
+        </div>
+    </div>
+
+    <!-- NOTIFICATIONS PANEL SLIDEOUT -->
+    <div class="notifications-slider-panel" id="notifications-slider-panel">
+        <h2 class="search-header">Notifications</h2>
+        <div class="notifications-list" id="notifications-list">
+            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                No notifications yet.
+            </div>
         </div>
     </div>
 
