@@ -194,13 +194,47 @@ const rateLimiter = (req, res, next) => {
   next();
 };
 
-// Helper to send verification email via nodemailer/SMTP or fallback to Console logging
+// Helper to send verification email via nodemailer/SMTP or EmailJS or fallback to Console logging
 async function sendVerificationEmail(username, email, code) {
   console.log(`\n======================================================`);
   console.log(`[MAIL VERIFICATION] To: ${username} (${email})`);
   console.log(`[MAIL VERIFICATION] Code: ${code}`);
   console.log(`======================================================\n`);
 
+  // 1. Try EmailJS first if configured
+  if (process.env.EMAILJS_SERVICE_ID && process.env.EMAILJS_TEMPLATE_ID && process.env.EMAILJS_PUBLIC_KEY) {
+    try {
+      const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: process.env.EMAILJS_SERVICE_ID,
+          template_id: process.env.EMAILJS_TEMPLATE_ID,
+          user_id: process.env.EMAILJS_PUBLIC_KEY,
+          accessToken: process.env.EMAILJS_PRIVATE_KEY || undefined,
+          template_params: {
+            to_name: username,
+            to_email: email,
+            reply_to: 'support@spotlite.com',
+            verification_code: code,
+            message: `Hello ${username}, this is your user verification code: ${code}.`
+          }
+        })
+      });
+
+      if (response.ok) {
+        console.log(`Verification email sent to ${email} successfully via EmailJS.`);
+        return;
+      } else {
+        const text = await response.text();
+        console.error('EmailJS send failed:', text);
+      }
+    } catch (err) {
+      console.error('Failed to send verification email via EmailJS:', err.message);
+    }
+  }
+
+  // 2. Try NodeMailer/SMTP second if configured
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
     try {
       const nodemailer = require('nodemailer');
