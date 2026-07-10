@@ -306,7 +306,8 @@ app.post('/api/auth/register', rateLimiter, async (req, res) => {
 
     res.status(201).json({
       message: 'Verification code sent to your email.',
-      email: cleanEmail
+      email: cleanEmail,
+      devCode: process.env.SMTP_HOST ? undefined : verificationCode
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -348,7 +349,8 @@ app.post('/api/auth/login', rateLimiter, async (req, res) => {
       return res.status(400).json({
         error: 'Your email address is not verified. A new verification code has been sent to your email.',
         emailUnverified: true,
-        email: user.email
+        email: user.email,
+        devCode: process.env.SMTP_HOST ? undefined : newCode
       });
     }
 
@@ -473,7 +475,10 @@ app.post('/api/auth/resend-code', rateLimiter, async (req, res) => {
     // Send email
     sendVerificationEmail(user.username, cleanEmail, newCode);
 
-    res.json({ message: 'A new verification code has been sent to your email.' });
+    res.json({ 
+      message: 'A new verification code has been sent to your email.',
+      devCode: process.env.SMTP_HOST ? undefined : newCode
+    });
   } catch (error) {
     console.error('Resend verification code error:', error);
     res.status(500).json({ error: 'Internal server error during resending.' });

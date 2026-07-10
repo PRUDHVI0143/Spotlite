@@ -583,11 +583,15 @@ function initAuthPage() {
                         if (loginCard) loginCard.style.display = 'none';
                         if (signupCard) signupCard.style.display = 'none';
                         if (verifyCard) verifyCard.style.display = 'block';
-                        if (verifyError) {
-                            verifyError.textContent = data.error;
+                         if (verifyError) {
+                            let errText = data.error;
+                            if (data.devCode) {
+                                errText += `<br><span style="color: var(--accent-gold); font-weight: bold;">[Dev Mode] SMTP not configured. Your code is: ${data.devCode}</span>`;
+                            }
+                            verifyError.innerHTML = errText;
                             verifyError.style.display = 'block';
-                        }
-                        if (verifySuccess) verifySuccess.style.display = 'none';
+                         }
+                         if (verifySuccess) verifySuccess.style.display = 'none';
                         return;
                     }
                     throw new Error(data.error || 'Login failed.');
@@ -631,7 +635,11 @@ function initAuthPage() {
                 if (verifyCard) verifyCard.style.display = 'block';
                 if (verifyError) verifyError.style.display = 'none';
                 if (verifySuccess) {
-                    verifySuccess.textContent = 'Registration successful! A verification code has been sent to your email.';
+                    let msg = 'Registration successful! A verification code has been sent to your email.';
+                    if (data.devCode) {
+                        msg += `<br><span style="color: var(--accent-gold); font-weight: bold;">[Dev Mode] SMTP not configured. Your code is: ${data.devCode}</span>`;
+                    }
+                    verifySuccess.innerHTML = msg;
                     verifySuccess.style.display = 'block';
                 }
             } catch (err) {
@@ -709,7 +717,11 @@ function initAuthPage() {
                 }
 
                 if (verifySuccess) {
-                    verifySuccess.textContent = data.message || 'Verification code resent successfully!';
+                    let msg = data.message || 'Verification code resent successfully!';
+                    if (data.devCode) {
+                        msg += `<br><span style="color: var(--accent-gold); font-weight: bold;">[Dev Mode] SMTP not configured. Your code is: ${data.devCode}</span>`;
+                    }
+                    verifySuccess.innerHTML = msg;
                     verifySuccess.style.display = 'block';
                 }
             } catch (err) {
