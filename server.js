@@ -214,9 +214,10 @@ async function sendVerificationEmail(username, email, code) {
           accessToken: process.env.EMAILJS_PRIVATE_KEY || undefined,
           template_params: {
             to_name: username,
-            to_email: email,
+            email: email,
             reply_to: 'support@spotlite.com',
-            verification_code: code,
+            passcode: code,
+            time: '15 minutes',
             message: `Hello ${username}, this is your user verification code: ${code}.`
           }
         })
