@@ -480,7 +480,31 @@ app.post('/api/auth/resend-code', rateLimiter, async (req, res) => {
   }
 });
 
-// 2c. Refresh Token
+// 2c. Cancel Registration
+app.post('/api/auth/cancel-registration', rateLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+
+    if (user && !user.isVerified) {
+      await User.deleteOne({ _id: user._id });
+      console.log(`Cancelled registration and deleted unverified user: ${cleanEmail}`);
+    }
+
+    res.json({ message: 'Registration cancelled.' });
+  } catch (error) {
+    console.error('Cancel registration error:', error);
+    res.status(500).json({ error: 'Internal server error during cancellation.' });
+  }
+});
+
+// 2d. Refresh Token
 app.post('/api/auth/refresh', async (req, res) => {
   try {
     const { refreshToken } = req.body;

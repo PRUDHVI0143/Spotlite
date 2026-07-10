@@ -722,6 +722,42 @@ function initAuthPage() {
             }
         });
     }
+
+    const verifyBackToLoginBtn = document.getElementById('verify-back-to-login-btn');
+    if (verifyBackToLoginBtn) {
+        verifyBackToLoginBtn.addEventListener('click', async () => {
+            const email = verifyEmailHidden ? verifyEmailHidden.value : '';
+            
+            // Clear all input fields in signup form and verify form
+            const signupEmailField = document.getElementById('signup-email');
+            const signupUsernameField = document.getElementById('signup-username');
+            const signupPasswordField = document.getElementById('signup-password');
+            const verifyCodeField = document.getElementById('verify-code');
+
+            if (signupEmailField) signupEmailField.value = '';
+            if (signupUsernameField) signupUsernameField.value = '';
+            if (signupPasswordField) signupPasswordField.value = '';
+            if (verifyCodeField) verifyCodeField.value = '';
+
+            // Clean error/success messages
+            if (verifyError) verifyError.style.display = 'none';
+            if (verifySuccess) verifySuccess.style.display = 'none';
+            if (signupError) signupError.style.display = 'none';
+
+            if (!email) return;
+
+            try {
+                // Cancel on backend (silently remove unverified user)
+                await fetch(`${API_BASE}/auth/cancel-registration`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+            } catch (err) {
+                console.error('Failed to cancel registration:', err);
+            }
+        });
+    }
 }
 
 // =============================================================
