@@ -195,9 +195,9 @@ const rateLimiter = (req, res, next) => {
 };
 
 // Helper to send verification email via nodemailer/SMTP or fallback to Console logging
-async function sendVerificationEmail(email, code) {
+async function sendVerificationEmail(username, email, code) {
   console.log(`\n======================================================`);
-  console.log(`[MAIL VERIFICATION] To: ${email}`);
+  console.log(`[MAIL VERIFICATION] To: ${username} (${email})`);
   console.log(`[MAIL VERIFICATION] Code: ${code}`);
   console.log(`======================================================\n`);
 
@@ -218,11 +218,12 @@ async function sendVerificationEmail(email, code) {
         from: `"Spotlite Support" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
         to: email,
         subject: "Verify your Spotlite Account",
-        text: `Your Spotlite verification code is: ${code}. It expires in 15 minutes.`,
+        text: `Hello ${username}, this is your user verification code: ${code}.`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ffd700; border-radius: 12px; background-color: #121212; color: #ffffff;">
             <h2 style="color: #ffd700; text-align: center;">Spotlite Account Verification</h2>
-            <p>Welcome to Spotlite! Please use the verification code below to verify your email address and activate your account:</p>
+            <p>Hello <strong>${username}</strong>,</p>
+            <p>This is your user verification code to activate your account:</p>
             <div style="font-size: 24px; font-weight: bold; letter-spacing: 4px; text-align: center; padding: 15px; margin: 20px 0; background-color: #1a1a1a; border-radius: 8px; border: 1px dashed #ffd700; color: #ffd700;">
               ${code}
             </div>
@@ -301,7 +302,7 @@ app.post('/api/auth/register', rateLimiter, async (req, res) => {
     await user.save();
 
     // Send verification email asynchronously
-    sendVerificationEmail(cleanEmail, verificationCode);
+    sendVerificationEmail(cleanUsername, cleanEmail, verificationCode);
 
     res.status(201).json({
       message: 'Verification code sent to your email.',
@@ -342,7 +343,7 @@ app.post('/api/auth/login', rateLimiter, async (req, res) => {
       await user.save();
 
       // Send code
-      sendVerificationEmail(user.email, newCode);
+      sendVerificationEmail(user.username, user.email, newCode);
 
       return res.status(400).json({
         error: 'Your email address is not verified. A new verification code has been sent to your email.',
@@ -470,7 +471,7 @@ app.post('/api/auth/resend-code', rateLimiter, async (req, res) => {
     await user.save();
 
     // Send email
-    sendVerificationEmail(cleanEmail, newCode);
+    sendVerificationEmail(user.username, cleanEmail, newCode);
 
     res.json({ message: 'A new verification code has been sent to your email.' });
   } catch (error) {
