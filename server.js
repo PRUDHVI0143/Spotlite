@@ -301,7 +301,7 @@ async function sendVerificationEmail(username, email, code) {
 
   // 1. Try Nodemailer / SMTP first if configured
   const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : '';
-  const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.trim() : '';
+  const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.trim().replace(/\s+/g, '') : '';
   const smtpHost = process.env.SMTP_HOST ? process.env.SMTP_HOST.trim() : 'smtp.gmail.com';
 
   if (smtpUser !== '' && smtpPass !== '') {
@@ -311,20 +311,29 @@ async function sendVerificationEmail(username, email, code) {
       let transportConfig;
       if (smtpHost === 'smtp.gmail.com' || smtpUser.endsWith('@gmail.com')) {
         transportConfig = {
-          service: 'gmail',
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true, // SSL
           auth: {
             user: smtpUser,
             pass: smtpPass
+          },
+          tls: {
+            rejectUnauthorized: false
           }
         };
       } else {
+        const port = parseInt(process.env.SMTP_PORT) || 465;
         transportConfig = {
           host: smtpHost,
-          port: parseInt(process.env.SMTP_PORT) || 587,
-          secure: process.env.SMTP_PORT === '465',
+          port: port,
+          secure: port === 465,
           auth: {
             user: smtpUser,
             pass: smtpPass
+          },
+          tls: {
+            rejectUnauthorized: false
           }
         };
       }
@@ -344,6 +353,7 @@ async function sendVerificationEmail(username, email, code) {
       return { success: true, provider: 'SMTP' };
     } catch (err) {
       console.error(`[SMTP ERROR] Failed to send email via SMTP to ${email}:`, err.message);
+      var lastSmtpError = err.message;
     }
   }
 
@@ -393,7 +403,7 @@ async function sendVerificationEmail(username, email, code) {
   console.warn(`  3. Set SMTP_PASS=your_16_char_google_app_password`);
   console.warn(`  4. Restart server!\n`);
 
-  return { success: false, reason: 'SMTP credentials not set in .env' };
+  return { success: false, reason: (typeof lastSmtpError !== 'undefined' && lastSmtpError) ? lastSmtpError : 'SMTP credentials not set in .env' };
 }
 
 
