@@ -99,7 +99,9 @@ const UserSchema = new mongoose.Schema({
   bioLink: { type: String, default: '' },
   isVerified: { type: Boolean, default: false },
   verificationCode: { type: String, default: '' },
-  verificationCodeExpires: { type: Date }
+  verificationCodeExpires: { type: Date },
+  savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
+  profileTheme: { type: String, default: 'gold' }
 }, { timestamps: true });
 
 const User = mongoose.model('User', UserSchema);
@@ -194,6 +196,99 @@ const rateLimiter = (req, res, next) => {
   next();
 };
 
+// Custom HTML Email Template Generator for Spotlite
+function buildCustomEmailHTML(username, code) {
+  const digits = (code || '000000').toString().split('');
+  const digitHTML = digits.map(d => `
+    <td align="center" style="padding: 0 4px;">
+      <div style="width: 44px; height: 56px; line-height: 56px; font-family: 'SF Mono', 'Courier New', Courier, monospace; font-size: 30px; font-weight: 900; color: #ffffff; background: linear-gradient(180deg, #222536 0%, #151724 100%); border: 1.5px solid #ffd700; border-radius: 12px; box-shadow: 0 4px 14px rgba(255, 215, 0, 0.2); text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);">
+        ${d}
+      </div>
+    </td>
+  `).join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotlite Verification Code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #08090d; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e0e0e0; -webkit-font-smoothing: antialiased;">
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 40px auto; background: #0f111a; border-radius: 20px; overflow: hidden; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);">
+    
+    <!-- HEADER BRANDING -->
+    <tr>
+      <td align="center" style="padding: 40px 20px 30px 20px; background: linear-gradient(135deg, #161927 0%, #0a0b12 100%); border-bottom: 2px solid #ffd700;">
+        <div style="display: inline-block; width: 56px; height: 56px; line-height: 56px; background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%); border-radius: 16px; font-size: 28px; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); margin-bottom: 12px;">
+          ✨
+        </div>
+        <div style="font-size: 34px; font-weight: 900; letter-spacing: 2px; color: #ffffff; text-shadow: 0 0 15px rgba(255, 215, 0, 0.3);">
+          <span style="color: #ffd700;">SPOT</span>LITE
+        </div>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #8f93a8; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">Showcase • Connect • Elevate</p>
+      </td>
+    </tr>
+
+    <!-- BODY -->
+    <tr>
+      <td style="padding: 45px 35px 35px 35px;">
+        <h2 style="margin: 0 0 12px 0; color: #ffffff; font-size: 24px; font-weight: 800; text-align: center; letter-spacing: -0.5px;">
+          Welcome to Spotlite, <span style="color: #ffd700;">${username}</span>! 🚀
+        </h2>
+        
+        <p style="margin: 0 0 30px 0; color: #9da2b8; font-size: 15px; line-height: 1.6; text-align: center;">
+          We're thrilled to have you! Enter the 6-digit verification code below to activate your account and start sharing your talent with the world.
+        </p>
+
+        <!-- DIGIT CARDS CONTAINER -->
+        <div style="background: linear-gradient(145deg, #161824, #0d0e17); border: 1px solid #282b3d; border-radius: 16px; padding: 30px 20px; margin: 30px 0; text-align: center; box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);">
+          <div style="font-size: 12px; font-weight: 700; color: #ffd700; text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 20px;">
+            Security Verification Code
+          </div>
+          
+          <!-- DIGITS TABLE -->
+          <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+            <tr>
+              ${digitHTML}
+            </tr>
+          </table>
+
+          <div style="margin-top: 22px; font-size: 13px; color: #ff6b6b; font-weight: 600;">
+            ⏱ Code expires in <strong>15 minutes</strong>
+          </div>
+        </div>
+
+        <!-- SECURITY NOTICE CARD -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 30px;">
+          <tr>
+            <td style="background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: 12px; padding: 18px 20px; border-left: 4px solid #00f2fe;">
+              <p style="margin: 0; font-size: 13px; color: #b4b9cc; line-height: 1.5;">
+                <strong style="color: #00f2fe;">🛡 Security Warning:</strong> Never share this code with anyone. Spotlite support staff will never ask for your verification code or login password.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- FOOTER -->
+    <tr>
+      <td align="center" style="padding: 30px 25px; background-color: #090a10; border-top: 1px solid #1a1c29; font-size: 12px; color: #64687d;">
+        <p style="margin: 0 0 10px 0; color: #8e92a6; font-weight: 600; font-size: 13px;">Spotlite Platform • Connect & Showcase</p>
+        <p style="margin: 0 0 15px 0; line-height: 1.5;">If you did not request a verification code from Spotlite, please ignore this email.</p>
+        <p style="margin: 0; font-size: 11px; color: #494c5e;">&copy; ${new Date().getFullYear()} Spotlite Inc. All rights reserved.</p>
+      </td>
+    </tr>
+
+  </table>
+</body>
+</html>
+  `;
+}
+
+
 // Helper to send verification email via nodemailer/SMTP or EmailJS or fallback to Console logging
 async function sendVerificationEmail(username, email, code) {
   console.log(`\n======================================================`);
@@ -201,16 +296,71 @@ async function sendVerificationEmail(username, email, code) {
   console.log(`[MAIL VERIFICATION] Code: ${code}`);
   console.log(`======================================================\n`);
 
-  // 1. Try EmailJS first if configured
-  if (process.env.EMAILJS_SERVICE_ID && process.env.EMAILJS_TEMPLATE_ID && process.env.EMAILJS_PUBLIC_KEY) {
+  const htmlContent = buildCustomEmailHTML(username, code);
+  const textContent = `Hello ${username},\n\nYour Spotlite verification code is: ${code}\n\nThis code will expire in 15 minutes.`;
+
+  // 1. Try Nodemailer / SMTP first if configured
+  const smtpUser = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : '';
+  const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.trim() : '';
+  const smtpHost = process.env.SMTP_HOST ? process.env.SMTP_HOST.trim() : 'smtp.gmail.com';
+
+  if (smtpUser !== '' && smtpPass !== '') {
+    try {
+      const nodemailer = require('nodemailer');
+      
+      let transportConfig;
+      if (smtpHost === 'smtp.gmail.com' || smtpUser.endsWith('@gmail.com')) {
+        transportConfig = {
+          service: 'gmail',
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          }
+        };
+      } else {
+        transportConfig = {
+          host: smtpHost,
+          port: parseInt(process.env.SMTP_PORT) || 587,
+          secure: process.env.SMTP_PORT === '465',
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          }
+        };
+      }
+
+      const transporter = nodemailer.createTransport(transportConfig);
+      const fromAddress = process.env.SMTP_FROM || `"Spotlite Support" <${smtpUser}>`;
+
+      await transporter.sendMail({
+        from: fromAddress,
+        to: email,
+        subject: `✨ ${code} is your Spotlite verification code`,
+        text: textContent,
+        html: htmlContent
+      });
+
+      console.log(`[SMTP SUCCESS] Custom verification email sent successfully to ${email}`);
+      return { success: true, provider: 'SMTP' };
+    } catch (err) {
+      console.error(`[SMTP ERROR] Failed to send email via SMTP to ${email}:`, err.message);
+    }
+  }
+
+  // 2. Try EmailJS second if configured with valid non-dummy keys
+  const emailJsService = process.env.EMAILJS_SERVICE_ID ? process.env.EMAILJS_SERVICE_ID.trim() : '';
+  const emailJsTemplate = process.env.EMAILJS_TEMPLATE_ID ? process.env.EMAILJS_TEMPLATE_ID.trim() : '';
+  const emailJsPublic = process.env.EMAILJS_PUBLIC_KEY ? process.env.EMAILJS_PUBLIC_KEY.trim() : '';
+
+  if (emailJsService !== '' && emailJsTemplate !== '' && emailJsPublic !== '' && !emailJsService.includes('service_2q05aqi')) {
     try {
       const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          service_id: process.env.EMAILJS_SERVICE_ID,
-          template_id: process.env.EMAILJS_TEMPLATE_ID,
-          user_id: process.env.EMAILJS_PUBLIC_KEY,
+          service_id: emailJsService,
+          template_id: emailJsTemplate,
+          user_id: emailJsPublic,
           accessToken: process.env.EMAILJS_PRIVATE_KEY || undefined,
           template_params: {
             to_name: username,
@@ -218,60 +368,34 @@ async function sendVerificationEmail(username, email, code) {
             reply_to: 'support@spotlite.com',
             passcode: code,
             time: '15 minutes',
-            message: `Hello ${username}, this is your user verification code: ${code}.`
+            message: `Hello ${username}, your Spotlite verification code is: ${code}.`
           }
         })
       });
 
       if (response.ok) {
-        console.log(`Verification email sent to ${email} successfully via EmailJS.`);
-        return;
+        console.log(`[EMAILJS SUCCESS] Verification email sent to ${email} successfully via EmailJS.`);
+        return { success: true, provider: 'EmailJS' };
       } else {
         const text = await response.text();
-        console.error('EmailJS send failed:', text);
+        console.error('[EMAILJS ERROR] EmailJS send failed:', text);
       }
     } catch (err) {
-      console.error('Failed to send verification email via EmailJS:', err.message);
+      console.error('[EMAILJS ERROR] Failed to send verification email via EmailJS:', err.message);
     }
   }
 
-  // 2. Try NodeMailer/SMTP second if configured
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    try {
-      const nodemailer = require('nodemailer');
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT) || 587,
-        secure: process.env.SMTP_PORT === '465',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
-      });
+  // 3. Fallback notice if SMTP / EmailJS is not configured
+  console.warn(`\n[MAIL NOTICE] Real email dispatch was skipped because SMTP_USER / SMTP_PASS are empty in .env.`);
+  console.warn(`To receive REAL emails to your inbox:`);
+  console.warn(`  1. Open .env file`);
+  console.warn(`  2. Set SMTP_USER=your_gmail@gmail.com`);
+  console.warn(`  3. Set SMTP_PASS=your_16_char_google_app_password`);
+  console.warn(`  4. Restart server!\n`);
 
-      await transporter.sendMail({
-        from: `"Spotlite Support" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-        to: email,
-        subject: "Verify your Spotlite Account",
-        text: `Hello ${username}, this is your user verification code: ${code}.`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ffd700; border-radius: 12px; background-color: #121212; color: #ffffff;">
-            <h2 style="color: #ffd700; text-align: center;">Spotlite Account Verification</h2>
-            <p>Hello <strong>${username}</strong>,</p>
-            <p>This is your user verification code to activate your account:</p>
-            <div style="font-size: 24px; font-weight: bold; letter-spacing: 4px; text-align: center; padding: 15px; margin: 20px 0; background-color: #1a1a1a; border-radius: 8px; border: 1px dashed #ffd700; color: #ffd700;">
-              ${code}
-            </div>
-            <p style="font-size: 12px; color: #888888;">This code will expire in 15 minutes. If you did not register for a Spotlite account, please ignore this email.</p>
-          </div>
-        `
-      });
-      console.log(`Verification email sent to ${email} successfully via SMTP.`);
-    } catch (err) {
-      console.error('Failed to send verification email via SMTP:', err.message);
-    }
-  }
+  return { success: false, reason: 'SMTP credentials not set in .env' };
 }
+
 
 // Helper to generate access and refresh tokens
 function generateTokens(user) {
@@ -336,13 +460,13 @@ app.post('/api/auth/register', rateLimiter, async (req, res) => {
 
     await user.save();
 
-    // Send verification email asynchronously
-    sendVerificationEmail(cleanUsername, cleanEmail, verificationCode);
+    // Send verification email
+    const mailResult = await sendVerificationEmail(cleanUsername, cleanEmail, verificationCode);
 
     res.status(201).json({
       message: 'Verification code sent to your email.',
       email: cleanEmail,
-      devCode: (process.env.SMTP_HOST || process.env.EMAILJS_SERVICE_ID) ? undefined : verificationCode
+      devCode: (mailResult && mailResult.success) ? undefined : verificationCode
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -379,13 +503,13 @@ app.post('/api/auth/login', rateLimiter, async (req, res) => {
       await user.save();
 
       // Send code
-      sendVerificationEmail(user.username, user.email, newCode);
+      const mailResult = await sendVerificationEmail(user.username, user.email, newCode);
 
       return res.status(400).json({
         error: 'Your email address is not verified. A new verification code has been sent to your email.',
         emailUnverified: true,
         email: user.email,
-        devCode: (process.env.SMTP_HOST || process.env.EMAILJS_SERVICE_ID) ? undefined : newCode
+        devCode: (mailResult && mailResult.success) ? undefined : newCode
       });
     }
 
@@ -409,7 +533,8 @@ app.post('/api/auth/login', rateLimiter, async (req, res) => {
         techStack: user.techStack,
         spotlightMode: user.spotlightMode,
         badge: user.badge,
-        bioLink: user.bioLink
+        bioLink: user.bioLink,
+        profileTheme: user.profileTheme
       }
     });
   } catch (error) {
@@ -472,7 +597,8 @@ app.post('/api/auth/verify-email', rateLimiter, async (req, res) => {
         techStack: user.techStack,
         spotlightMode: user.spotlightMode,
         badge: user.badge,
-        bioLink: user.bioLink
+        bioLink: user.bioLink,
+        profileTheme: user.profileTheme
       }
     });
   } catch (error) {
@@ -508,11 +634,11 @@ app.post('/api/auth/resend-code', rateLimiter, async (req, res) => {
     await user.save();
 
     // Send email
-    sendVerificationEmail(user.username, cleanEmail, newCode);
+    const mailResult = await sendVerificationEmail(user.username, cleanEmail, newCode);
 
     res.json({ 
       message: 'A new verification code has been sent to your email.',
-      devCode: (process.env.SMTP_HOST || process.env.EMAILJS_SERVICE_ID) ? undefined : newCode
+      devCode: (mailResult && mailResult.success) ? undefined : newCode
     });
   } catch (error) {
     console.error('Resend verification code error:', error);
@@ -543,6 +669,37 @@ app.post('/api/auth/cancel-registration', rateLimiter, async (req, res) => {
     res.status(500).json({ error: 'Internal server error during cancellation.' });
   }
 });
+
+// 2c-2. Test Custom Email
+app.post('/api/auth/test-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Target email address is required.' });
+    }
+
+    const testCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const result = await sendVerificationEmail('TestUser', email.trim().toLowerCase(), testCode);
+
+    if (result && result.success) {
+      return res.json({
+        message: `Custom HTML email sent successfully to ${email} via ${result.provider}!`,
+        provider: result.provider,
+        codeSent: testCode
+      });
+    } else {
+      return res.status(400).json({
+        error: 'Email delivery failed.',
+        reason: result ? result.reason : 'SMTP or EmailJS not configured properly.',
+        instructions: 'Please configure SMTP_USER and SMTP_PASS (Gmail App Password) in your .env file.'
+      });
+    }
+  } catch (err) {
+    console.error('Test email error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // 2d. Refresh Token
 app.post('/api/auth/refresh', async (req, res) => {
@@ -595,7 +752,8 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
       techStack: user.techStack,
       spotlightMode: user.spotlightMode,
       badge: user.badge,
-      bioLink: user.bioLink
+      bioLink: user.bioLink,
+      profileTheme: user.profileTheme
     });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching user profile.' });
@@ -605,7 +763,7 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
 // 4. Update Profile
 app.put('/api/users/profile', authenticateToken, async (req, res) => {
   try {
-    const { bio, avatar, username, githubUrl, techStack, spotlightMode, badge, bioLink } = req.body;
+    const { bio, avatar, username, githubUrl, techStack, spotlightMode, badge, bioLink, profileTheme } = req.body;
     const updateData = {};
 
     if (bio !== undefined) updateData.bio = bio;
@@ -615,6 +773,7 @@ app.put('/api/users/profile', authenticateToken, async (req, res) => {
     if (spotlightMode !== undefined) updateData.spotlightMode = spotlightMode;
     if (badge !== undefined) updateData.badge = badge;
     if (bioLink !== undefined) updateData.bioLink = bioLink;
+    if (profileTheme !== undefined) updateData.profileTheme = profileTheme;
 
     if (username) {
       const cleanUsername = username.trim().toLowerCase();
@@ -645,7 +804,8 @@ app.put('/api/users/profile', authenticateToken, async (req, res) => {
       techStack: updatedUser.techStack,
       spotlightMode: updatedUser.spotlightMode,
       badge: updatedUser.badge,
-      bioLink: updatedUser.bioLink
+      bioLink: updatedUser.bioLink,
+      profileTheme: updatedUser.profileTheme
     });
   } catch (error) {
     console.error('Profile update error:', error);
@@ -676,7 +836,8 @@ app.get('/api/users/profile/:username', async (req, res) => {
       techStack: user.techStack,
       spotlightMode: user.spotlightMode,
       badge: user.badge,
-      bioLink: user.bioLink
+      bioLink: user.bioLink,
+      profileTheme: user.profileTheme
     });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching profile.' });
@@ -877,6 +1038,22 @@ app.get('/api/posts/user/:username', async (req, res) => {
   }
 });
 
+// NEW ENDPOINT: Get Saved Posts
+app.get('/api/posts/saved', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const posts = await Post.find({ _id: { $in: user.savedPosts } })
+      .populate('author', 'username avatar')
+      .sort({ createdAt: -1 });
+
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch saved posts.' });
+  }
+});
+
 // NEW ENDPOINT: Get a single post by ID
 app.get('/api/posts/:id', authenticateToken, async (req, res) => {
   try {
@@ -946,6 +1123,28 @@ app.post('/api/posts/:id/share', authenticateToken, async (req, res) => {
   }
 });
 
+// NEW ENDPOINT: Save/Bookmark Post
+app.post('/api/posts/:id/save', authenticateToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const isSaved = user.savedPosts.includes(post._id);
+    if (isSaved) {
+      user.savedPosts.pull(post._id);
+    } else {
+      user.savedPosts.push(post._id);
+    }
+    await user.save();
+
+    res.json({ saved: !isSaved });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save post.' });
+  }
+});
 // 12. Add Comment to Post
 app.post('/api/posts/:id/comment', authenticateToken, async (req, res) => {
   try {

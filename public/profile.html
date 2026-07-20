@@ -186,10 +186,19 @@
                         <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                         <span>Q&A</span>
                     </button>
+                    <button class="profile-tab" id="tab-saved-btn" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                        <span>Saved</span>
+                    </button>
                 </div>
 
                 <!-- Grid of Posts -->
                 <div class="posts-grid" id="profile-posts-grid">
+                    <!-- Loaded dynamically -->
+                </div>
+
+                <!-- Saved Posts Grid (Only visible on own profile) -->
+                <div class="posts-grid" id="profile-saved-grid" style="display: none;">
                     <!-- Loaded dynamically -->
                 </div>
 
@@ -316,6 +325,17 @@
             <div class="form-group">
                 <label for="edit-tech-stack">Tech Stack (comma separated)</label>
                 <input type="text" id="edit-tech-stack" placeholder="HTML, CSS, JS, Node, React">
+            </div>
+
+            <div class="form-group">
+                <label for="edit-profile-theme">Profile Theme</label>
+                <select id="edit-profile-theme" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; color: var(--text-primary); font-size: 0.95rem;">
+                    <option value="gold">Gold (Default) ✨</option>
+                    <option value="emerald">Emerald 💚</option>
+                    <option value="sapphire">Sapphire 💙</option>
+                    <option value="crimson">Crimson ❤️</option>
+                    <option value="purple">Royal Purple 💜</option>
+                </select>
             </div>
 
             <div class="privacy-toggle-wrapper" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">

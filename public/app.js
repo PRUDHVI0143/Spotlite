@@ -2,6 +2,43 @@
 // SPOTLITE APP - FRONTEND APPLICATION JAVASCRIPT
 // -------------------------------------------------------------
 
+// Utility: Apply chosen profile theme to the body
+function applyThemeClass(theme) {
+    if (!theme) theme = 'gold';
+    // Remove any existing theme- classes
+    document.body.className = document.body.className.split(' ').filter(c => !c.startsWith('theme-')).join(' ');
+    document.body.classList.add('theme-' + theme);
+}
+
+window.savedPostIdsSet = new Set();
+async function fetchSavedPostsSet() {
+    try {
+        const res = await fetch(`${API_BASE}/posts/saved`, {
+            headers: getHeaders()
+        });
+        if (res.ok) {
+            const posts = await res.json();
+            window.savedPostIdsSet = new Set(posts.map(p => p._id));
+        }
+    } catch (e) {
+        console.error('Failed to fetch saved posts set:', e);
+    }
+}
+
+// Immediately apply the theme if saved in localStorage
+(function() {
+    try {
+        const cachedUser = JSON.parse(localStorage.getItem('user'));
+        if (cachedUser && cachedUser.profileTheme) {
+            applyThemeClass(cachedUser.profileTheme);
+        } else {
+            applyThemeClass('gold');
+        }
+    } catch (e) {
+        applyThemeClass('gold');
+    }
+})();
+
 const API_BASE = '/api';
 
 // Global Fetch Interceptor to handle expired/invalid tokens
@@ -991,6 +1028,7 @@ function setupCreatePostModal() {
 async function initFeedPage() {
     if (!checkAuth()) return;
     
+    await fetchSavedPostsSet();
     setupNavigationLinks();
     setupCreatePostModal();
     setupSearchPanel();
@@ -1170,7 +1208,7 @@ function createPostCard(post) {
                 </button>
             </div>
             <!-- Bookmark -->
-            <button class="action-btn bookmark-btn" id="bookmark-btn-${post._id}" title="Save">
+            <button class="action-btn bookmark-btn ${window.savedPostIdsSet && window.savedPostIdsSet.has(post._id) ? 'bookmarked' : ''}" id="bookmark-btn-${post._id}" title="Save">
                 <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
             </button>
         </div>
@@ -1251,8 +1289,29 @@ function createPostCard(post) {
     commentBtn.addEventListener('click', () => openPostDetailModal(post._id));
 
     // Bookmark toggle
-    bookmarkBtn.addEventListener('click', () => {
-        bookmarkBtn.classList.toggle('bookmarked');
+    bookmarkBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+            const response = await fetch(`${API_BASE}/posts/${post._id}/save`, {
+                method: 'POST',
+                headers: getHeaders()
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+            bookmarkBtn.classList.toggle('bookmarked', data.saved);
+            if (data.saved) {
+                if (window.savedPostIdsSet) window.savedPostIdsSet.add(post._id);
+            } else {
+                if (window.savedPostIdsSet) window.savedPostIdsSet.delete(post._id);
+                // If we are on the profile page and the active tab is "Saved", remove the card immediately
+                const activeTab = document.querySelector('.profile-tab.active');
+                if (activeTab && activeTab.id === 'tab-saved-btn') {
+                    card.remove();
+                }
+            }
+        } catch (err) {
+            console.error('Save post error:', err);
+        }
     });
 
     // Share button
@@ -1701,6 +1760,7 @@ let profileUserObjectId = ''; // Stores target profile ID for follow actions
 async function initProfilePage() {
     if (!checkAuth()) return;
 
+    await fetchSavedPostsSet();
     setupNavigationLinks();
     setupCreatePostModal();
     setupEditProfileModal();
@@ -1786,23 +1846,25 @@ function setupProfileTabs() {
     const btnPosts = document.getElementById('tab-posts-btn');
     const btnDev = document.getElementById('tab-dev-info-btn');
     const btnQA = document.getElementById('tab-qa-btn');
+    const btnSaved = document.getElementById('tab-saved-btn');
 
     const panelPosts = document.getElementById('profile-posts-grid');
     const panelDev = document.getElementById('profile-dev-container');
     const panelQA = document.getElementById('profile-qa-container');
+    const panelSaved = document.getElementById('profile-saved-grid');
 
     if (!btnPosts) return;
 
     function switchTab(activeBtn, activePanel) {
-        [btnPosts, btnDev, btnQA].forEach(btn => {
+        [btnPosts, btnDev, btnQA, btnSaved].forEach(btn => {
             if (btn) btn.classList.remove('active');
         });
-        [panelPosts, panelDev, panelQA].forEach(panel => {
+        [panelPosts, panelDev, panelQA, panelSaved].forEach(panel => {
             if (panel) panel.style.display = 'none';
         });
 
         activeBtn.classList.add('active');
-        activePanel.style.display = activePanel === panelPosts ? 'grid' : 'block';
+        activePanel.style.display = (activePanel === panelPosts || activePanel === panelSaved) ? 'grid' : 'block';
     }
 
     btnPosts.onclick = () => switchTab(btnPosts, panelPosts);
@@ -1840,6 +1902,68 @@ function setupProfileTabs() {
         loadQA(profileUserObjectId);
         setupQASubmission(profileUserObjectId);
     };
+
+    if (btnSaved) {
+        btnSaved.onclick = () => {
+            switchTab(btnSaved, panelSaved);
+            loadSavedProfileGrid();
+        };
+    }
+}
+
+// Helper: Load Saved posts grid
+async function loadSavedProfileGrid() {
+    const grid = document.getElementById('profile-saved-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '<p style="color:var(--text-secondary); grid-column: 1/-1; text-align: center; padding: 20px;">Loading saved posts...</p>';
+
+    try {
+        const response = await fetch(`${API_BASE}/posts/saved`, {
+            headers: getHeaders()
+        });
+
+        const posts = await response.json();
+        if (!response.ok) throw new Error(posts.error);
+
+        if (posts.length === 0) {
+            grid.innerHTML = `
+                <div style="text-align: center; padding: 60px 0; border-top: 1px solid var(--border-color); grid-column: 1/-1; width: 100%;">
+                    <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--text-secondary)" stroke-width="1.5" fill="none" style="margin-bottom: 12px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                    <h3>No Saved Posts</h3>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = '';
+        posts.forEach(post => {
+            const item = document.createElement('div');
+            item.className = 'grid-post-item';
+            item.innerHTML = `
+                <img src="${post.image}" alt="Post image" class="grid-post-img">
+                <div class="grid-post-overlay">
+                    <div class="overlay-stat">
+                        <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                        <span>${post.likes ? post.likes.length : 0}</span>
+                    </div>
+                    <div class="overlay-stat">
+                        <svg viewBox="0 0 24 24" stroke="white" fill="white"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span>${post.comments ? post.comments.length : 0}</span>
+                    </div>
+                </div>
+            `;
+
+            item.addEventListener('click', () => {
+                openPostDetailModal(post._id);
+            });
+
+            grid.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Error fetching saved grid posts:', err);
+        grid.innerHTML = '<p style="color:var(--accent-red); grid-column: 1/-1; text-align: center; padding: 20px;">Failed to load saved posts.</p>';
+    }
 }
 
 // Helper: Load Anonymous QA questions list
@@ -1979,6 +2103,7 @@ async function loadProfileHeader(username) {
 
         profileUserObjectId = data.id;
         currentProfileUser = data;
+        applyThemeClass(data.profileTheme);
 
         // Populate elements
         document.getElementById('profile-user-avatar').src = data.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${data.username}`;
@@ -2121,16 +2246,19 @@ async function loadProfileHeader(username) {
             }
         }
 
+        const tabSavedBtn = document.getElementById('tab-saved-btn');
         if (currentUser && currentUser.username === username.toLowerCase()) {
             // OWN profile – show edit button only
             editBtn.style.display = 'block';
             optionsBtn.style.display = 'none';
             actionsRow.style.display = 'none';
+            if (tabSavedBtn) tabSavedBtn.style.display = 'flex';
         } else {
             // OTHER profile – show actions row & options
             editBtn.style.display = 'none';
             optionsBtn.style.display = 'flex';
             actionsRow.style.display = 'flex';
+            if (tabSavedBtn) tabSavedBtn.style.display = 'none';
 
             // Check if currently following
             const isFollowing = data.followers && data.followers.some(f => (f._id || f) === (currentUser ? currentUser.id : ''));
@@ -2261,6 +2389,7 @@ function setupEditProfileModal() {
     const githubUrlInput = document.getElementById('edit-github-url');
     const techStackInput = document.getElementById('edit-tech-stack');
     const spotlightModeInput = document.getElementById('edit-spotlight-mode');
+    const profileThemeInput = document.getElementById('edit-profile-theme');
     const avatarPreview = document.getElementById('edit-avatar-preview');
     const saveBtn = document.getElementById('save-profile-btn');
     const errorMsg = document.getElementById('edit-profile-error');
@@ -2287,6 +2416,7 @@ function setupEditProfileModal() {
             if (githubUrlInput) githubUrlInput.value = currentProfileUser.githubUrl || '';
             if (techStackInput) techStackInput.value = currentProfileUser.techStack ? currentProfileUser.techStack.join(', ') : '';
             if (spotlightModeInput) spotlightModeInput.checked = currentProfileUser.spotlightMode || false;
+            if (profileThemeInput) profileThemeInput.value = currentProfileUser.profileTheme || 'gold';
         }
     });
 
@@ -2343,6 +2473,7 @@ function setupEditProfileModal() {
         const techStackRaw = techStackInput ? techStackInput.value.trim() : '';
         const techStack = techStackRaw ? techStackRaw.split(',').map(s => s.trim()).filter(s => s !== '') : [];
         const spotlightMode = spotlightModeInput ? spotlightModeInput.checked : false;
+        const profileTheme = profileThemeInput ? profileThemeInput.value : 'gold';
 
         try {
             saveBtn.textContent = 'Saving...';
@@ -2351,7 +2482,7 @@ function setupEditProfileModal() {
             const response = await fetch(`${API_BASE}/users/profile`, {
                 method: 'PUT',
                 headers: getHeaders(),
-                body: JSON.stringify({ avatar, bio, bioLink, githubUrl, techStack, spotlightMode })
+                body: JSON.stringify({ avatar, bio, bioLink, githubUrl, techStack, spotlightMode, profileTheme })
             });
 
             const data = await response.json();
@@ -2366,8 +2497,10 @@ function setupEditProfileModal() {
                 cachedUser.githubUrl = data.githubUrl;
                 cachedUser.techStack = data.techStack;
                 cachedUser.spotlightMode = data.spotlightMode;
+                cachedUser.profileTheme = data.profileTheme;
                 localStorage.setItem('user', JSON.stringify(cachedUser));
             }
+            applyThemeClass(data.profileTheme);
 
             closeModal();
             // Reload header

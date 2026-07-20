@@ -26,6 +26,52 @@
     --glass-border: rgba(191, 149, 63, 0.18);
 }
 
+/* Theme Overrides */
+body.theme-gold {
+    --accent-blue: #bf953f;
+    --accent-blue-hover: #ffcb05;
+    --accent-gold: #ffcb05;
+    --accent-gold-hover: #ffdb4d;
+    --spotlite-gradient: linear-gradient(45deg, #bf953f 0%, #aa771c 50%, #ffcb05 100%);
+    --glass-border: rgba(191, 149, 63, 0.18);
+}
+
+body.theme-emerald {
+    --accent-blue: #059669;
+    --accent-blue-hover: #10b981;
+    --accent-gold: #10b981;
+    --accent-gold-hover: #34d399;
+    --spotlite-gradient: linear-gradient(45deg, #059669 0%, #065f46 50%, #10b981 100%);
+    --glass-border: rgba(16, 185, 129, 0.18);
+}
+
+body.theme-sapphire {
+    --accent-blue: #2563eb;
+    --accent-blue-hover: #3b82f6;
+    --accent-gold: #3b82f6;
+    --accent-gold-hover: #60a5fa;
+    --spotlite-gradient: linear-gradient(45deg, #2563eb 0%, #1e3a8a 50%, #3b82f6 100%);
+    --glass-border: rgba(59, 130, 246, 0.18);
+}
+
+body.theme-crimson {
+    --accent-blue: #dc2626;
+    --accent-blue-hover: #ef4444;
+    --accent-gold: #ef4444;
+    --accent-gold-hover: #f87171;
+    --spotlite-gradient: linear-gradient(45deg, #dc2626 0%, #7f1d1d 50%, #ef4444 100%);
+    --glass-border: rgba(239, 68, 68, 0.18);
+}
+
+body.theme-purple {
+    --accent-blue: #7c3aed;
+    --accent-blue-hover: #8b5cf6;
+    --accent-gold: #8b5cf6;
+    --accent-gold-hover: #a78bfa;
+    --spotlite-gradient: linear-gradient(45deg, #7c3aed 0%, #4c1d95 50%, #8b5cf6 100%);
+    --glass-border: rgba(139, 92, 246, 0.18);
+}
+
 * {
     margin: 0;
     padding: 0;
