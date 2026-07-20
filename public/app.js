@@ -3354,3 +3354,146 @@ async function sendMessage() {
         alert('Failed to send message: ' + err.message);
     }
 }
+
+// -------------------------------------------------------------
+// POST DETAIL MODAL (SINGLE POST VIEW)
+// -------------------------------------------------------------
+async function openPostDetailModal(postId) {
+    const modal = document.getElementById('post-detail-modal-overlay');
+    if (!modal) return;
+
+    const img = document.getElementById('detail-post-img');
+    const avatar = document.getElementById('detail-post-avatar');
+    const username = document.getElementById('detail-post-username');
+    const catBadge = document.getElementById('detail-post-category-badge');
+    const commentsList = document.getElementById('detail-comments-list');
+    const likesCount = document.getElementById('detail-likes-count');
+    const likeBtn = document.getElementById('detail-like-btn');
+    const commentInput = document.getElementById('detail-comment-input');
+    const commentSubmit = document.getElementById('detail-comment-submit-btn');
+    const authorNav = document.getElementById('detail-author-nav');
+
+    if (commentsList) commentsList.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">Loading post details...</p>';
+    modal.classList.add('active');
+
+    try {
+        const response = await fetch(`${API_BASE}/posts/single/${postId}`, { headers: getHeaders() });
+        const post = await response.json();
+        if (!response.ok) throw new Error(post.error || 'Failed to load post');
+
+        if (img) img.src = post.image;
+        if (avatar) avatar.src = post.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${post.author.username}`;
+        if (username) username.textContent = post.author.username;
+        if (catBadge) catBadge.innerHTML = getCategoryBadgeHTML(post.category);
+
+        if (authorNav) {
+            authorNav.onclick = () => {
+                window.location.href = `profile.html?u=${post.author.username}`;
+            };
+        }
+
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+        const isLiked = post.likes ? post.likes.includes(currentUser ? currentUser.id : '') : false;
+
+        if (likeBtn) {
+            likeBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="${isLiked ? 'var(--accent-red)' : 'none'}" stroke="${isLiked ? 'var(--accent-red)' : 'currentColor'}" stroke-width="2">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+            `;
+            likeBtn.onclick = async () => {
+                try {
+                    const lRes = await fetch(`${API_BASE}/posts/${post._id}/like`, {
+                        method: 'POST',
+                        headers: getHeaders()
+                    });
+                    const lData = await lRes.json();
+                    if (!lRes.ok) throw new Error(lData.error);
+                    openPostDetailModal(postId); // Refresh modal
+                } catch (e) {
+                    alert(e.message);
+                }
+            };
+        }
+
+        if (likesCount) likesCount.textContent = `${post.likes ? post.likes.length : 0} like${(post.likes && post.likes.length !== 1) ? 's' : ''}`;
+
+        // Render Comments and Caption
+        if (commentsList) {
+            commentsList.innerHTML = `
+                <div style="display:flex;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border-color);">
+                    <img src="${post.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${post.author.username}`}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="">
+                    <div>
+                        <span style="font-weight:700;color:var(--text-primary);margin-right:6px;">${post.author.username}</span>
+                        <span style="color:var(--text-primary);">${escapeHtml(post.caption || '')}</span>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">${formatTime(post.createdAt)}</div>
+                    </div>
+                </div>
+            `;
+
+            if (!post.comments || post.comments.length === 0) {
+                commentsList.innerHTML += `<p style="color:var(--text-muted);text-align:center;padding:20px 0;font-size:0.85rem;">No comments yet. Be the first to comment!</p>`;
+            } else {
+                post.comments.forEach(c => {
+                    const cAuthor = c.author || { username: 'user', avatar: '' };
+                    const cDiv = document.createElement('div');
+                    cDiv.style.cssText = 'display:flex;gap:12px;align-items:flex-start;';
+                    cDiv.innerHTML = `
+                        <img src="${cAuthor.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${cAuthor.username}`}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" alt="">
+                        <div style="flex:1;">
+                            <span style="font-weight:600;color:var(--text-primary);margin-right:6px;font-size:0.85rem;">${cAuthor.username}</span>
+                            <span style="color:var(--text-primary);font-size:0.85rem;">${escapeHtml(c.text)}</span>
+                            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${formatTime(c.createdAt || post.createdAt)}</div>
+                        </div>
+                    `;
+                    commentsList.appendChild(cDiv);
+                });
+            }
+        }
+
+        // Comment submission
+        if (commentSubmit && commentInput) {
+            commentSubmit.onclick = async () => {
+                const text = commentInput.value.trim();
+                if (!text) return;
+                try {
+                    commentSubmit.disabled = true;
+                    const cRes = await fetch(`${API_BASE}/posts/${post._id}/comment`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ text })
+                    });
+                    const cData = await cRes.json();
+                    if (!cRes.ok) throw new Error(cData.error);
+                    commentInput.value = '';
+                    openPostDetailModal(postId); // Refresh modal
+                } catch (e) {
+                    alert(e.message);
+                } finally {
+                    commentSubmit.disabled = false;
+                }
+            };
+        }
+
+    } catch (err) {
+        if (commentsList) commentsList.innerHTML = `<p style="color:var(--accent-red);text-align:center;padding:20px;">${err.message}</p>`;
+    }
+}
+
+// Global listener for post detail closing
+document.addEventListener('DOMContentLoaded', () => {
+    const detailOverlay = document.getElementById('post-detail-modal-overlay');
+    const closeBtn = document.getElementById('close-detail-modal');
+    if (closeBtn && detailOverlay) {
+        closeBtn.addEventListener('click', () => {
+            detailOverlay.classList.remove('active');
+        });
+    }
+    if (detailOverlay) {
+        detailOverlay.addEventListener('click', (e) => {
+            if (e.target === detailOverlay) {
+                detailOverlay.classList.remove('active');
+            }
+        });
+    }
+});

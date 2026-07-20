@@ -1072,6 +1072,20 @@ app.get('/api/posts/user/:username', async (req, res) => {
   }
 });
 
+// 10b. Get Single Post Details
+app.get('/api/posts/single/:id', authenticateToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .populate('author', 'username avatar')
+      .populate('comments.author', 'username avatar');
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+    res.json(post);
+  } catch (error) {
+    console.error('Fetch single post error:', error);
+    res.status(500).json({ error: 'Error fetching post details.' });
+  }
+});
+
 // NEW ENDPOINT: Get Saved Posts
 app.get('/api/posts/saved', authenticateToken, async (req, res) => {
   try {
