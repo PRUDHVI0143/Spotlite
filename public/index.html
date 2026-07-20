@@ -192,11 +192,11 @@
     <div class="modal-overlay" id="create-post-modal-overlay">
         <div class="modal-content create-post-modal">
             <div class="modal-header">
-                <h3 class="modal-title">Create new post</h3>
+                <h3 class="modal-title">✨ Create New Spotlite</h3>
                 <button class="modal-close-btn" id="close-create-modal">
                     <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
-                <button class="modal-next-btn" id="submit-post-btn">Share</button>
+                <button class="modal-next-btn" id="submit-post-btn">Share ✨</button>
             </div>
             
             <!-- Category Selection Bar (Always Visible Immediately) -->
@@ -222,15 +222,15 @@
 
             <!-- File Drop / Paste Link area -->
             <div class="drag-drop-area" id="drop-area">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <p>Drag photos here or click to upload</p>
-                <label for="post-file-input" style="color: var(--accent-blue); font-weight: 600; cursor: pointer;">Select from computer</label>
+                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+                <p style="margin-top: 10px; font-weight: 600; font-size: 0.95rem;">Drag & drop photos here or upload</p>
+                <label for="post-file-input" style="display: inline-block; margin-top: 10px; background: var(--spotlite-gradient); color: black; font-weight: 700; padding: 8px 18px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; box-shadow: 0 4px 14px rgba(255, 203, 5, 0.3);">Select from computer</label>
                 <input type="file" id="post-file-input" accept="image/*" style="display: none;">
                 
-                <p style="margin-top: 15px; font-size: 0.85rem;">Or paste an image URL:</p>
-                <div style="display: flex; gap: 8px; width: 80%; justify-content: center; margin-top: 5px;">
-                    <input type="text" id="post-url-input" placeholder="https://example.com/image.jpg" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; color: var(--text-primary); flex: 1; font-size: 0.85rem;">
-                    <button id="post-url-submit-btn" style="background: var(--spotlite-gradient); color: black; border: none; border-radius: 6px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 0.85rem;">Load</button>
+                <p style="margin-top: 18px; font-size: 0.82rem; color: var(--text-muted);">Or paste an image URL:</p>
+                <div style="display: flex; gap: 8px; width: 85%; justify-content: center; margin-top: 6px;">
+                    <input type="text" id="post-url-input" placeholder="https://example.com/image.jpg" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); flex: 1; font-size: 0.85rem;">
+                    <button id="post-url-submit-btn" style="background: var(--spotlite-gradient); color: black; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">Load</button>
                 </div>
             </div>
 
@@ -242,6 +242,22 @@
 
             <div class="modal-caption-area" id="caption-area" style="display: none;">
                 <textarea class="caption-textarea" id="post-caption-input" placeholder="Write a caption..."></textarea>
+                <div class="char-counter" id="caption-char-counter">0 / 500</div>
+                
+                <!-- Quick Hashtag Pills -->
+                <div style="margin-top: 8px;">
+                    <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">Suggested Tags:</span>
+                    <div class="hashtag-chips-row" id="quick-hashtag-chips">
+                        <span class="hashtag-chip" data-tag="#spotlite">#spotlite</span>
+                        <span class="hashtag-chip" data-tag="#trending">#trending</span>
+                        <span class="hashtag-chip" data-tag="#viral">#viral</span>
+                        <span class="hashtag-chip" data-tag="#vibes">#vibes</span>
+                        <span class="hashtag-chip" data-tag="#tech">#tech</span>
+                        <span class="hashtag-chip" data-tag="#travel">#travel</span>
+                        <span class="hashtag-chip" data-tag="#coding">#coding</span>
+                    </div>
+                </div>
+
                 <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
                         <label for="post-mood-select" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 70px;">Post Mood:</label>
@@ -256,7 +272,7 @@
                     </div>
                     <button type="button" class="ai-caption-btn" id="ai-generate-caption-btn">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 4px;"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
-                        Generate AI Caption & Auto-Category
+                        ✨ Generate AI Caption & Auto-Category
                     </button>
                 </div>
             </div>

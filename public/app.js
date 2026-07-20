@@ -882,6 +882,8 @@ function setupCreatePostModal() {
         const customInput = document.getElementById('post-custom-category-input');
         if (customWrapper) customWrapper.style.display = 'none';
         if (customInput) customInput.value = '';
+        const charCounter = document.getElementById('caption-char-counter');
+        if (charCounter) charCounter.textContent = '0 / 500';
         
         dropArea.style.display = 'flex';
         previewContainer.style.display = 'none';
@@ -911,6 +913,31 @@ function setupCreatePostModal() {
                 if (customInput) customInput.focus();
             } else {
                 customWrapper.style.display = 'none';
+            }
+        });
+    // Character counter & Quick Hashtags
+    const charCounter = document.getElementById('caption-char-counter');
+    if (captionInput && charCounter) {
+        captionInput.addEventListener('input', () => {
+            charCounter.textContent = `${captionInput.value.length} / 500`;
+            if (captionInput.value.length > 500) {
+                charCounter.style.color = 'var(--accent-red)';
+            } else {
+                charCounter.style.color = 'var(--text-muted)';
+            }
+        });
+    }
+
+    const hashtagContainer = document.getElementById('quick-hashtag-chips');
+    if (hashtagContainer && captionInput) {
+        hashtagContainer.addEventListener('click', (e) => {
+            const chip = e.target.closest('.hashtag-chip');
+            if (chip) {
+                const tag = chip.getAttribute('data-tag');
+                if (tag && !captionInput.value.includes(tag)) {
+                    captionInput.value = captionInput.value ? `${captionInput.value.trim()} ${tag}` : tag;
+                    if (charCounter) charCounter.textContent = `${captionInput.value.length} / 500`;
+                }
             }
         });
     }

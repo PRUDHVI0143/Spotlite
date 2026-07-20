@@ -3172,3 +3172,92 @@ input:checked+.slider:before {
     border-radius: 16px;
     overflow: visible;
 }
+
+/* -------------------------------------------------------------
+   CREATE POST MODAL REDESIGN & ENHANCEMENTS
+   ------------------------------------------------------------- */
+.modal-content.create-post-modal {
+    border-radius: 20px;
+    border: 1px solid rgba(255, 203, 5, 0.25);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(255, 203, 5, 0.12);
+    overflow: hidden;
+    backdrop-filter: blur(16px);
+}
+
+.create-post-modal .modal-header {
+    background: linear-gradient(180deg, rgba(255, 203, 5, 0.08) 0%, transparent 100%);
+    padding: 16px 20px;
+}
+
+.create-post-modal .modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    background: var(--spotlite-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.drag-drop-area {
+    border: 2px dashed rgba(255, 203, 5, 0.35);
+    border-radius: 16px;
+    margin: 16px 20px;
+    padding: 35px 20px;
+    background: rgba(255, 255, 255, 0.02);
+    transition: all 0.25s ease;
+}
+
+.drag-drop-area:hover, .drag-drop-area.drag-over {
+    border-color: var(--accent-gold);
+    background: rgba(255, 203, 5, 0.05);
+    box-shadow: 0 0 20px rgba(255, 203, 5, 0.15);
+}
+
+.drag-drop-area svg {
+    color: var(--accent-gold);
+    filter: drop-shadow(0 4px 12px rgba(255, 203, 5, 0.3));
+    transition: transform 0.25s ease;
+}
+
+.drag-drop-area:hover svg {
+    transform: translateY(-4px) scale(1.06);
+}
+
+.hashtag-chips-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 6px 0 10px;
+    scrollbar-width: none;
+}
+
+.hashtag-chips-row::-webkit-scrollbar {
+    display: none;
+}
+
+.hashtag-chip {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    color: var(--accent-blue);
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.hashtag-chip:hover {
+    background: rgba(0, 210, 255, 0.15);
+    border-color: rgba(0, 210, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.char-counter {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: right;
+    font-weight: 500;
+    margin-top: 4px;
+}
