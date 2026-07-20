@@ -100,6 +100,12 @@
         <!-- Main Content Area -->
         <main class="main-content">
             <div class="content-container" style="flex-direction: column; max-width: 935px;">
+                <!-- Animated Profile Cover Banner -->
+                <div class="profile-cover-banner" id="profile-cover-banner">
+                    <div class="cover-gradient-overlay"></div>
+                    <div class="cover-sparkles">✨</div>
+                </div>
+
                 <!-- Profile Header Card -->
                 <header class="profile-header">
                     <div class="profile-avatar-container">
@@ -192,6 +198,27 @@
                     </button>
                 </div>
 
+                <!-- Profile Post Sub-Header (Category Filter & Grid/List View Controls) -->
+                <div class="profile-post-controls-bar" id="profile-post-controls-bar">
+                    <div class="profile-category-pills" id="profile-category-filter-bar">
+                        <button class="prof-cat-pill active" data-category="all">All</button>
+                        <button class="prof-cat-pill" data-category="Happy">😊 Happy</button>
+                        <button class="prof-cat-pill" data-category="Tech & Code">💻 Tech</button>
+                        <button class="prof-cat-pill" data-category="Art & Design">🎨 Art</button>
+                        <button class="prof-cat-pill" data-category="Travel & Lifestyle">✈️ Travel</button>
+                        <button class="prof-cat-pill" data-category="Fitness & Health">🏋️ Fitness</button>
+                        <button class="prof-cat-pill" data-category="Gaming">🎮 Gaming</button>
+                    </div>
+                    <div class="view-mode-toggle">
+                        <button class="view-mode-btn active" id="view-mode-grid" title="Grid View">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        </button>
+                        <button class="view-mode-btn" id="view-mode-list" title="Feed View">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Grid of Posts -->
                 <div class="posts-grid" id="profile-posts-grid">
                     <!-- Loaded dynamically -->
@@ -248,6 +275,27 @@
                 <button class="modal-next-btn" id="submit-post-btn">Share</button>
             </div>
             
+            <!-- Category Selection Bar (Always Visible Immediately) -->
+            <div style="padding: 14px 20px; background: rgba(255, 203, 5, 0.05); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <label for="post-category-select" style="font-size: 0.88rem; color: var(--accent-gold); font-weight: 700; min-width: 75px;">Category:</label>
+                <select id="post-category-select" style="background-color: var(--bg-input); border: 1.5px solid var(--border-color); border-radius: 8px; padding: 9px 14px; color: var(--text-primary); font-size: 0.88rem; flex: 1; outline: none; cursor: pointer; font-weight: 600;">
+                    <option value="General">🌟 General / Showcase</option>
+                    <option value="Happy">😊 Happy</option>
+                    <option value="Tech & Code">💻 Tech & Code</option>
+                    <option value="Art & Design">🎨 Art & Design</option>
+                    <option value="Travel & Lifestyle">✈️ Travel & Lifestyle</option>
+                    <option value="Fitness & Health">🏋️ Fitness & Health</option>
+                    <option value="Gaming">🎮 Gaming</option>
+                    <option value="Music">🎵 Music</option>
+                    <option value="Education">📚 Education & Study</option>
+                    <option value="Other">✏️ Other (Custom Category)</option>
+                </select>
+            </div>
+            <div id="post-custom-category-wrapper" style="display: none; padding: 10px 20px; background: rgba(255, 203, 5, 0.03); border-bottom: 1px solid var(--border-color); align-items: center; justify-content: space-between; gap: 12px;">
+                <label for="post-custom-category-input" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 75px;">Custom:</label>
+                <input type="text" id="post-custom-category-input" placeholder="Type custom category name..." style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; flex: 1; outline: none;">
+            </div>
+
             <div class="drag-drop-area" id="drop-area">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 <p>Drag photos here or click to upload</p>
@@ -268,10 +316,10 @@
 
             <div class="modal-caption-area" id="caption-area" style="display: none;">
                 <textarea class="caption-textarea" id="post-caption-input" placeholder="Write a caption..."></textarea>
-                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <label for="post-mood-select" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 550;">Post Mood:</label>
-                        <select id="post-mood-select" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-size: 0.8rem;">
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <label for="post-mood-select" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 70px;">Post Mood:</label>
+                        <select id="post-mood-select" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; flex: 1; outline: none; cursor: pointer;">
                             <option value="">None</option>
                             <option value="Happy">Happy 😊</option>
                             <option value="Travel">Travel ✈️</option>
@@ -282,7 +330,7 @@
                     </div>
                     <button type="button" class="ai-caption-btn" id="ai-generate-caption-btn">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 4px;"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
-                        Generate AI Caption & Tags
+                        Generate AI Caption & Auto-Category
                     </button>
                 </div>
             </div>

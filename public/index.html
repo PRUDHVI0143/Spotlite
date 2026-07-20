@@ -107,14 +107,35 @@
                         <!-- Real user stories loaded by app.js -->
                     </div>
 
-                    <!-- Mood Filter Bar -->
-                    <div class="mood-filter-bar" id="mood-filter-bar">
-                        <button class="mood-pill active" data-mood="all">All</button>
-                        <button class="mood-pill" data-mood="Happy">Happy 😊</button>
-                        <button class="mood-pill" data-mood="Travel">Travel ✈️</button>
-                        <button class="mood-pill" data-mood="Study">Study 📚</button>
-                        <button class="mood-pill" data-mood="Fitness">Fitness 💪</button>
-                        <button class="mood-pill" data-mood="Coding">Coding 💻</button>
+                    <!-- Quick Post Creator Box -->
+                    <div class="quick-post-card" id="quick-post-trigger">
+                        <img src="https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=default" alt="Avatar" class="quick-post-avatar" id="quick-post-user-avatar">
+                        <div class="quick-post-input-box">
+                            <span>What's on your mind? Share a spotlite...</span>
+                        </div>
+                        <button class="quick-post-btn" title="Create Post">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Category & Mood Filter Bar -->
+                    <div class="category-filter-section">
+                        <div class="category-filter-header">
+                            <span class="category-filter-title">Explore Feed</span>
+                            <span class="category-filter-subtitle">Filter by Category</span>
+                        </div>
+                        <div class="mood-filter-bar" id="category-filter-bar">
+                            <button class="mood-pill active" data-category="all" data-mood="all">✨ All Posts</button>
+                            <button class="mood-pill" data-category="Happy" data-mood="Happy">😊 Happy</button>
+                            <button class="mood-pill" data-category="Tech & Code" data-mood="Coding">💻 Tech & Code</button>
+                            <button class="mood-pill" data-category="Art & Design">🎨 Art & Design</button>
+                            <button class="mood-pill" data-category="Travel & Lifestyle" data-mood="Travel">✈️ Travel & Lifestyle</button>
+                            <button class="mood-pill" data-category="Fitness & Health" data-mood="Fitness">🏋️ Fitness & Health</button>
+                            <button class="mood-pill" data-category="Gaming">🎮 Gaming</button>
+                            <button class="mood-pill" data-category="Music">🎵 Music</button>
+                            <button class="mood-pill" data-category="Education" data-mood="Study">📚 Education</button>
+                            <button class="mood-pill" data-category="General">🌟 General</button>
+                        </div>
                     </div>
 
                     <!-- Posts Stream -->
@@ -136,6 +157,20 @@
                                 <span class="user-card-username" id="current-user-username">username</span>
                                 <span class="user-card-fullname" id="current-user-bio">View Profile</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Popular Categories Section -->
+                    <div class="suggestions-section category-sidebar-widget">
+                        <div class="suggestions-header">
+                            <span class="suggestions-title">Trending Categories</span>
+                        </div>
+                        <div class="category-widget-grid">
+                            <button class="widget-cat-chip" data-category="Tech & Code">💻 Tech & Code</button>
+                            <button class="widget-cat-chip" data-category="Art & Design">🎨 Art & Design</button>
+                            <button class="widget-cat-chip" data-category="Travel & Lifestyle">✈️ Travel</button>
+                            <button class="widget-cat-chip" data-category="Fitness & Health">🏋️ Fitness</button>
+                            <button class="widget-cat-chip" data-category="Gaming">🎮 Gaming</button>
                         </div>
                     </div>
 
@@ -164,6 +199,27 @@
                 <button class="modal-next-btn" id="submit-post-btn">Share</button>
             </div>
             
+            <!-- Category Selection Bar (Always Visible Immediately) -->
+            <div style="padding: 14px 20px; background: rgba(255, 203, 5, 0.05); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <label for="post-category-select" style="font-size: 0.88rem; color: var(--accent-gold); font-weight: 700; min-width: 75px;">Category:</label>
+                <select id="post-category-select" style="background-color: var(--bg-input); border: 1.5px solid var(--border-color); border-radius: 8px; padding: 9px 14px; color: var(--text-primary); font-size: 0.88rem; flex: 1; outline: none; cursor: pointer; font-weight: 600;">
+                    <option value="General">🌟 General / Showcase</option>
+                    <option value="Happy">😊 Happy</option>
+                    <option value="Tech & Code">💻 Tech & Code</option>
+                    <option value="Art & Design">🎨 Art & Design</option>
+                    <option value="Travel & Lifestyle">✈️ Travel & Lifestyle</option>
+                    <option value="Fitness & Health">🏋️ Fitness & Health</option>
+                    <option value="Gaming">🎮 Gaming</option>
+                    <option value="Music">🎵 Music</option>
+                    <option value="Education">📚 Education & Study</option>
+                    <option value="Other">✏️ Other (Custom Category)</option>
+                </select>
+            </div>
+            <div id="post-custom-category-wrapper" style="display: none; padding: 10px 20px; background: rgba(255, 203, 5, 0.03); border-bottom: 1px solid var(--border-color); align-items: center; justify-content: space-between; gap: 12px;">
+                <label for="post-custom-category-input" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 75px;">Custom:</label>
+                <input type="text" id="post-custom-category-input" placeholder="Type custom category name..." style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; flex: 1; outline: none;">
+            </div>
+
             <!-- File Drop / Paste Link area -->
             <div class="drag-drop-area" id="drop-area">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -186,10 +242,10 @@
 
             <div class="modal-caption-area" id="caption-area" style="display: none;">
                 <textarea class="caption-textarea" id="post-caption-input" placeholder="Write a caption..."></textarea>
-                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <label for="post-mood-select" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 550;">Post Mood:</label>
-                        <select id="post-mood-select" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-size: 0.8rem;">
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <label for="post-mood-select" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 70px;">Post Mood:</label>
+                        <select id="post-mood-select" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; flex: 1; outline: none; cursor: pointer;">
                             <option value="">None</option>
                             <option value="Happy">Happy 😊</option>
                             <option value="Travel">Travel ✈️</option>
@@ -200,7 +256,7 @@
                     </div>
                     <button type="button" class="ai-caption-btn" id="ai-generate-caption-btn">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 4px;"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
-                        Generate AI Caption & Tags
+                        Generate AI Caption & Auto-Category
                     </button>
                 </div>
             </div>

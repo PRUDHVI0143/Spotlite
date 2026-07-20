@@ -120,6 +120,7 @@ const PostSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
   }],
   mood: { type: String, default: '' }, // Happy, Travel, Study, Fitness, Coding
+  category: { type: String, default: 'General' }, // Tech & Code, Art & Design, Travel & Lifestyle, Fitness & Health, Gaming, Music, Education, General
   isPinned: { type: Boolean, default: false },
   hashtags: [{ type: String }]
 }, { timestamps: true });
@@ -938,7 +939,7 @@ app.get('/api/users/all', authenticateToken, async (req, res) => {
 // 8. Create Post
 app.post('/api/posts', authenticateToken, async (req, res) => {
   try {
-    const { image, caption, mood } = req.body;
+    const { image, caption, mood, category } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image is required.' });
@@ -974,6 +975,7 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
       image,
       caption: caption || '',
       mood: mood || '',
+      category: category || 'General',
       hashtags
     });
 
@@ -1018,8 +1020,19 @@ app.get('/api/posts', authenticateToken, async (req, res) => {
 
     // Create a list of user IDs to fetch posts from: the user themselves and the people they follow.
     const userIds = [...currentUser.following, currentUser._id];
+    const queryFilter = { author: { $in: userIds } };
 
-    const posts = await Post.find({ author: { $in: userIds } })
+    const { category } = req.query;
+    if (category && category.toLowerCase() !== 'all') {
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const reg = new RegExp(escapeRegex(category), 'i');
+      queryFilter.$or = [
+        { category: reg },
+        { mood: reg }
+      ];
+    }
+
+    const posts = await Post.find(queryFilter)
       .populate('author', 'username avatar')
       .sort({ createdAt: -1 })
       .limit(50); // Add a limit to avoid sending too much data
@@ -1038,7 +1051,18 @@ app.get('/api/posts/user/:username', async (req, res) => {
     const user = await User.findOne({ username });
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
-    const posts = await Post.find({ author: user._id })
+    const queryFilter = { author: user._id };
+    const { category } = req.query;
+    if (category && category.toLowerCase() !== 'all') {
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const reg = new RegExp(escapeRegex(category), 'i');
+      queryFilter.$or = [
+        { category: reg },
+        { mood: reg }
+      ];
+    }
+
+    const posts = await Post.find(queryFilter)
       .populate('author', 'username avatar')
       .sort({ isPinned: -1, createdAt: -1 });
 

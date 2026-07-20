@@ -120,6 +120,23 @@ function compressImage(file, maxWidth = 1080, maxHeight = 1080, quality = 0.8) {
     });
 }
 
+// Utility: Get category badge HTML helper
+function getCategoryBadgeHTML(category) {
+    if (!category) category = 'General';
+    let catClass = 'cat-general';
+    let catIcon = '🌟';
+    const c = category.toLowerCase();
+    if (c.includes('tech') || c.includes('code')) { catClass = 'cat-tech'; catIcon = '💻'; }
+    else if (c.includes('art') || c.includes('design')) { catClass = 'cat-art'; catIcon = '🎨'; }
+    else if (c.includes('travel') || c.includes('lifestyle')) { catClass = 'cat-travel'; catIcon = '✈️'; }
+    else if (c.includes('fitness') || c.includes('health')) { catClass = 'cat-fitness'; catIcon = '🏋️'; }
+    else if (c.includes('gaming')) { catClass = 'cat-gaming'; catIcon = '🎮'; }
+    else if (c.includes('music')) { catClass = 'cat-music'; catIcon = '🎵'; }
+    else if (c.includes('education') || c.includes('study')) { catClass = 'cat-education'; catIcon = '📚'; }
+    
+    return `<span class="post-category-badge ${catClass}">${catIcon} ${category}</span>`;
+}
+
 // Utility: Format timestamp (e.g. "3 hours ago" or "2 days ago")
 function formatTime(dateString) {
     const date = new Date(dateString);
@@ -859,6 +876,12 @@ function setupCreatePostModal() {
         captionInput.value = '';
         const moodSelect = document.getElementById('post-mood-select');
         if (moodSelect) moodSelect.value = '';
+        const categorySelect = document.getElementById('post-category-select');
+        if (categorySelect) categorySelect.value = 'General';
+        const customWrapper = document.getElementById('post-custom-category-wrapper');
+        const customInput = document.getElementById('post-custom-category-input');
+        if (customWrapper) customWrapper.style.display = 'none';
+        if (customInput) customInput.value = '';
         
         dropArea.style.display = 'flex';
         previewContainer.style.display = 'none';
@@ -874,6 +897,22 @@ function setupCreatePostModal() {
         previewContainer.style.display = 'block';
         captionArea.style.display = 'block';
         submitBtn.style.display = 'block';
+    }
+
+    // Category Select change handler for "Other" custom category input
+    const categorySelect = document.getElementById('post-category-select');
+    const customWrapper = document.getElementById('post-custom-category-wrapper');
+    const customInput = document.getElementById('post-custom-category-input');
+
+    if (categorySelect && customWrapper) {
+        categorySelect.addEventListener('change', () => {
+            if (categorySelect.value === 'Other') {
+                customWrapper.style.display = 'flex';
+                if (customInput) customInput.focus();
+            } else {
+                customWrapper.style.display = 'none';
+            }
+        });
     }
 
     // Event Listeners
@@ -977,6 +1016,16 @@ function setupCreatePostModal() {
             const list = mockCaptions[selectedMood] || mockCaptions[''];
             const randomCaption = list[Math.floor(Math.random() * list.length)];
             captionInput.value = randomCaption;
+
+            // Auto-select category if appropriate
+            const categorySelect = document.getElementById('post-category-select');
+            if (categorySelect) {
+                if (selectedMood === 'Coding') categorySelect.value = 'Tech & Code';
+                else if (selectedMood === 'Travel') categorySelect.value = 'Travel & Lifestyle';
+                else if (selectedMood === 'Fitness') categorySelect.value = 'Fitness & Health';
+                else if (selectedMood === 'Study') categorySelect.value = 'Education';
+                else if (selectedMood === 'Happy') categorySelect.value = 'General';
+            }
         });
     }
 
@@ -987,6 +1036,26 @@ function setupCreatePostModal() {
         const caption = captionInput.value;
         const moodSelect = document.getElementById('post-mood-select');
         const mood = moodSelect ? moodSelect.value : '';
+        const categorySelect = document.getElementById('post-category-select');
+        let category = categorySelect ? categorySelect.value : '';
+
+        if (category === 'Other') {
+            const customInput = document.getElementById('post-custom-category-input');
+            category = customInput ? customInput.value.trim() : '';
+            if (!category) category = 'Other';
+        } else if (!category) {
+            category = 'General';
+            const lowerCap = caption.toLowerCase();
+            if (mood === 'Coding' || lowerCap.includes('code') || lowerCap.includes('tech') || lowerCap.includes('dev')) {
+                category = 'Tech & Code';
+            } else if (mood === 'Travel' || lowerCap.includes('travel') || lowerCap.includes('trip')) {
+                category = 'Travel & Lifestyle';
+            } else if (mood === 'Fitness' || lowerCap.includes('gym') || lowerCap.includes('workout')) {
+                category = 'Fitness & Health';
+            } else if (mood === 'Study' || lowerCap.includes('study') || lowerCap.includes('learn')) {
+                category = 'Education';
+            }
+        }
 
         try {
             submitBtn.textContent = 'Sharing...';
@@ -998,7 +1067,8 @@ function setupCreatePostModal() {
                 body: JSON.stringify({
                     image: selectedPostImageBase64,
                     caption,
-                    mood
+                    mood,
+                    category
                 })
             });
 
@@ -1102,7 +1172,12 @@ async function loadFeedPosts() {
     postsStream.innerHTML = Array(4).fill(skeletonPostCard()).join('');
 
     try {
-        const response = await fetch(`${API_BASE}/posts`, {
+        let url = `${API_BASE}/posts`;
+        if (activeCategoryFilter && activeCategoryFilter.toLowerCase() !== 'all') {
+            url += `?category=${encodeURIComponent(activeCategoryFilter)}`;
+        }
+
+        const response = await fetch(url, {
             headers: getHeaders()
         });
 
@@ -1110,16 +1185,13 @@ async function loadFeedPosts() {
         if (!response.ok) throw new Error(posts.error || 'Failed to load posts');
 
         let filteredPosts = posts;
-        if (activeMoodFilter !== 'all') {
-            filteredPosts = posts.filter(post => post.mood === activeMoodFilter);
-        }
 
         if (filteredPosts.length === 0) {
             postsStream.innerHTML = `
                 <div style="text-align: center; padding: 60px 20px; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-secondary); width: 100%;">
                     <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--text-secondary)" stroke-width="1.5" fill="none" style="margin-bottom: 12px;"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3"/><path d="M19 5L17 5"/></svg>
-                    <h3>No posts in mood "${activeMoodFilter}"</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 6px;">Try filtering other moods or create a post with this mood tag!</p>
+                    <h3>No posts in category "${activeCategoryFilter}"</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 6px;">Try selecting another category or share a post under this category!</p>
                 </div>
             `;
             return;
@@ -1161,9 +1233,10 @@ function createPostCard(post) {
                     <img src="${post.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${post.author.username}`}" alt="Avatar" class="post-avatar">
                 </div>
                 <div class="post-header-meta">
-                    <span class="post-username" style="display: inline-flex; align-items: center;">
+                    <span class="post-username" style="display: inline-flex; align-items: center; gap: 6px;">
                         ${post.author.username}
-                        ${post.isPinned ? '<span class="pin-indicator" title="Pinned Post" style="margin-left: 6px; color: var(--accent-gold); font-size: 0.8rem;">📌</span>' : ''}
+                        ${getCategoryBadgeHTML(post.category)}
+                        ${post.isPinned ? '<span class="pin-indicator" title="Pinned Post" style="margin-left: 4px; color: var(--accent-gold); font-size: 0.8rem;">📌</span>' : ''}
                     </span>
                     <span class="post-time-sub">${formatTime(post.createdAt)}</span>
                 </div>
@@ -1781,7 +1854,48 @@ async function initProfilePage() {
     }
 
     await loadProfileHeader(usernameParam);
+    setupProfileCategoryControls(usernameParam);
     await loadProfileGrid(usernameParam);
+}
+
+let activeProfileCategoryFilter = 'all';
+let activeProfileViewMode = 'grid';
+
+function setupProfileCategoryControls(username) {
+    const filterBar = document.getElementById('profile-category-filter-bar');
+    if (filterBar) {
+        const pills = filterBar.querySelectorAll('.prof-cat-pill');
+        pills.forEach(pill => {
+            pill.onclick = () => {
+                pills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                activeProfileCategoryFilter = pill.dataset.category || 'all';
+                loadProfileGrid(username);
+            };
+        });
+    }
+
+    const gridBtn = document.getElementById('view-mode-grid');
+    const listBtn = document.getElementById('view-mode-list');
+    const grid = document.getElementById('profile-posts-grid');
+
+    if (gridBtn && listBtn && grid) {
+        gridBtn.onclick = () => {
+            gridBtn.classList.add('active');
+            listBtn.classList.remove('active');
+            activeProfileViewMode = 'grid';
+            grid.classList.remove('list-view');
+            loadProfileGrid(username);
+        };
+
+        listBtn.onclick = () => {
+            listBtn.classList.add('active');
+            gridBtn.classList.remove('active');
+            activeProfileViewMode = 'list';
+            grid.classList.add('list-view');
+            loadProfileGrid(username);
+        };
+    }
 }
 
 let currentProfileUser = null; // Stores currently loaded profile data
@@ -2328,7 +2442,12 @@ async function loadProfileGrid(username) {
     if (!grid) return;
 
     try {
-        const response = await fetch(`${API_BASE}/posts/user/${username}`, {
+        let url = `${API_BASE}/posts/user/${username}`;
+        if (activeProfileCategoryFilter && activeProfileCategoryFilter.toLowerCase() !== 'all') {
+            url += `?category=${encodeURIComponent(activeProfileCategoryFilter)}`;
+        }
+
+        const response = await fetch(url, {
             headers: getHeaders()
         });
 
@@ -2338,39 +2457,48 @@ async function loadProfileGrid(username) {
         document.getElementById('profile-post-count').textContent = posts.length;
 
         if (posts.length === 0) {
-            grid.outerHTML = `
-                <div style="text-align: center; padding: 60px 0; border-top: 1px solid var(--border-color); width: 100%;">
+            grid.innerHTML = `
+                <div style="text-align: center; padding: 60px 0; border-top: 1px solid var(--border-color); width: 100%; grid-column: 1/-1;">
                     <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--text-secondary)" stroke-width="1.5" fill="none" style="margin-bottom: 12px;"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="3"/><path d="M19 5L17 5"/></svg>
-                    <h3>No Posts Yet</h3>
+                    <h3>No Posts ${activeProfileCategoryFilter !== 'all' ? `in category "${activeProfileCategoryFilter}"` : 'Yet'}</h3>
                 </div>
             `;
             return;
         }
 
         grid.innerHTML = '';
-        posts.forEach(post => {
-            const item = document.createElement('div');
-            item.className = 'grid-post-item';
-            item.innerHTML = `
-                <img src="${post.image}" alt="Post image" class="grid-post-img">
-                <div class="grid-post-overlay">
-                    <div class="overlay-stat">
-                        <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                        <span>${post.likes.length}</span>
-                    </div>
-                    <div class="overlay-stat">
-                        <svg viewBox="0 0 24 24" stroke="white" fill="white"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                        <span>${post.comments.length}</span>
-                    </div>
-                </div>
-            `;
-
-            item.addEventListener('click', () => {
-                openPostDetailModal(post._id);
+        if (activeProfileViewMode === 'list') {
+            grid.classList.add('list-view');
+            posts.forEach(post => {
+                const card = createPostCard(post);
+                grid.appendChild(card);
             });
+        } else {
+            grid.classList.remove('list-view');
+            posts.forEach(post => {
+                const item = document.createElement('div');
+                item.className = 'grid-post-item';
+                item.innerHTML = `
+                    <img src="${post.image}" alt="Post image" class="grid-post-img">
+                    <div class="grid-post-overlay">
+                        <div class="overlay-stat">
+                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                            <span>${post.likes.length}</span>
+                        </div>
+                        <div class="overlay-stat">
+                            <svg viewBox="0 0 24 24" stroke="white" fill="white"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            <span>${post.comments.length}</span>
+                        </div>
+                    </div>
+                `;
 
-            grid.appendChild(item);
-        });
+                item.addEventListener('click', () => {
+                    openPostDetailModal(post._id);
+                });
+
+                grid.appendChild(item);
+            });
+        }
     } catch (err) {
         console.error('Error fetching grid posts:', err);
     }
