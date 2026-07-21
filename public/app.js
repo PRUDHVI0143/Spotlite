@@ -893,6 +893,8 @@ function setupCreatePostModal() {
                 p.style.color = 'var(--text-secondary)';
             }
         });
+        const moodSelectTop = document.getElementById('post-mood-select-top');
+        if (moodSelectTop) moodSelectTop.value = '';
         const moodSelect = document.getElementById('post-mood-select');
         if (moodSelect) moodSelect.value = '';
         const customMoodWrapper = document.getElementById('post-custom-mood-wrapper');
@@ -937,20 +939,27 @@ function setupCreatePostModal() {
         submitBtn.style.display = 'block';
     }
 
-    // Post Mood Change Handler for Custom Mood ("Other")
+    // Post Mood Change Handler & Top Sync
+    const moodSelectTop = document.getElementById('post-mood-select-top');
     const moodSelect = document.getElementById('post-mood-select');
     const customMoodWrapper = document.getElementById('post-custom-mood-wrapper');
     const customMoodInput = document.getElementById('post-custom-mood-input');
-    if (moodSelect && customMoodWrapper) {
-        moodSelect.addEventListener('change', () => {
-            if (moodSelect.value === 'Other') {
+
+    function syncMoodSelection(val) {
+        if (moodSelectTop) moodSelectTop.value = val;
+        if (moodSelect) moodSelect.value = val;
+        if (customMoodWrapper) {
+            if (val === 'Other') {
                 customMoodWrapper.style.display = 'flex';
                 if (customMoodInput) customMoodInput.focus();
             } else {
                 customMoodWrapper.style.display = 'none';
             }
-        });
+        }
     }
+
+    if (moodSelectTop) moodSelectTop.addEventListener('change', () => syncMoodSelection(moodSelectTop.value));
+    if (moodSelect) moodSelect.addEventListener('change', () => syncMoodSelection(moodSelect.value));
 
     // Category Buttons Row & Dropdown sync
     const categorySelect = document.getElementById('post-category-select');
@@ -1163,8 +1172,9 @@ function setupCreatePostModal() {
         if (!selectedPostImageBase64) return;
 
         const caption = captionInput.value;
+        const moodSelectTop = document.getElementById('post-mood-select-top');
         const moodSelect = document.getElementById('post-mood-select');
-        let mood = moodSelect ? moodSelect.value : '';
+        let mood = (moodSelectTop && moodSelectTop.value) ? moodSelectTop.value : (moodSelect ? moodSelect.value : '');
         if (mood === 'Other') {
             const customMoodInput = document.getElementById('post-custom-mood-input');
             mood = customMoodInput ? customMoodInput.value.trim() : '';
@@ -1172,7 +1182,7 @@ function setupCreatePostModal() {
 
         if (!mood) {
             alert('⚠️ Post Mood is required! Please select or enter a post mood before sharing.');
-            if (moodSelect) moodSelect.focus();
+            if (moodSelectTop) moodSelectTop.focus();
             return;
         }
 
