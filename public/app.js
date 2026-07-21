@@ -458,6 +458,132 @@ async function checkNotifications() {
     }
 }
 
+// Web Audio Synthesizer for UI sound effects
+function playActionSound(type = 'like') {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'like') {
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.12);
+        } else if (type === 'share') {
+            osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+        } else if (type === 'comment') {
+            osc.frequency.setValueAtTime(440, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(587.33, ctx.currentTime + 0.1);
+        }
+
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+    } catch (e) {}
+}
+
+// Interactive Notifications Panel Modal
+function setupNotificationPanel() {
+    const notifBtn = document.getElementById('sidebar-notifications-btn');
+    const mobNotifBtn = document.getElementById('mobile-notifications-btn');
+
+    async function openNotificationPanel() {
+        try {
+            const res = await fetch(`${API_BASE}/notifications`, { headers: getHeaders() });
+            const notifications = await res.json();
+            if (!res.ok) return;
+
+            let notifHTML = '';
+            if (notifications.length === 0) {
+                notifHTML = `
+                    <div style="text-align: center; padding: 50px 20px; color: var(--text-secondary);">
+                        <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" fill="none" stroke-width="1.5" style="margin-bottom: 12px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        <p style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">No notifications yet</p>
+                        <p style="font-size: 0.82rem; margin-top: 6px;">When people follow you or like your posts, you'll see them here!</p>
+                    </div>
+                `;
+            } else {
+                notifications.forEach(n => {
+                    const senderAvatar = n.sender ? (n.sender.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${n.sender.username}`) : 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=default';
+                    const senderName = n.sender ? n.sender.username : 'Someone';
+                    const postImg = n.post && n.post.image ? `<img src="${n.post.image}" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; margin-left: auto;">` : '';
+
+                    notifHTML += `
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border-color); background: ${n.isRead ? 'transparent' : 'rgba(255,203,5,0.06)'}; cursor: pointer; transition: background 0.2s;" onclick="window.location.href='profile.html?u=${senderName}'">
+                            <img src="${senderAvatar}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-gold);">
+                            <div style="flex: 1; min-width: 0;">
+                                <p style="font-size: 0.88rem; color: var(--text-primary); margin: 0; line-height: 1.3;">
+                                    <strong style="color: var(--accent-gold);">${escapeHtml(senderName)}</strong> ${escapeHtml(n.text || getNotificationText(n))}
+                                </p>
+                                <span style="font-size: 0.76rem; color: var(--text-muted);">${formatTime(n.createdAt)}</span>
+                            </div>
+                            ${postImg}
+                        </div>
+                    `;
+                });
+            }
+
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.display = 'flex';
+            overlay.style.zIndex = '10005';
+
+            overlay.innerHTML = `
+                <div style="position: relative; width: 100%; max-width: 440px; height: 85vh; background: var(--bg-secondary); border-radius: 20px; border: 1.5px solid var(--accent-gold); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.8);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-primary);">
+                        <h3 style="margin: 0; font-size: 1.05rem; color: var(--accent-gold); display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                            🔔 Notifications
+                        </h3>
+                        <button id="close-notif-modal-btn" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+                    </div>
+                    <div style="flex: 1; overflow-y: auto;">
+                        ${notifHTML}
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            overlay.querySelector('#close-notif-modal-btn').onclick = () => overlay.remove();
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+        } catch (err) {
+            console.error('Notification open error:', err);
+        }
+    }
+
+    if (notifBtn) notifBtn.addEventListener('click', openNotificationPanel);
+    if (mobNotifBtn) mobNotifBtn.addEventListener('click', openNotificationPanel);
+}
+
+// Global Keyboard Shortcuts (Ctrl + K for Search, Escape to Close)
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            const searchPanel = document.getElementById('search-slider-panel');
+            if (searchPanel) {
+                searchPanel.classList.add('active');
+                const searchInput = document.getElementById('search-panel-input');
+                if (searchInput) searchInput.focus();
+            }
+        }
+        if (e.key === 'Escape') {
+            const overlays = document.querySelectorAll('.modal-overlay');
+            overlays.forEach(m => {
+                if (m.style.display !== 'none') m.style.display = 'none';
+            });
+            const searchPanel = document.getElementById('search-slider-panel');
+            if (searchPanel) searchPanel.classList.remove('active');
+        }
+    });
+}
+
 function setupNotificationsSliderPanel() {
     const sidebarBtn = document.getElementById('sidebar-notifications-btn');
     const mobileBtn = document.getElementById('mobile-notifications-btn');
@@ -1256,6 +1382,8 @@ async function initFeedPage() {
     setupNavigationLinks();
     setupCreatePostModal();
     setupSearchPanel();
+    setupNotificationPanel();
+    setupKeyboardShortcuts();
     setupSettingsModal();
     loadCurrentUserCard();
     setupCategoryFilterBar();
@@ -1663,6 +1791,7 @@ function createPostCard(post) {
             if (!response.ok) throw new Error(data.error);
             likeBtn.classList.toggle('liked', data.liked);
             likesCount.textContent = data.likesCount;
+            if (data.liked) playActionSound('like');
         } catch (err) {
             console.error('Like error:', err);
         }
