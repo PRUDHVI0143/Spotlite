@@ -1692,7 +1692,8 @@ function createPostCard(post) {
         </div>
 
         <!-- Post Image -->
-        <div class="post-image-container">
+        <div class="post-image-container" style="position: relative;">
+            ${post.mood ? `<span class="post-mood-overlay-tag">${escapeHtml(post.mood)}</span>` : ''}
             <img src="${post.image}" alt="Post image" class="post-image" style="${post.filter && post.filter !== 'none' ? `filter: ${post.filter};` : ''}">
             <span class="like-heart-pop">❤️</span>
         </div>

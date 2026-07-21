@@ -10,64 +10,63 @@
 <body>
     <div class="app-wrapper">
         <!-- Sidebar Navigation (Desktop & Tablet) -->
-        <aside class="sidebar">
+        <aside class="sidebar" aria-label="Main Navigation">
             <div class="sidebar-logo">
                 <a href="index.html" class="brand-header-container">
                     <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img">
                     <span class="insta-logo-text">Spotlite</span>
                 </a>
-            </div>
-            <ul class="sidebar-menu">
+            </div            <ul class="sidebar-menu">
                 <li class="menu-item">
-                    <a href="index.html">
-                        <svg viewBox="0 0 24 24"><path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A3 3 0 0 1 15 16.545V22h-5.995v-5.455Z" fill="none"/><path d="M12 .726a1 1 0 0 0-1.28.053l-8.995 8.16A1 1 0 0 0 2.414 10.5H5v10.5a1 1 0 0 0 1 1h4v-5.455a2 2 0 0 1 2-2 2 2 0 0 1 2 2V22h4a1 1 0 0 0 1-1V10.5h2.586a1 1 0 0 0 .689-1.56l-8.995-8.161A1 1 0 0 0 12 .726Z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    <a href="index.html" aria-label="Home">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A3 3 0 0 1 15 16.545V22h-5.995v-5.455Z" fill="none"/><path d="M12 .726a1 1 0 0 0-1.28.053l-8.995 8.16A1 1 0 0 0 2.414 10.5H5v10.5a1 1 0 0 0 1 1h4v-5.455a2 2 0 0 1 2-2 2 2 0 0 1 2 2V22h4a1 1 0 0 0 1-1V10.5h2.586a1 1 0 0 0 .689-1.56l-8.995-8.161A1 1 0 0 0 12 .726Z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
                         <span>Home</span>
                     </a>
                 </li>
                 <li class="menu-item">
-                    <button id="sidebar-search-btn">
-                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke-width="2"/></svg>
+                    <button id="sidebar-search-btn" aria-label="Search">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke-width="2"/></svg>
                         <span>Search</span>
                     </button>
                 </li>
                 <li class="menu-item">
-                    <button id="sidebar-notifications-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    <button id="sidebar-notifications-btn" aria-label="Notifications">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                         <span>Notifications</span>
-                        <span class="unread-badge" id="notif-count-badge" style="display: none;">0</span>
+                        <span class="unread-badge d-none" id="notif-count-badge">0</span>
                     </button>
                 </li>
                 <li class="menu-item">
-                    <a href="messages.html">
-                        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2" fill="none"/></svg>
+                    <a href="messages.html" aria-label="Messages">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2" fill="none"/></svg>
                         <span>Messages</span>
                     </a>
                 </li>
                 <li class="menu-item">
-                    <button id="open-create-btn">
-                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="16" stroke-width="2"/><line x1="8" y1="12" x2="16" y2="12" stroke-width="2"/></svg>
+                    <button id="open-create-btn" aria-label="Create Post">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="16" stroke-width="2"/><line x1="8" y1="12" x2="16" y2="12" stroke-width="2"/></svg>
                         <span>Create</span>
                     </button>
                 </li>
                 <li class="menu-item active">
-                    <a href="#" id="sidebar-profile-link">
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke-width="2"/><path d="M6 19.5c1-2.5 3-4.5 6-4.5s5 2 6 4.5" stroke-width="2"/></svg>
+                    <a href="#" id="sidebar-profile-link" aria-label="Profile" aria-current="page">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke-width="2"/><path d="M6 19.5c1-2.5 3-4.5 6-4.5s5 2 6 4.5" stroke-width="2"/></svg>
                         <span>Profile</span>
                     </a>
                 </li>
                 <li class="menu-item">
-                    <button id="open-settings-btn">
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="2" fill="none"/></svg>
+                    <button id="open-settings-btn" aria-label="Settings">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="2" fill="none"/></svg>
                         <span>Settings</span>
                     </button>
                 </li>
                 <li class="menu-item" style="margin-top: auto;">
-                    <button id="logout-btn">
-                        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2" stroke-linecap="round"/><polyline points="16 17 21 12 16 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke-width="2" stroke-linecap="round"/></svg>
+                    <button id="logout-btn" aria-label="Log Out">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2" stroke-linecap="round"/><polyline points="16 17 21 12 16 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke-width="2" stroke-linecap="round"/></svg>
                         <span>Log Out</span>
                     </button>
                 </li>
-            </ul>
+            </ul>l>
         </aside>
 
         <!-- Bottom Navigation (Mobile Only) -->
@@ -179,21 +178,21 @@
                 </div>
 
                 <!-- Profile Navigation Tabs -->
-                <div class="profile-tabs">
-                    <button class="profile-tab active" id="tab-posts-btn">
-                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+                <div class="profile-tabs" role="tablist" aria-label="Profile navigation tabs">
+                    <button class="profile-tab active" id="tab-posts-btn" role="tab" aria-selected="true">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
                         <span>Posts</span>
                     </button>
-                    <button class="profile-tab" id="tab-dev-info-btn">
-                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    <button class="profile-tab" id="tab-dev-info-btn" role="tab" aria-selected="false">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true" focusable="false"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                         <span>Developer</span>
                     </button>
-                    <button class="profile-tab" id="tab-qa-btn">
-                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <button class="profile-tab" id="tab-qa-btn" role="tab" aria-selected="false">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true" focusable="false"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                         <span>Q&A</span>
                     </button>
-                    <button class="profile-tab" id="tab-saved-btn" style="display: none;">
-                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                    <button class="profile-tab d-none" id="tab-saved-btn" role="tab" aria-selected="false">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true" focusable="false"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
                         <span>Saved</span>
                     </button>
                 </div>
@@ -265,15 +264,15 @@
     </div>
 
     <!-- CREATE POST MODAL -->
-    <div class="modal-overlay" id="create-post-modal-overlay">
+    <div class="modal-overlay" id="create-post-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="create-post-profile-title">
+        <div class="modal-content create-post-modal">
             <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px;">
-                <button class="modal-close-btn" id="close-create-modal" title="Close" style="margin-right: 4px;">
-                    <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-                <h3 class="modal-title" style="margin: 0; font-size: 1rem; font-weight: 700;">Create new post</h3>
-                <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
-                    <!-- Post Mood Select (Positioned on top beside Share button) -->
-                    <select id="post-mood-select-top" title="Select Post Mood (Required)" style="background-color: var(--bg-input); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 6px 12px; color: var(--accent-gold); font-size: 0.82rem; font-weight: 700; outline: none; cursor: pointer;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="modal-close-btn" id="close-create-modal" title="Close" aria-label="Close modal">
+                        <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                    <!-- Post Mood Select (Positioned on top left) -->
+                    <select id="post-mood-select-top" title="Select Post Mood (Required)" aria-label="Select Post Mood" style="background-color: var(--bg-input); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 6px 12px; color: var(--accent-gold); font-size: 0.82rem; font-weight: 700; outline: none; cursor: pointer;">
                         <option value="">Mood *</option>
                         <option value="Food">Food 🍔</option>
                         <option value="Funny">Funny 😂</option>
@@ -291,8 +290,9 @@
                         <option value="Happy">Happy 😊</option>
                         <option value="Other">✏️ Other</option>
                     </select>
-                    <button class="modal-next-btn" id="submit-post-btn">Share ✨</button>
                 </div>
+                <h3 class="modal-title" id="create-post-profile-title" style="margin: 0; font-size: 1rem; font-weight: 700;">Create new post</h3>
+                <button class="modal-next-btn" id="submit-post-btn">Share ✨</button>
             </div>
             
             <!-- Category Selection Bar (Always Visible Immediately) -->

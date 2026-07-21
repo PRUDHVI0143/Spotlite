@@ -10,47 +10,47 @@
 <body>
     <div class="auth-container">
         <!-- Login Card -->
-        <div class="auth-card" id="login-card">
+        <main class="auth-card" id="login-card">
             <div class="logo-container">
                 <div class="brand-header-container" style="justify-content: center; margin-bottom: 10px;">
                     <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img" style="width: 40px; height: 40px;">
-                    <span class="insta-logo-text" style="font-size: 2.2rem;">Spotlite</span>
+                    <h1 class="insta-logo-text" style="font-size: 2.2rem; margin: 0;">Spotlite</h1>
                 </div>
             </div>
-            <form class="auth-form" id="login-form">
+            <form class="auth-form" id="login-form" aria-label="Log in to Spotlite">
                 <div class="input-wrapper">
-                    <input type="text" id="login-username" placeholder="Username" required autocomplete="username">
+                    <input type="text" id="login-username" placeholder="Username" aria-label="Username" required autocomplete="username">
                 </div>
                 <div class="input-wrapper">
-                    <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password">
+                    <input type="password" id="login-password" placeholder="Password" aria-label="Password" required autocomplete="current-password">
                 </div>
-                <div class="error-message" id="login-error">Error message placeholder</div>
+                <div class="error-message" id="login-error" role="alert" aria-live="polite">Error message placeholder</div>
                 <button type="submit" class="btn-primary">Log In</button>
             </form>
             <div class="auth-switch">
                 Don't have an account? <a href="#" id="show-signup-btn">Sign up</a>
             </div>
-        </div>
+        </main>
 
         <!-- Signup Card (hidden by default) -->
-        <div class="auth-card" id="signup-card" style="display: none;">
+        <div class="auth-card d-none" id="signup-card" style="display: none;">
             <div class="logo-container">
                 <div class="brand-header-container" style="justify-content: center; margin-bottom: 10px;">
                     <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img" style="width: 40px; height: 40px;">
                     <span class="insta-logo-text" style="font-size: 2.2rem;">Spotlite</span>
                 </div>
             </div>
-            <form class="auth-form" id="signup-form">
+            <form class="auth-form" id="signup-form" aria-label="Create Spotlite account">
                 <div class="input-wrapper">
-                    <input type="email" id="signup-email" placeholder="Email address" required autocomplete="email">
+                    <input type="email" id="signup-email" placeholder="Email address" aria-label="Email address" required autocomplete="email">
                 </div>
                 <div class="input-wrapper">
-                    <input type="text" id="signup-username" placeholder="Username" required autocomplete="username">
+                    <input type="text" id="signup-username" placeholder="Username" aria-label="Username" required autocomplete="username">
                 </div>
                 <div class="input-wrapper">
-                    <input type="password" id="signup-password" placeholder="Password" required autocomplete="new-password">
+                    <input type="password" id="signup-password" placeholder="Password" aria-label="Password" required autocomplete="new-password">
                 </div>
-                <div class="error-message" id="signup-error">Error message placeholder</div>
+                <div class="error-message" id="signup-error" role="alert" aria-live="polite">Error message placeholder</div>
                 <button type="submit" class="btn-primary">Sign Up</button>
             </form>
             <div class="auth-switch">
@@ -59,7 +59,7 @@
         </div>
 
         <!-- Verification Card (hidden by default) -->
-        <div class="auth-card" id="verify-card" style="display: none;">
+        <div class="auth-card d-none" id="verify-card" style="display: none;">
             <div class="logo-container">
                 <div class="brand-header-container" style="justify-content: center; margin-bottom: 10px;">
                     <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img" style="width: 40px; height: 40px;">
@@ -70,13 +70,13 @@
             <p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; margin-bottom: 15px; line-height: 1.4; padding: 0 10px;">
                 A 6-digit verification code has been sent to your email address. Please enter it below to activate your account.
             </p>
-            <form class="auth-form" id="verify-form">
+            <form class="auth-form" id="verify-form" aria-label="Verify email address">
                 <input type="hidden" id="verify-email-hidden">
                 <div class="input-wrapper">
-                    <input type="text" id="verify-code" placeholder="6-digit Code" required pattern="[0-9]{6}" maxlength="6" style="text-align: center; font-size: 1.25rem; letter-spacing: 4px; font-weight: 700;">
+                    <input type="text" id="verify-code" placeholder="6-digit Code" aria-label="Verification code" required pattern="[0-9]{6}" maxlength="6" style="text-align: center; font-size: 1.25rem; letter-spacing: 4px; font-weight: 700;">
                 </div>
-                <div class="error-message" id="verify-error">Error message placeholder</div>
-                <div class="success-message" id="verify-success" style="color: #27ae60; font-size: 0.85rem; display: none; font-weight: 600; text-align: center; margin-bottom: 10px;">Success! Redirecting...</div>
+                <div class="error-message" id="verify-error" role="alert" aria-live="polite">Error message placeholder</div>
+                <div class="success-message" id="verify-success" role="status" aria-live="polite" style="color: #27ae60; font-size: 0.85rem; display: none; font-weight: 600; text-align: center; margin-bottom: 10px;">Success! Redirecting...</div>
                 <button type="submit" class="btn-primary">Verify & Log In</button>
             </form>
             <div style="text-align: center; margin-top: 15px; font-size: 0.82rem;">
