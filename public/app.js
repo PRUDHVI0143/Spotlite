@@ -1304,6 +1304,125 @@ function skeletonPostCard() {
 let activeMoodFilter = 'all';
 let activeCategoryFilter = 'all';
 
+// Helper to show floating toast alert
+function showSpotliteToast(msg) {
+    const existing = document.querySelector('.spotlite-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'spotlite-toast';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.transition = 'all 0.3s ease';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(20px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 2600);
+}
+
+// Load real dynamic user stories bar
+async function loadStoriesBar() {
+    const storiesContainer = document.getElementById('stories-container');
+    if (!storiesContainer) return;
+
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    const userAvatar = currentUser && currentUser.avatar 
+        ? currentUser.avatar 
+        : `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentUser ? currentUser.username : 'me'}`;
+
+    let html = `
+        <div class="story-item" id="add-story-trigger" title="Share a new spotlite post">
+            <div class="story-avatar-wrapper user-story-add">
+                <img src="${userAvatar}" class="story-avatar-img" alt="Your story">
+                <div class="add-story-badge">+</div>
+            </div>
+            <span class="story-username" style="color: var(--accent-gold); font-weight: 700;">+ Story</span>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`${API_BASE}/users/search?q=a`, { headers: getHeaders() });
+        const users = await response.json();
+        if (Array.isArray(users) && users.length > 0) {
+            users.slice(0, 12).forEach(u => {
+                html += `
+                    <div class="story-item" onclick="openStoryViewerModal('${u.username}', '${u.avatar || ''}')">
+                        <div class="story-avatar-wrapper">
+                            <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" class="story-avatar-img" alt="${u.username}">
+                        </div>
+                        <span class="story-username">${escapeHtml(u.username)}</span>
+                    </div>
+                `;
+            });
+        }
+    } catch (e) {
+        console.error('Stories load error:', e);
+    }
+
+    storiesContainer.innerHTML = html;
+
+    const addBtn = document.getElementById('add-story-trigger');
+    if (addBtn) addBtn.addEventListener('click', openModal);
+}
+
+// Story Viewer Overlay Modal
+function openStoryViewerModal(username, avatar) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay story-viewer-overlay';
+    modal.style.display = 'flex';
+    modal.style.zIndex = '10005';
+    modal.style.background = 'rgba(0, 0, 0, 0.9)';
+
+    const userImg = avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${username}`;
+
+    modal.innerHTML = `
+        <div style="position: relative; width: 100%; max-width: 420px; height: 90vh; max-height: 720px; background: var(--bg-secondary); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; border: 1.5px solid var(--accent-gold);">
+            <!-- Progress Bar -->
+            <div style="height: 4px; background: rgba(255,255,255,0.2); width: 100%;">
+                <div id="story-progress-inner" style="height: 100%; width: 0%; background: var(--accent-gold); transition: width 0.05s linear;"></div>
+            </div>
+            <!-- Header -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img src="${userImg}" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--accent-gold); object-fit: cover;">
+                    <span style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">${escapeHtml(username)}</span>
+                </div>
+                <button id="close-story-viewer-btn" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <!-- Story Content Card -->
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; background: radial-gradient(circle, rgba(255,203,5,0.15) 0%, transparent 70%);">
+                <img src="${userImg}" style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--accent-gold); margin-bottom: 16px; object-fit: cover;">
+                <h3 style="color: var(--accent-gold); font-size: 1.3rem; margin-bottom: 8px;">✨ ${escapeHtml(username)}'s Spotlight Story</h3>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Check out ${escapeHtml(username)}'s profile for recent posts and updates!</p>
+                <button onclick="window.location.href='profile.html?u=${username}'" style="margin-top: 20px; background: var(--spotlite-gradient); color: black; border: none; padding: 10px 24px; border-radius: 20px; font-weight: 700; cursor: pointer;">View Profile ✨</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    let progress = 0;
+    const innerBar = modal.querySelector('#story-progress-inner');
+    const interval = setInterval(() => {
+        progress += 1;
+        if (innerBar) innerBar.style.width = progress + '%';
+        if (progress >= 100) {
+            clearInterval(interval);
+            modal.remove();
+        }
+    }, 50);
+
+    const closeBtn = modal.querySelector('#close-story-viewer-btn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            clearInterval(interval);
+            modal.remove();
+        });
+    }
+}
+
 function setupCategoryFilterBar() {
     const filterBar = document.getElementById('category-filter-bar');
     if (!filterBar) return;
@@ -1496,6 +1615,16 @@ function createPostCard(post) {
         <button class="comments-preview-btn" onclick="openPostDetailModal('${post._id}')">View all ${post.comments.length} comment${post.comments.length !== 1 ? 's' : ''}</button>
         ` : ''}
 
+        <!-- Quick Emoji Reaction Pills -->
+        <div class="comment-emoji-bar">
+            <span class="emoji-reaction-pill" data-emoji="❤️">❤️</span>
+            <span class="emoji-reaction-pill" data-emoji="🔥">🔥</span>
+            <span class="emoji-reaction-pill" data-emoji="😍">😍</span>
+            <span class="emoji-reaction-pill" data-emoji="👏">👏</span>
+            <span class="emoji-reaction-pill" data-emoji="💯">💯</span>
+            <span class="emoji-reaction-pill" data-emoji="✨">✨</span>
+        </div>
+
         <div class="comment-input-wrapper">
             <img src="${currentUser ? (currentUser.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentUser.username}`) : 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=default'}" class="comment-input-avatar" alt="">
             <input type="text" class="comment-input" id="comment-input-${post._id}" placeholder="Add a comment...">
@@ -1559,6 +1688,32 @@ function createPostCard(post) {
     // Comment button opens detail modal to view/add comments
     commentBtn.addEventListener('click', () => openPostDetailModal(post._id));
 
+    // Share / Copy Link trigger
+    if (shareBtn) {
+        shareBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const postUrl = `${window.location.origin}/index.html#post-${post._id}`;
+            navigator.clipboard.writeText(postUrl).then(() => {
+                showSpotliteToast('Post link copied to clipboard! 📋✨');
+            }).catch(() => {
+                showSpotliteToast('Sharing post spotlite... ✨');
+            });
+        });
+    }
+
+    // Quick Emoji Pills Click Handler
+    const emojiPills = card.querySelectorAll('.emoji-reaction-pill');
+    emojiPills.forEach(pill => {
+        pill.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const emoji = pill.getAttribute('data-emoji');
+            if (commentInput) {
+                commentInput.value += ' ' + emoji;
+                commentInput.focus();
+            }
+        });
+    });
+
     // Bookmark toggle
     bookmarkBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -1572,8 +1727,10 @@ function createPostCard(post) {
             bookmarkBtn.classList.toggle('bookmarked', data.saved);
             if (data.saved) {
                 if (window.savedPostIdsSet) window.savedPostIdsSet.add(post._id);
+                showSpotliteToast('Saved to your bookmarks! 🔖');
             } else {
                 if (window.savedPostIdsSet) window.savedPostIdsSet.delete(post._id);
+                showSpotliteToast('Removed from bookmarks');
                 // If we are on the profile page and the active tab is "Saved", remove the card immediately
                 const activeTab = document.querySelector('.profile-tab.active');
                 if (activeTab && activeTab.id === 'tab-saved-btn') {
