@@ -11,6 +11,15 @@ const PostSchema = new mongoose.Schema({
   hashtags: [{ type: String, index: true }],
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   shares: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  repostOf: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null },
+  repostComment: { type: String, default: '' },
+  poll: {
+    question: { type: String, default: '' },
+    options: [{
+      text: { type: String, required: true },
+      votes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    }]
+  },
   viewsCount: { type: Number, default: 0 },
   isPinned: { type: Boolean, default: false },
   comments: [{

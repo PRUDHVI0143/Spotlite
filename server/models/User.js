@@ -10,6 +10,8 @@ const UserSchema = new mongoose.Schema({
   website: { type: String, default: '' },
   github: { type: String, default: '' },
   linkedin: { type: String, default: '' },
+  accentColor: { type: String, default: 'purple' },
+  themeMode: { type: String, default: 'dark' },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],

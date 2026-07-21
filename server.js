@@ -99,6 +99,9 @@ const UserSchema = new mongoose.Schema({
   badge: { type: String, default: '' },
   refreshToken: { type: String, default: '' },
   bioLink: { type: String, default: '' },
+  coverPhoto: { type: String, default: '' },
+  accentColor: { type: String, default: 'purple' },
+  themeMode: { type: String, default: 'dark' },
   isVerified: { type: Boolean, default: false },
   verificationCode: { type: String, default: '' },
   verificationCodeExpires: { type: Date },
@@ -111,10 +114,19 @@ const User = mongoose.model('User', UserSchema);
 // Post Schema
 const PostSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  image: { type: String, required: true }, // base64 image data
+  image: { type: String, default: '' }, // base64 image data or empty for poll/text post
   caption: { type: String, default: '' },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   shares: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  repostOf: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null },
+  repostComment: { type: String, default: '' },
+  poll: {
+    question: { type: String, default: '' },
+    options: [{
+      text: { type: String, required: true },
+      votes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    }]
+  },
   comments: [{
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     username: { type: String, required: true },
@@ -135,7 +147,9 @@ const Post = mongoose.model('Post', PostSchema);
 const MessageSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  text: { type: String, required: true },
+  text: { type: String, default: '' },
+  audioUrl: { type: String, default: '' },
+  messageType: { type: String, default: 'text' }, // 'text', 'audio', 'post'
   sharedPostId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' }
 }, { timestamps: true });
 
@@ -175,6 +189,13 @@ const authenticateToken = (req, res, next) => {
     req.user = user;
     next();
   });
+};
+
+const verifyAdmin = (req, res, next) => {
+  if (!req.user || !req.user.isAdmin) {
+    return res.status(403).json({ error: 'Access denied. Admin rights required.' });
+  }
+  next();
 };
 
 // --- ROUTES ---
@@ -943,10 +964,10 @@ app.get('/api/users/all', authenticateToken, async (req, res) => {
 // 8. Create Post
 app.post('/api/posts', authenticateToken, async (req, res) => {
   try {
-    const { image, caption, mood, category, location, filter } = req.body;
+    const { image, caption, mood, category, location, filter, pollQuestion, pollOptions } = req.body;
 
-    if (!image) {
-      return res.status(400).json({ error: 'Image is required.' });
+    if (!image && (!pollQuestion || !pollOptions || pollOptions.length < 2)) {
+      return res.status(400).json({ error: 'An image or a poll with at least 2 options is required.' });
     }
 
     if (!mood || !mood.trim()) {
@@ -978,15 +999,24 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
       }
     }
 
+    let pollData = undefined;
+    if (pollQuestion && Array.isArray(pollOptions) && pollOptions.length >= 2) {
+      pollData = {
+        question: pollQuestion.trim(),
+        options: pollOptions.filter(opt => opt && opt.trim()).map(opt => ({ text: opt.trim(), votes: [] }))
+      };
+    }
+
     const post = new Post({
       author: req.user.id,
-      image,
+      image: image || '',
       caption: caption || '',
       mood: mood || '',
       category: category || 'General',
       location: location || '',
       filter: filter || 'none',
-      hashtags
+      hashtags,
+      poll: pollData
     });
 
     await post.save();
@@ -1043,7 +1073,8 @@ app.get('/api/posts', authenticateToken, async (req, res) => {
     }
 
     const posts = await Post.find(queryFilter)
-      .populate('author', 'username avatar')
+      .populate('author', 'username avatar badge isVerified')
+      .populate({ path: 'repostOf', populate: { path: 'author', select: 'username avatar badge isVerified' } })
       .sort({ createdAt: -1 })
       .limit(50); // Add a limit to avoid sending too much data
 
@@ -1073,12 +1104,99 @@ app.get('/api/posts/user/:username', async (req, res) => {
     }
 
     const posts = await Post.find(queryFilter)
-      .populate('author', 'username avatar')
+      .populate('author', 'username avatar badge isVerified')
+      .populate({ path: 'repostOf', populate: { path: 'author', select: 'username avatar badge isVerified' } })
       .sort({ isPinned: -1, createdAt: -1 });
 
     res.json(posts);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching user posts.' });
+  }
+});
+
+// API: Vote on a Post Poll
+app.post('/api/posts/:id/vote', authenticateToken, async (req, res) => {
+  try {
+    const { optionIndex } = req.body;
+    const post = await Post.findById(req.params.id);
+    if (!post || !post.poll || !post.poll.options) {
+      return res.status(404).json({ error: 'Poll not found on this post.' });
+    }
+    if (optionIndex < 0 || optionIndex >= post.poll.options.length) {
+      return res.status(400).json({ error: 'Invalid option index.' });
+    }
+    // Remove user's previous votes across options
+    post.poll.options.forEach(opt => {
+      opt.votes = opt.votes.filter(v => v.toString() !== req.user.id);
+    });
+    // Add vote to target option
+    post.poll.options[optionIndex].votes.push(req.user.id);
+    await post.save();
+
+    const updatedPost = await Post.findById(req.params.id)
+      .populate('author', 'username avatar badge isVerified')
+      .populate({ path: 'repostOf', populate: { path: 'author', select: 'username avatar badge isVerified' } });
+
+    res.json(updatedPost);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to register poll vote.' });
+  }
+});
+
+// API: Repost a Post
+app.post('/api/posts/:id/repost', authenticateToken, async (req, res) => {
+  try {
+    const { comment } = req.body;
+    const originalPost = await Post.findById(req.params.id);
+    if (!originalPost) return res.status(404).json({ error: 'Original post not found.' });
+
+    // Update shares count on original post
+    if (!originalPost.shares.includes(req.user.id)) {
+      originalPost.shares.push(req.user.id);
+      await originalPost.save();
+    }
+
+    const repost = new Post({
+      author: req.user.id,
+      image: originalPost.image || '',
+      caption: originalPost.caption || '',
+      mood: originalPost.mood || 'Repost',
+      category: originalPost.category || 'General',
+      repostOf: originalPost._id,
+      repostComment: comment || ''
+    });
+
+    await repost.save();
+
+    const populatedRepost = await Post.findById(repost._id)
+      .populate('author', 'username avatar badge isVerified')
+      .populate({ path: 'repostOf', populate: { path: 'author', select: 'username avatar badge isVerified' } });
+
+    res.status(201).json(populatedRepost);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to repost content.' });
+  }
+});
+
+// API: Update User Profile Banner & Settings
+app.put('/api/users/profile-settings', authenticateToken, async (req, res) => {
+  try {
+    const { coverPhoto, accentColor, themeMode, bio, website, github, linkedin } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
+    if (accentColor !== undefined) user.accentColor = accentColor;
+    if (themeMode !== undefined) user.themeMode = themeMode;
+    if (bio !== undefined) user.bio = bio;
+    if (website !== undefined) user.bioLink = website;
+    if (github !== undefined) user.githubUrl = github;
+    if (linkedin !== undefined) user.linkedin = linkedin;
+
+    await user.save();
+    res.json({ message: 'Profile settings updated successfully', user });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update profile settings.' });
   }
 });
 
@@ -1324,14 +1442,16 @@ app.get('/api/search', authenticateToken, async (req, res) => {
 // 14. Send Direct Message
 app.post('/api/messages', authenticateToken, async (req, res) => {
   try {
-    const { receiverId, text, sharedPostId } = req.body;
-    if (!receiverId || (!text && !sharedPostId)) {
+    const { receiverId, text, sharedPostId, audioUrl, messageType } = req.body;
+    if (!receiverId || (!text && !sharedPostId && !audioUrl)) {
       return res.status(400).json({ error: 'Receiver and message content are required.' });
     }
     const message = new Message({
       sender: req.user.id,
       receiver: receiverId,
-      text: text ? text.trim() : '📸 Shared a post',
+      text: text ? text.trim() : (audioUrl ? '🎙️ Voice note' : '📸 Shared a post'),
+      audioUrl: audioUrl || '',
+      messageType: messageType || (audioUrl ? 'audio' : (sharedPostId ? 'post' : 'text')),
       sharedPostId: sharedPostId || undefined
     });
     await message.save();
@@ -1341,7 +1461,7 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
       recipient: receiverId,
       sender: req.user.id,
       type: 'message',
-      text: text ? `sent you a message: "${text.trim().substring(0, 30)}${text.trim().length > 30 ? '...' : ''}"` : 'shared a post with you'
+      text: audioUrl ? 'sent you a voice note 🎙️' : (text ? `sent you a message: "${text.trim().substring(0, 30)}${text.trim().length > 30 ? '...' : ''}"` : 'shared a post with you')
     });
     await notif.save();
 
@@ -1900,7 +2020,11 @@ app.post('/api/ai/suggest-hashtags', authenticateToken, async (req, res) => {
   }
 });
 
-// Front-end SPA support - Serve HTML files dynamically or fallback
+// Front-end SPA & Clean Route support
+app.get('/profile', (req, res) => res.sendFile(path.join(__dirname, 'public', 'profile.html')));
+app.get('/messages', (req, res) => res.sendFile(path.join(__dirname, 'public', 'messages.html')));
+app.get('/auth', (req, res) => res.sendFile(path.join(__dirname, 'public', 'auth.html')));
+
 app.use((req, res) => {
   // If request is for an API route that wasn't matched, send JSON 404
   if (req.originalUrl.startsWith('/api')) {

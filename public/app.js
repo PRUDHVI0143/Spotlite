@@ -1667,6 +1667,48 @@ function createPostCard(post) {
         : caption;
     const hasTruncation = caption.length > CAPTION_LIMIT;
 
+    // Repost preview HTML
+    let repostHTML = '';
+    if (post.repostOf) {
+        const repAuthor = post.repostOf.author ? post.repostOf.author.username : 'Someone';
+        const repAvatar = (post.repostOf.author && post.repostOf.author.avatar) ? post.repostOf.author.avatar : `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${repAuthor}`;
+        repostHTML = `
+            <div class="repost-wrapper">
+                ${post.repostComment ? `<p class="repost-comment-text">💭 "${escapeHtml(post.repostComment)}"</p>` : ''}
+                <div class="repost-author-bar">
+                    <img src="${repAvatar}" class="repost-author-avatar">
+                    <span>Reposted from @${escapeHtml(repAuthor)}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Poll HTML
+    let pollHTML = '';
+    if (post.poll && post.poll.question && post.poll.options && post.poll.options.length > 0) {
+        let totalVotes = 0;
+        post.poll.options.forEach(o => totalVotes += (o.votes ? o.votes.length : 0));
+        const optionsHTML = post.poll.options.map((opt, idx) => {
+            const votes = opt.votes ? opt.votes.length : 0;
+            const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+            return `
+                <div class="poll-option-btn" onclick="votePollOption('${post._id}', ${idx})">
+                    <div class="poll-progress-fill" style="width: ${pct}%;"></div>
+                    <span class="poll-option-text">${escapeHtml(opt.text)}</span>
+                    <span class="poll-option-pct">${pct}%</span>
+                </div>
+            `;
+        }).join('');
+
+        pollHTML = `
+            <div class="post-poll-container">
+                <div class="poll-question">📊 ${escapeHtml(post.poll.question)}</div>
+                ${optionsHTML}
+                <div class="poll-total-votes">${totalVotes} vote${totalVotes !== 1 ? 's' : ''}</div>
+            </div>
+        `;
+    }
+
     card.innerHTML = `
         <!-- Post Header -->
         <div class="post-header">
@@ -1691,17 +1733,17 @@ function createPostCard(post) {
             </button>
         </div>
 
+        ${repostHTML}
+        ${pollHTML}
+
         <!-- Post Image -->
+        ${(post.image && post.image.trim()) ? `
         <div class="post-image-container" style="position: relative;">
             ${post.mood ? `<span class="post-mood-overlay-tag">${escapeHtml(post.mood)}</span>` : ''}
             <img src="${post.image}" alt="Post image" class="post-image" style="${post.filter && post.filter !== 'none' ? `filter: ${post.filter};` : ''}">
             <span class="like-heart-pop">❤️</span>
         </div>
-
-        <!-- Dot indicator -->
-        <div class="post-dots-row">
-            <span class="post-dot post-dot--active"></span>
-        </div>
+        ` : ''}
 
         <!-- Action Bar -->
         <div class="post-actions">
@@ -3965,7 +4007,7 @@ async function openPostDetailModal(postId) {
     }
 }
 
-// Global listener for post detail closing
+// Global listener for post detail closing & feature initializers
 document.addEventListener('DOMContentLoaded', () => {
     const detailOverlay = document.getElementById('post-detail-modal-overlay');
     const closeBtn = document.getElementById('close-detail-modal');
@@ -3981,4 +4023,149 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    loadTrendingHashtags();
+    initVoiceRecorder();
 });
+
+// =============================================================
+// NEW FEATURE HELPERS: THEMES, HASHTAGS, POLLS, REPOSTS & VOICE
+// =============================================================
+
+function setThemeMode(mode) {
+    document.body.classList.remove('mode-dark', 'mode-oled', 'mode-light');
+    document.body.classList.add('mode-' + mode);
+    localStorage.setItem('spotlite_mode', mode);
+    if (typeof showToast === 'function') showToast(`Theme changed to ${mode.toUpperCase()} 🎨`);
+}
+
+function setAccentTheme(accent) {
+    if (typeof applyThemeClass === 'function') applyThemeClass(accent);
+    try {
+        const cachedUser = JSON.parse(localStorage.getItem('user'));
+        if (cachedUser) {
+            cachedUser.profileTheme = accent;
+            localStorage.setItem('user', JSON.stringify(cachedUser));
+        }
+    } catch(e) {}
+    if (typeof showToast === 'function') showToast(`Accent color updated to ${accent.toUpperCase()} ✨`);
+}
+
+async function loadTrendingHashtags() {
+    const container = document.getElementById('trending-hashtags-list');
+    if (!container) return;
+    try {
+        const res = await fetch(`${API_BASE}/posts/trending-tags`, { headers: getHeaders() });
+        if (!res.ok) return;
+        const tags = await res.json();
+        if (tags && tags.length > 0) {
+            container.innerHTML = tags.map(t => `
+                <span class="tag-badge" onclick="filterByTag('${escapeHtml(t.tag)}')">
+                    #${escapeHtml(t.tag)} <span class="tag-count">${t.count}</span>
+                </span>
+            `).join('');
+        }
+    } catch (e) {
+        console.error('Failed to load trending tags:', e);
+    }
+}
+
+function filterByTag(tag) {
+    window.location.href = `index.html?hashtag=${encodeURIComponent(tag)}`;
+}
+
+async function votePollOption(postId, optionIndex) {
+    try {
+        const res = await fetch(`${API_BASE}/posts/${postId}/vote`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ optionIndex })
+        });
+        if (res.ok) {
+            if (typeof showToast === 'function') showToast('Vote registered! 📊');
+            if (typeof loadFeedPosts === 'function') loadFeedPosts();
+        } else {
+            const err = await res.json();
+            if (typeof showToast === 'function') showToast(err.error || 'Failed to vote');
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Failed to vote');
+    }
+}
+
+async function repostPost(postId) {
+    const comment = prompt('Add a comment to your repost (optional):');
+    if (comment === null) return;
+    try {
+        const res = await fetch(`${API_BASE}/posts/${postId}/repost`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ comment })
+        });
+        if (res.ok) {
+            if (typeof showToast === 'function') showToast('Post reposted to your profile! 🚀');
+            if (typeof loadFeedPosts === 'function') loadFeedPosts();
+        } else {
+            const err = await res.json();
+            if (typeof showToast === 'function') showToast(err.error || 'Failed to repost');
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Failed to repost');
+    }
+}
+
+function initVoiceRecorder() {
+    const voiceBtn = document.getElementById('chat-voice-note-btn');
+    if (!voiceBtn) return;
+    let mediaRecorder = null;
+    let audioChunks = [];
+
+    voiceBtn.addEventListener('click', async () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            voiceBtn.style.color = '';
+            voiceBtn.title = 'Record Voice Note 🎙️';
+        } else {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = async () => {
+                        const base64Audio = reader.result;
+                        if (typeof activeChatUser !== 'undefined' && activeChatUser) {
+                            await sendVoiceMessage(activeChatUser._id, base64Audio);
+                        }
+                    };
+                    stream.getTracks().forEach(t => t.stop());
+                };
+                mediaRecorder.start();
+                voiceBtn.style.color = '#ef4444';
+                voiceBtn.title = 'Click to Stop & Send 🔴';
+                if (typeof showToast === 'function') showToast('Recording voice note... Click again to send 🎙️');
+            } catch (err) {
+                if (typeof showToast === 'function') showToast('Microphone access unavailable or denied.');
+            }
+        }
+    });
+}
+
+async function sendVoiceMessage(receiverId, audioUrl) {
+    try {
+        const res = await fetch(`${API_BASE}/messages`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ receiverId, audioUrl, messageType: 'audio' })
+        });
+        if (res.ok) {
+            if (typeof showToast === 'function') showToast('Voice note sent! 🎙️');
+            if (typeof loadMessageThread === 'function') loadMessageThread(receiverId);
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Failed to send voice note');
+    }
+}

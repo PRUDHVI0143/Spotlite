@@ -189,6 +189,19 @@
                         </div>
                     </div>
 
+                    <!-- Trending Hashtags Section -->
+                    <div class="trending-widget">
+                        <div class="trending-widget-title">
+                            <span>🔥 Trending Hashtags</span>
+                        </div>
+                        <div class="trending-tag-list" id="trending-hashtags-list">
+                            <span class="tag-badge" onclick="filterByTag('spotlite')">#spotlite <span class="tag-count">🔥</span></span>
+                            <span class="tag-badge" onclick="filterByTag('coding')">#coding <span class="tag-count">💻</span></span>
+                            <span class="tag-badge" onclick="filterByTag('tech')">#tech <span class="tag-count">🚀</span></span>
+                            <span class="tag-badge" onclick="filterByTag('design')">#design <span class="tag-count">🎨</span></span>
+                        </div>
+                    </div>
+
                     <!-- Suggestions list -->
                     <div class="suggestions-section">
                         <div class="suggestions-header">
@@ -386,6 +399,16 @@
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 4px;"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
                         ✨ Generate AI Caption & Auto-Category
                     </button>
+
+                    <!-- Add Optional Poll Section -->
+                    <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--accent-gold); display: block; margin-bottom: 6px;">📊 Add Interactive Poll (Optional):</label>
+                        <input type="text" id="poll-question-input" placeholder="Poll question (e.g. Which design is better?)" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; margin-bottom: 6px; outline: none;">
+                        <div style="display: flex; gap: 6px;">
+                            <input type="text" id="poll-opt-1" placeholder="Option 1" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 10px; color: var(--text-primary); font-size: 0.8rem; outline: none;">
+                            <input type="text" id="poll-opt-2" placeholder="Option 2" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 10px; color: var(--text-primary); font-size: 0.8rem; outline: none;">
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -416,6 +439,24 @@
     <div class="modal-overlay" id="settings-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <div class="modal-content settings-modal">
             <h2 class="settings-tab-title" id="settings-title">Settings</h2>
+            
+            <!-- Appearance / Theme Switcher -->
+            <div style="margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
+                <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">🎨 Appearance & Themes</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <button type="button" class="btn-secondary" onclick="setThemeMode('dark')" style="flex: 1; font-size: 0.8rem; padding: 8px;">🌙 Dark</button>
+                    <button type="button" class="btn-secondary" onclick="setThemeMode('oled')" style="flex: 1; font-size: 0.8rem; padding: 8px;">🖤 OLED</button>
+                    <button type="button" class="btn-secondary" onclick="setThemeMode('light')" style="flex: 1; font-size: 0.8rem; padding: 8px;">☀️ Light</button>
+                </div>
+                <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 6px;">Accent Color:</label>
+                <div class="theme-picker-group">
+                    <div class="theme-color-dot" style="background: #bf953f;" onclick="setAccentTheme('gold')" title="Warm Gold"></div>
+                    <div class="theme-color-dot" style="background: #8b5cf6;" onclick="setAccentTheme('purple')" title="Electric Purple"></div>
+                    <div class="theme-color-dot" style="background: #10b981;" onclick="setAccentTheme('emerald')" title="Emerald Mint"></div>
+                    <div class="theme-color-dot" style="background: #3b82f6;" onclick="setAccentTheme('sapphire')" title="Sapphire Blue"></div>
+                    <div class="theme-color-dot" style="background: #ef4444;" onclick="setAccentTheme('crimson')" title="Crimson Red"></div>
+                </div>
+            </div>
             
             <!-- Privacy Section -->
             <div class="privacy-toggle-wrapper">
