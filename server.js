@@ -1276,6 +1276,49 @@ app.get('/api/users/search', authenticateToken, async (req, res) => {
   }
 });
 
+// 13b. Unified Global Search API (Users, Posts & Hashtags)
+app.get('/api/search', authenticateToken, async (req, res) => {
+  try {
+    const q = req.query.q ? req.query.q.trim() : '';
+    if (!q) {
+      return res.json({ users: [], posts: [], hashtags: [] });
+    }
+
+    const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    const users = await User.find({ username: regex, _id: { $ne: req.user.id } })
+      .select('username avatar bio isVerified')
+      .limit(8);
+
+    const posts = await Post.find({
+      $or: [
+        { caption: regex },
+        { category: regex },
+        { mood: regex },
+        { location: regex }
+      ]
+    })
+    .populate('author', 'username avatar')
+    .limit(8);
+
+    const hashtagPosts = await Post.find({ hashtags: regex }).select('hashtags');
+    const tagCounts = {};
+    hashtagPosts.forEach(p => {
+      p.hashtags.forEach(tag => {
+        if (tag.toLowerCase().includes(q.toLowerCase())) {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        }
+      });
+    });
+
+    const hashtags = Object.keys(tagCounts).map(tag => ({ tag, count: tagCounts[tag] }));
+
+    res.json({ users, posts, hashtags });
+  } catch (error) {
+    res.status(500).json({ error: 'Unified search failed.' });
+  }
+});
+
 // 14. Send Direct Message
 app.post('/api/messages', authenticateToken, async (req, res) => {
   try {
@@ -1701,6 +1744,38 @@ app.get('/api/posts/trending-tags', authenticateToken, async (req, res) => {
   }
 });
 
+// 23. Create 24h Story
+app.post('/api/stories', authenticateToken, async (req, res) => {
+  try {
+    const { image, caption } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Image is required for story.' });
+    }
+    const story = new Story({
+      author: req.user.id,
+      image,
+      caption: caption || ''
+    });
+    await story.save();
+    res.status(201).json(story);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create story.' });
+  }
+});
+
+// 24. Get Active 24h Stories
+app.get('/api/stories', authenticateToken, async (req, res) => {
+  try {
+    const now = new Date();
+    const stories = await Story.find({ expiresAt: { $gt: now } })
+      .populate('author', 'username avatar isVerified')
+      .sort({ createdAt: -1 });
+    res.json(stories);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch stories.' });
+  }
+});
+
 // J. Explore Page Trending Posts Algorithm
 app.get('/api/posts/explore', authenticateToken, async (req, res) => {
   try {
@@ -1767,6 +1842,59 @@ app.get('/api/users/analytics', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to calculate analytics.' });
+  }
+});
+
+// 25. Admin User Management & Verification
+app.get('/api/admin/users', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const users = await User.find().select('username email avatar isVerified isAdmin isBanned createdAt').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch admin users list.' });
+  }
+});
+
+app.put('/api/admin/users/:id/verify', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    user.isVerified = !user.isVerified;
+    await user.save();
+    res.json({ message: 'User verification status updated.', isVerified: user.isVerified });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update verification status.' });
+  }
+});
+
+// 26. AI Capabilities (Caption, Hashtags & Bio Generator)
+app.post('/api/ai/generate-caption', authenticateToken, async (req, res) => {
+  try {
+    const { mood, category } = req.body;
+    const moodCaptions = {
+      'Happy': "Living life with pure joy & good vibes! 😊✨ #happy #lifestyle #spotlite",
+      'Travel': "Wanderlust adventures & unforgettable views! ✈️🌍 #travel #explore #vibes",
+      'Coding': "Building the future line by line. 💻🔥 #dev #coding #mern #tech",
+      'Fitness': "Pushing limits & grinding every single day! 💪🏋️ #fitness #health #workout",
+      'Food': "Good food, good mood, good memories! 🍔🍕 #foodie #delicious #spotlite",
+      'Anime': "Entering a whole new animated dimension! 🎌✨ #anime #otaku #art",
+      'Funny': "Why so serious? Laugh a little! 😂💀 #funny #memes #vibes"
+    };
+
+    const caption = moodCaptions[mood] || `Capturing moments that matter under ${category || 'General'}. ✨ #spotlite #lifestyle`;
+    res.json({ caption });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to generate AI caption.' });
+  }
+});
+
+app.post('/api/ai/suggest-hashtags', authenticateToken, async (req, res) => {
+  try {
+    const { text } = req.body;
+    const suggestions = ['#spotlite', '#trending', '#viral', '#vibes', '#lifestyle', '#developer', '#tech', '#mern'];
+    res.json({ hashtags: suggestions });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to suggest hashtags.' });
   }
 });
 
