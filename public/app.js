@@ -858,6 +858,9 @@ function setupCreatePostModal() {
 
     if (!modal) return;
 
+    let selectedPostImageBase64 = '';
+    let selectedPostFilter = 'none';
+
     function openModal() {
         modal.classList.add('active');
         resetModal();
@@ -870,10 +873,26 @@ function setupCreatePostModal() {
 
     function resetModal() {
         selectedPostImageBase64 = '';
+        selectedPostFilter = 'none';
         fileInput.value = '';
         urlInput.value = '';
         previewImg.src = '';
+        previewImg.style.filter = 'none';
         captionInput.value = '';
+        const locInput = document.getElementById('post-location-input');
+        if (locInput) locInput.value = '';
+        
+        // Reset filter pills
+        const filterPills = document.querySelectorAll('.filter-pill');
+        filterPills.forEach(p => {
+            if (p.getAttribute('data-filter') === 'none') {
+                p.style.borderColor = 'var(--accent-gold)';
+                p.style.color = 'var(--accent-gold)';
+            } else {
+                p.style.borderColor = 'var(--border-color)';
+                p.style.color = 'var(--text-secondary)';
+            }
+        });
         const moodSelect = document.getElementById('post-mood-select');
         if (moodSelect) moodSelect.value = '';
         const categorySelect = document.getElementById('post-category-select');
@@ -938,6 +957,26 @@ function setupCreatePostModal() {
                     captionInput.value = captionInput.value ? `${captionInput.value.trim()} ${tag}` : tag;
                     if (charCounter) charCounter.textContent = `${captionInput.value.length} / 500`;
                 }
+            }
+        });
+    }
+
+    // Photo filter preset selection
+    const filterPillsContainer = document.getElementById('photo-filters-bar');
+    if (filterPillsContainer) {
+        filterPillsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.filter-pill');
+            if (btn) {
+                const filterVal = btn.getAttribute('data-filter') || 'none';
+                selectedPostFilter = filterVal;
+                if (previewImg) previewImg.style.filter = filterVal;
+
+                filterPillsContainer.querySelectorAll('.filter-pill').forEach(p => {
+                    p.style.borderColor = 'var(--border-color)';
+                    p.style.color = 'var(--text-secondary)';
+                });
+                btn.style.borderColor = 'var(--accent-gold)';
+                btn.style.color = 'var(--accent-gold)';
             }
         });
     }
@@ -1063,6 +1102,8 @@ function setupCreatePostModal() {
         const caption = captionInput.value;
         const moodSelect = document.getElementById('post-mood-select');
         const mood = moodSelect ? moodSelect.value : '';
+        const locInput = document.getElementById('post-location-input');
+        const location = locInput ? locInput.value.trim() : '';
         const categorySelect = document.getElementById('post-category-select');
         let category = categorySelect ? categorySelect.value : '';
 
@@ -1095,7 +1136,9 @@ function setupCreatePostModal() {
                     image: selectedPostImageBase64,
                     caption,
                     mood,
-                    category
+                    category,
+                    location,
+                    filter: selectedPostFilter
                 })
             });
 
@@ -1265,7 +1308,10 @@ function createPostCard(post) {
                         ${getCategoryBadgeHTML(post.category)}
                         ${post.isPinned ? '<span class="pin-indicator" title="Pinned Post" style="margin-left: 4px; color: var(--accent-gold); font-size: 0.8rem;">📌</span>' : ''}
                     </span>
-                    <span class="post-time-sub">${formatTime(post.createdAt)}</span>
+                    <span class="post-time-sub">
+                        ${formatTime(post.createdAt)}
+                        ${post.location ? `<span style="color:var(--accent-gold);margin-left:6px;font-weight:600;">📍 ${escapeHtml(post.location)}</span>` : ''}
+                    </span>
                 </div>
             </div>
             <button class="post-menu-btn" title="More options">
@@ -1275,7 +1321,7 @@ function createPostCard(post) {
 
         <!-- Post Image -->
         <div class="post-image-container">
-            <img src="${post.image}" alt="Post image" class="post-image">
+            <img src="${post.image}" alt="Post image" class="post-image" style="${post.filter && post.filter !== 'none' ? `filter: ${post.filter};` : ''}">
             <span class="like-heart-pop">❤️</span>
         </div>
 

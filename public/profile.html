@@ -314,6 +314,19 @@
             <div class="preview-container" id="image-preview-container">
                 <img src="" alt="Preview" class="preview-image" id="preview-img-element">
                 <button class="remove-preview-btn" id="remove-preview-btn">&times;</button>
+                
+                <!-- Live Photo Filter Presets -->
+                <div style="margin-top: 10px; padding: 0 10px;">
+                    <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">Photo Filter:</span>
+                    <div class="photo-filters-bar" id="photo-filters-bar" style="display: flex; gap: 8px; overflow-x: auto; padding: 6px 0;">
+                        <button type="button" class="filter-pill active" data-filter="none" style="background: var(--bg-input); border: 1px solid var(--accent-gold); color: var(--accent-gold); padding: 4px 12px; border-radius: 16px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">✨ Original</button>
+                        <button type="button" class="filter-pill" data-filter="sepia(0.25) contrast(1.1) brightness(1.05)" style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 4px 12px; border-radius: 16px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">🌅 Warm Glow</button>
+                        <button type="button" class="filter-pill" data-filter="saturate(1.4) contrast(1.1)" style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 4px 12px; border-radius: 16px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">🎨 Vivid</button>
+                        <button type="button" class="filter-pill" data-filter="sepia(0.4) contrast(0.9) brightness(0.95)" style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 4px 12px; border-radius: 16px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">📽️ Vintage</button>
+                        <button type="button" class="filter-pill" data-filter="grayscale(1) contrast(1.2)" style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 4px 12px; border-radius: 16px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">🕶️ Noir B&W</button>
+                        <button type="button" class="filter-pill" data-filter="hue-rotate(290deg) saturate(1.3)" style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 4px 12px; border-radius: 16px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">🔮 Cyberpunk</button>
+                    </div>
+                </div>
             </div>
 
             <div class="modal-caption-area" id="caption-area" style="display: none;">
@@ -335,6 +348,10 @@
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <label for="post-location-input" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 70px;">📍 Location:</label>
+                        <input type="text" id="post-location-input" placeholder="Add location (e.g. Tokyo, Japan)..." style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; flex: 1; outline: none;">
+                    </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
                         <label for="post-mood-select" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 70px;">Post Mood:</label>
                         <select id="post-mood-select" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; flex: 1; outline: none; cursor: pointer;">

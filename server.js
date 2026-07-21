@@ -121,6 +121,8 @@ const PostSchema = new mongoose.Schema({
   }],
   mood: { type: String, default: '' }, // Happy, Travel, Study, Fitness, Coding
   category: { type: String, default: 'General' }, // Tech & Code, Art & Design, Travel & Lifestyle, Fitness & Health, Gaming, Music, Education, General
+  location: { type: String, default: '' },
+  filter: { type: String, default: 'none' },
   isPinned: { type: Boolean, default: false },
   hashtags: [{ type: String }]
 }, { timestamps: true });
@@ -939,7 +941,7 @@ app.get('/api/users/all', authenticateToken, async (req, res) => {
 // 8. Create Post
 app.post('/api/posts', authenticateToken, async (req, res) => {
   try {
-    const { image, caption, mood, category } = req.body;
+    const { image, caption, mood, category, location, filter } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image is required.' });
@@ -976,6 +978,8 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
       caption: caption || '',
       mood: mood || '',
       category: category || 'General',
+      location: location || '',
+      filter: filter || 'none',
       hashtags
     });
 
