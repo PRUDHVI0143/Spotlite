@@ -1,15 +1,9 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "server.js"
-    }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/server.js" },
+    { "source": "/profile", "destination": "/profile.html" },
+    { "source": "/messages", "destination": "/messages.html" },
+    { "source": "/auth", "destination": "/auth.html" }
   ]
 }
