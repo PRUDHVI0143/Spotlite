@@ -2835,6 +2835,42 @@ input:checked+.slider:before {
     border: 1px solid rgba(255, 184, 0, 0.35);
 }
 
+.post-category-badge.cat-funny {
+    background: rgba(255, 230, 0, 0.15);
+    color: #ffe600;
+    border: 1px solid rgba(255, 230, 0, 0.4);
+}
+
+.post-category-badge.cat-anime {
+    background: rgba(255, 121, 198, 0.15);
+    color: #ff79c6;
+    border: 1px solid rgba(255, 121, 198, 0.35);
+}
+
+.post-category-badge.cat-movies {
+    background: rgba(189, 147, 249, 0.15);
+    color: #bd93f9;
+    border: 1px solid rgba(189, 147, 249, 0.35);
+}
+
+.post-category-badge.cat-news {
+    background: rgba(255, 85, 85, 0.15);
+    color: #ff5555;
+    border: 1px solid rgba(255, 85, 85, 0.35);
+}
+
+.post-category-badge.cat-food {
+    background: rgba(255, 159, 67, 0.15);
+    color: #ff9f43;
+    border: 1px solid rgba(255, 159, 67, 0.35);
+}
+
+.post-category-badge.cat-study {
+    background: rgba(84, 160, 255, 0.15);
+    color: #54a0ff;
+    border: 1px solid rgba(84, 160, 255, 0.35);
+}
+
 .post-category-badge.cat-tech {
     background: rgba(0, 210, 255, 0.12);
     color: #00d2ff;

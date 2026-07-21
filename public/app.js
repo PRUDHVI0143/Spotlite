@@ -1368,6 +1368,30 @@ async function loadFeedPosts() {
     }
 }
 
+// Helper to render color-coded category badges on post headers
+function getCategoryBadgeHTML(category) {
+    if (!category) return '';
+    const cat = category.toLowerCase();
+    let badgeClass = 'cat-general';
+    let icon = '🌟';
+
+    if (cat.includes('funny') || cat.includes('meme')) { badgeClass = 'cat-funny'; icon = '😂'; }
+    else if (cat.includes('anime') || cat.includes('manga')) { badgeClass = 'cat-anime'; icon = '🎌'; }
+    else if (cat.includes('movie') || cat.includes('tv') || cat.includes('cinema')) { badgeClass = 'cat-movies'; icon = '🎬'; }
+    else if (cat.includes('news') || cat.includes('national')) { badgeClass = 'cat-news'; icon = '📰'; }
+    else if (cat.includes('study') || cat.includes('education') || cat.includes('learn')) { badgeClass = 'cat-study'; icon = '📚'; }
+    else if (cat.includes('travel') || cat.includes('trip') || cat.includes('lifestyle')) { badgeClass = 'cat-travel'; icon = '✈️'; }
+    else if (cat.includes('food') || cat.includes('cook') || cat.includes('recipe')) { badgeClass = 'cat-food'; icon = '🍔'; }
+    else if (cat.includes('fitness') || cat.includes('health') || cat.includes('gym')) { badgeClass = 'cat-fitness'; icon = '🏋️'; }
+    else if (cat.includes('tech') || cat.includes('code') || cat.includes('dev')) { badgeClass = 'cat-tech'; icon = '💻'; }
+    else if (cat.includes('gaming') || cat.includes('game')) { badgeClass = 'cat-gaming'; icon = '🎮'; }
+    else if (cat.includes('music') || cat.includes('song')) { badgeClass = 'cat-music'; icon = '🎵'; }
+    else if (cat.includes('art') || cat.includes('design')) { badgeClass = 'cat-art'; icon = '🎨'; }
+    else if (cat.includes('happy') || cat.includes('joy')) { badgeClass = 'cat-happy'; icon = '😊'; }
+
+    return `<span class="post-category-badge ${badgeClass}">${icon} ${escapeHtml(category)}</span>`;
+}
+
 // Generate the HTML elements of a feed post card
 function createPostCard(post) {
     const card = document.createElement('article');
