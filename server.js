@@ -1701,6 +1701,75 @@ app.get('/api/posts/trending-tags', authenticateToken, async (req, res) => {
   }
 });
 
+// J. Explore Page Trending Posts Algorithm
+app.get('/api/posts/explore', authenticateToken, async (req, res) => {
+  try {
+    const posts = await Post.find()
+      .populate('author', 'username avatar isVerified')
+      .sort({ createdAt: -1 })
+      .limit(60);
+
+    // Sort by engagement score: likes * 2 + comments * 3 + shares * 4
+    const rankedPosts = posts.map(post => {
+      const score = (post.likes ? post.likes.length * 2 : 0) + 
+                    (post.comments ? post.comments.length * 3 : 0) + 
+                    (post.shares ? post.shares.length * 4 : 0);
+      return { post, score };
+    }).sort((a, b) => b.score - a.score).map(item => item.post);
+
+    res.json(rankedPosts);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load explore feed.' });
+  }
+});
+
+// K. User Portfolio Analytics Dashboard
+app.get('/api/users/analytics', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const userPosts = await Post.find({ author: userId });
+    let totalLikes = 0;
+    let totalComments = 0;
+    let totalShares = 0;
+    let topPost = null;
+    let maxEngagement = -1;
+
+    userPosts.forEach(post => {
+      const likesCount = post.likes ? post.likes.length : 0;
+      const commentsCount = post.comments ? post.comments.length : 0;
+      const sharesCount = post.shares ? post.shares.length : 0;
+      
+      totalLikes += likesCount;
+      totalComments += commentsCount;
+      totalShares += sharesCount;
+
+      const engagement = likesCount + commentsCount;
+      if (engagement > maxEngagement) {
+        maxEngagement = engagement;
+        topPost = post;
+      }
+    });
+
+    res.json({
+      username: user.username,
+      isVerified: user.isVerified || false,
+      followersCount: user.followers ? user.followers.length : 0,
+      followingCount: user.following ? user.following.length : 0,
+      totalPosts: userPosts.length,
+      totalLikes,
+      totalComments,
+      totalShares,
+      engagementRate: userPosts.length > 0 ? ((totalLikes + totalComments) / userPosts.length).toFixed(1) : '0.0',
+      topPost: topPost ? { _id: topPost._id, image: topPost.image, likesCount: topPost.likes ? topPost.likes.length : 0 } : null
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to calculate analytics.' });
+  }
+});
+
 // Front-end SPA support - Serve HTML files dynamically or fallback
 app.use((req, res) => {
   // If request is for an API route that wasn't matched, send JSON 404
