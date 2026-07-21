@@ -192,14 +192,16 @@
     <div class="modal-overlay" id="create-post-modal-overlay">
         <div class="modal-content create-post-modal">
             <div class="modal-header">
-                <h3 class="modal-title">✨ Create New Spotlite</h3>
+                <h3 class="modal-title">Create new post</h3>
                 <button class="modal-close-btn" id="close-create-modal">
                     <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
                 <button class="modal-next-btn" id="submit-post-btn">Share ✨</button>
             </div>
+
+            <!-- Category Selection Bar (Always Visible Immediately) -->
             <div style="padding: 14px 20px; background: rgba(255, 203, 5, 0.05); border-bottom: 1px solid var(--border-color);">
-                <label style="font-size: 0.85rem; color: var(--accent-gold); font-weight: 700; display: block; margin-bottom: 8px;">📌 Select Post Category:</label>
+                <label style="font-size: 0.85rem; color: var(--accent-gold); font-weight: 700; display: block; margin-bottom: 8px;">📌 Select Photo Category (For Feed Filter):</label>
                 <div class="modal-category-buttons-row" id="modal-category-buttons-row" style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button type="button" class="category-btn-pill active" data-value="General">🌟 General</button>
                     <button type="button" class="category-btn-pill" data-value="Happy">😊 Happy</button>
@@ -233,9 +235,26 @@
 
             <!-- File Drop / Paste Link area -->
             <div class="drag-drop-area" id="drop-area">
+                <!-- Direct Category Dropdown inside Upload Screen -->
+                <div style="width: 100%; margin-bottom: 14px; padding: 12px 14px; background: rgba(255, 203, 5, 0.08); border: 1.5px solid var(--border-color); border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                    <label for="post-category-select-drop" style="font-size: 0.88rem; color: var(--accent-gold); font-weight: 700; white-space: nowrap;">Select Category:</label>
+                    <select id="post-category-select-drop" style="background-color: var(--bg-input); border: 1.5px solid var(--accent-gold); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; font-weight: 600; outline: none; cursor: pointer; flex: 1;">
+                        <option value="General">🌟 General / Showcase</option>
+                        <option value="Happy">😊 Happy</option>
+                        <option value="Tech & Code">💻 Tech & Code</option>
+                        <option value="Art & Design">🎨 Art & Design</option>
+                        <option value="Travel & Lifestyle">✈️ Travel & Lifestyle</option>
+                        <option value="Fitness & Health">🏋️ Fitness & Health</option>
+                        <option value="Gaming">🎮 Gaming</option>
+                        <option value="Music">🎵 Music</option>
+                        <option value="Education">📚 Education & Study</option>
+                        <option value="Other">✏️ Other (Custom Category)</option>
+                    </select>
+                </div>
+
                 <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
-                <p style="margin-top: 10px; font-weight: 600; font-size: 0.95rem;">Drag & drop photos here or upload</p>
-                <label for="post-file-input" style="display: inline-block; margin-top: 10px; background: var(--spotlite-gradient); color: black; font-weight: 700; padding: 8px 18px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; box-shadow: 0 4px 14px rgba(255, 203, 5, 0.3);">Select from computer</label>
+                <p style="margin-top: 10px; font-weight: 600; font-size: 0.95rem;">Drag photos here or click to upload</p>
+                <label for="post-file-input" style="display: inline-block; margin-top: 10px; color: var(--accent-gold); font-weight: 700; cursor: pointer; font-size: 0.9rem;">Select from computer</label>
                 <input type="file" id="post-file-input" accept="image/*" style="display: none;">
                 
                 <p style="margin-top: 18px; font-size: 0.82rem; color: var(--text-muted);">Or paste an image URL:</p>

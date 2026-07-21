@@ -897,6 +897,8 @@ function setupCreatePostModal() {
         if (moodSelect) moodSelect.value = '';
         const categorySelect = document.getElementById('post-category-select');
         if (categorySelect) categorySelect.value = 'General';
+        const categorySelectDrop = document.getElementById('post-category-select-drop');
+        if (categorySelectDrop) categorySelectDrop.value = 'General';
         const customWrapper = document.getElementById('post-custom-category-wrapper');
         const customInput = document.getElementById('post-custom-category-input');
         if (customWrapper) customWrapper.style.display = 'none';
@@ -932,12 +934,14 @@ function setupCreatePostModal() {
 
     // Category Buttons Row & Dropdown sync
     const categorySelect = document.getElementById('post-category-select');
+    const categorySelectDrop = document.getElementById('post-category-select-drop');
     const customWrapper = document.getElementById('post-custom-category-wrapper');
     const customInput = document.getElementById('post-custom-category-input');
     const catButtonsRow = document.getElementById('modal-category-buttons-row');
 
     function syncCategorySelection(val) {
         if (categorySelect) categorySelect.value = val;
+        if (categorySelectDrop) categorySelectDrop.value = val;
         if (catButtonsRow) {
             catButtonsRow.querySelectorAll('.category-btn-pill').forEach(btn => {
                 if (btn.getAttribute('data-value') === val) {
@@ -959,6 +963,9 @@ function setupCreatePostModal() {
 
     if (categorySelect) {
         categorySelect.addEventListener('change', () => syncCategorySelection(categorySelect.value));
+    }
+    if (categorySelectDrop) {
+        categorySelectDrop.addEventListener('change', () => syncCategorySelection(categorySelectDrop.value));
     }
 
     if (catButtonsRow) {
