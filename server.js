@@ -1237,7 +1237,10 @@ app.get('/api/posts/saved', authenticateToken, async (req, res) => {
 });
 
 // NEW ENDPOINT: Get a single post by ID
-app.get('/api/posts/:id', authenticateToken, async (req, res) => {
+app.get('/api/posts/:id', authenticateToken, async (req, res, next) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return next();
+  }
   try {
     const post = await Post.findById(req.params.id)
       .populate('author', 'username avatar')
