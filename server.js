@@ -947,6 +947,10 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Image is required.' });
     }
 
+    if (!mood || !mood.trim()) {
+      return res.status(400).json({ error: 'Post Mood is required to share a post! Please select or enter a mood.' });
+    }
+
     const currentUser = await User.findById(req.user.id);
     if (currentUser.spotlightMode) {
       const startOfToday = new Date();

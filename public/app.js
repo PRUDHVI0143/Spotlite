@@ -895,6 +895,11 @@ function setupCreatePostModal() {
         });
         const moodSelect = document.getElementById('post-mood-select');
         if (moodSelect) moodSelect.value = '';
+        const customMoodWrapper = document.getElementById('post-custom-mood-wrapper');
+        const customMoodInput = document.getElementById('post-custom-mood-input');
+        if (customMoodWrapper) customMoodWrapper.style.display = 'none';
+        if (customMoodInput) customMoodInput.value = '';
+        
         const categorySelect = document.getElementById('post-category-select');
         if (categorySelect) categorySelect.value = 'General';
         const categorySelectDrop = document.getElementById('post-category-select-drop');
@@ -930,6 +935,21 @@ function setupCreatePostModal() {
         previewContainer.style.display = 'block';
         captionArea.style.display = 'block';
         submitBtn.style.display = 'block';
+    }
+
+    // Post Mood Change Handler for Custom Mood ("Other")
+    const moodSelect = document.getElementById('post-mood-select');
+    const customMoodWrapper = document.getElementById('post-custom-mood-wrapper');
+    const customMoodInput = document.getElementById('post-custom-mood-input');
+    if (moodSelect && customMoodWrapper) {
+        moodSelect.addEventListener('change', () => {
+            if (moodSelect.value === 'Other') {
+                customMoodWrapper.style.display = 'flex';
+                if (customMoodInput) customMoodInput.focus();
+            } else {
+                customMoodWrapper.style.display = 'none';
+            }
+        });
     }
 
     // Category Buttons Row & Dropdown sync
@@ -1144,7 +1164,18 @@ function setupCreatePostModal() {
 
         const caption = captionInput.value;
         const moodSelect = document.getElementById('post-mood-select');
-        const mood = moodSelect ? moodSelect.value : '';
+        let mood = moodSelect ? moodSelect.value : '';
+        if (mood === 'Other') {
+            const customMoodInput = document.getElementById('post-custom-mood-input');
+            mood = customMoodInput ? customMoodInput.value.trim() : '';
+        }
+
+        if (!mood) {
+            alert('⚠️ Post Mood is required! Please select or enter a post mood before sharing.');
+            if (moodSelect) moodSelect.focus();
+            return;
+        }
+
         const locInput = document.getElementById('post-location-input');
         const location = locInput ? locInput.value.trim() : '';
         const categorySelect = document.getElementById('post-category-select');
