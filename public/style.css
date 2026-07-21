@@ -3261,3 +3261,29 @@ input:checked+.slider:before {
     font-weight: 500;
     margin-top: 4px;
 }
+
+/* Category Selection Pills (Modal after image loaded) */
+.category-btn-pill {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.category-btn-pill:hover {
+    border-color: rgba(255, 203, 5, 0.5);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.category-btn-pill.active {
+    background: rgba(255, 203, 5, 0.15);
+    border: 1.5px solid var(--accent-gold);
+    color: var(--accent-gold);
+    box-shadow: 0 0 12px rgba(255, 203, 5, 0.25);
+}

@@ -904,6 +904,16 @@ function setupCreatePostModal() {
         const charCounter = document.getElementById('caption-char-counter');
         if (charCounter) charCounter.textContent = '0 / 500';
         
+        // Reset category button pills
+        const catBtnPills = document.querySelectorAll('.category-btn-pill');
+        catBtnPills.forEach(btn => {
+            if (btn.getAttribute('data-value') === 'General') {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
         dropArea.style.display = 'flex';
         previewContainer.style.display = 'none';
         captionArea.style.display = 'none';
@@ -920,20 +930,46 @@ function setupCreatePostModal() {
         submitBtn.style.display = 'block';
     }
 
-    // Category Select change handler for "Other" custom category input
+    // Category Buttons Row & Dropdown sync
     const categorySelect = document.getElementById('post-category-select');
     const customWrapper = document.getElementById('post-custom-category-wrapper');
     const customInput = document.getElementById('post-custom-category-input');
+    const catButtonsRow = document.getElementById('modal-category-buttons-row');
 
-    if (categorySelect && customWrapper) {
-        categorySelect.addEventListener('change', () => {
-            if (categorySelect.value === 'Other') {
+    function syncCategorySelection(val) {
+        if (categorySelect) categorySelect.value = val;
+        if (catButtonsRow) {
+            catButtonsRow.querySelectorAll('.category-btn-pill').forEach(btn => {
+                if (btn.getAttribute('data-value') === val) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        if (customWrapper) {
+            if (val === 'Other') {
                 customWrapper.style.display = 'flex';
                 if (customInput) customInput.focus();
             } else {
                 customWrapper.style.display = 'none';
             }
+        }
+    }
+
+    if (categorySelect) {
+        categorySelect.addEventListener('change', () => syncCategorySelection(categorySelect.value));
+    }
+
+    if (catButtonsRow) {
+        catButtonsRow.addEventListener('click', (e) => {
+            const btn = e.target.closest('.category-btn-pill');
+            if (btn) {
+                const val = btn.getAttribute('data-value');
+                if (val) syncCategorySelection(val);
+            }
         });
+    }
     // Character counter & Quick Hashtags
     const charCounter = document.getElementById('caption-char-counter');
     if (captionInput && charCounter) {
