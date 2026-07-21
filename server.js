@@ -25,7 +25,6 @@ async function seedAdmin() {
     const adminEmail = 'admin@spotlite.com';
     const adminPassword = 'prudhvi';
 
-    const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     const existingAdmin = await User.findOne({ username: adminUsername });
@@ -41,12 +40,10 @@ async function seedAdmin() {
       await adminUser.save();
       console.log('Default administrator account created successfully.');
     } else {
-      // Ensure the admin account has isAdmin set to true and update the password
       existingAdmin.password = hashedPassword;
       existingAdmin.isAdmin = true;
       existingAdmin.isVerified = true;
       await existingAdmin.save();
-      console.log('Administrator account credentials updated successfully.');
     }
   } catch (err) {
     console.error('Failed to seed admin account:', err.message);
@@ -54,29 +51,34 @@ async function seedAdmin() {
 }
 
 async function connectDB() {
-  if (isConnected) return;
+  if (isConnected || mongoose.connection.readyState === 1) {
+    isConnected = true;
+    return true;
+  }
   try {
     await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 3000,
+      serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 20000,
     });
     isConnected = true;
     console.log('Connected to MongoDB successfully.');
     await seedAdmin();
+    return true;
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
-    throw err;
+    return false;
   }
 }
 
-// Middleware to ensure DB is connected on every request
+// Middleware to ensure DB is connected on API requests
 app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    res.status(500).json({ error: 'Database connection failed.' });
+  if (req.path.startsWith('/api')) {
+    const ok = await connectDB();
+    if (!ok && mongoose.connection.readyState !== 1) {
+      return res.status(500).json({ error: 'Database connection failed. Please check MONGODB_URI environment variable on Vercel.' });
+    }
   }
+  next();
 });
 
 // --- MODELS ---
