@@ -1210,6 +1210,7 @@ async function initFeedPage() {
     setupSearchPanel();
     setupSettingsModal();
     loadCurrentUserCard();
+    setupCategoryFilterBar();
     setupMoodFilters();
     loadFeedPosts();
     loadSuggestions();
@@ -1253,6 +1254,22 @@ function skeletonPostCard() {
 }
 
 let activeMoodFilter = 'all';
+let activeCategoryFilter = 'all';
+
+function setupCategoryFilterBar() {
+    const filterBar = document.getElementById('category-filter-bar');
+    if (!filterBar) return;
+
+    const pills = filterBar.querySelectorAll('.mood-pill');
+    pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+            pills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            activeCategoryFilter = pill.getAttribute('data-category') || 'all';
+            loadFeedPosts();
+        });
+    });
+}
 
 function setupMoodFilters() {
     const container = document.getElementById('feed-mood-filter-bar');
