@@ -198,25 +198,36 @@
                 </button>
                 <button class="modal-next-btn" id="submit-post-btn">Share ✨</button>
             </div>
-            
-            <!-- Category Selection Bar (Always Visible Immediately) -->
-            <div style="padding: 14px 20px; background: rgba(255, 203, 5, 0.05); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                <label for="post-category-select" style="font-size: 0.88rem; color: var(--accent-gold); font-weight: 700; min-width: 75px;">Category:</label>
-                <select id="post-category-select" style="background-color: var(--bg-input); border: 1.5px solid var(--border-color); border-radius: 8px; padding: 9px 14px; color: var(--text-primary); font-size: 0.88rem; flex: 1; outline: none; cursor: pointer; font-weight: 600;">
-                    <option value="General">🌟 General / Showcase</option>
-                    <option value="Happy">😊 Happy</option>
-                    <option value="Tech & Code">💻 Tech & Code</option>
-                    <option value="Art & Design">🎨 Art & Design</option>
-                    <option value="Travel & Lifestyle">✈️ Travel & Lifestyle</option>
-                    <option value="Fitness & Health">🏋️ Fitness & Health</option>
-                    <option value="Gaming">🎮 Gaming</option>
-                    <option value="Music">🎵 Music</option>
-                    <option value="Education">📚 Education & Study</option>
-                    <option value="Other">✏️ Other (Custom Category)</option>
+            <div style="padding: 14px 20px; background: rgba(255, 203, 5, 0.05); border-bottom: 1px solid var(--border-color);">
+                <label style="font-size: 0.85rem; color: var(--accent-gold); font-weight: 700; display: block; margin-bottom: 8px;">📌 Select Post Category:</label>
+                <div class="modal-category-buttons-row" id="modal-category-buttons-row" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="category-btn-pill active" data-value="General">🌟 General</button>
+                    <button type="button" class="category-btn-pill" data-value="Happy">😊 Happy</button>
+                    <button type="button" class="category-btn-pill" data-value="Tech & Code">💻 Tech & Code</button>
+                    <button type="button" class="category-btn-pill" data-value="Art & Design">🎨 Art & Design</button>
+                    <button type="button" class="category-btn-pill" data-value="Travel & Lifestyle">✈️ Travel</button>
+                    <button type="button" class="category-btn-pill" data-value="Fitness & Health">🏋️ Fitness</button>
+                    <button type="button" class="category-btn-pill" data-value="Gaming">🎮 Gaming</button>
+                    <button type="button" class="category-btn-pill" data-value="Music">🎵 Music</button>
+                    <button type="button" class="category-btn-pill" data-value="Education">📚 Education</button>
+                    <button type="button" class="category-btn-pill" data-value="Other">✏️ Other</button>
+                </div>
+                <!-- Hidden select for JS payload extraction -->
+                <select id="post-category-select" style="display: none;">
+                    <option value="General">General</option>
+                    <option value="Happy">Happy</option>
+                    <option value="Tech & Code">Tech & Code</option>
+                    <option value="Art & Design">Art & Design</option>
+                    <option value="Travel & Lifestyle">Travel & Lifestyle</option>
+                    <option value="Fitness & Health">Fitness & Health</option>
+                    <option value="Gaming">Gaming</option>
+                    <option value="Music">Music</option>
+                    <option value="Education">Education</option>
+                    <option value="Other">Other</option>
                 </select>
             </div>
             <div id="post-custom-category-wrapper" style="display: none; padding: 10px 20px; background: rgba(255, 203, 5, 0.03); border-bottom: 1px solid var(--border-color); align-items: center; justify-content: space-between; gap: 12px;">
-                <label for="post-custom-category-input" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 75px;">Custom:</label>
+                <label for="post-custom-category-input" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 120px;">Custom Category:</label>
                 <input type="text" id="post-custom-category-input" placeholder="Type custom category name..." style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.85rem; flex: 1; outline: none;">
             </div>
 
@@ -230,7 +241,7 @@
                 <p style="margin-top: 18px; font-size: 0.82rem; color: var(--text-muted);">Or paste an image URL:</p>
                 <div style="display: flex; gap: 8px; width: 85%; justify-content: center; margin-top: 6px;">
                     <input type="text" id="post-url-input" placeholder="https://example.com/image.jpg" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); flex: 1; font-size: 0.85rem;">
-                    <button id="post-url-submit-btn" style="background: var(--spotlite-gradient); color: black; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">Load</button>
+                    <button id="post-url-submit-btn" style="background: var(--spotlite-gradient); color: black; border: none; border-radius: 6px; padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">Load</button>
                 </div>
             </div>
 
@@ -268,23 +279,6 @@
                         <span class="hashtag-chip" data-tag="#tech">#tech</span>
                         <span class="hashtag-chip" data-tag="#travel">#travel</span>
                         <span class="hashtag-chip" data-tag="#coding">#coding</span>
-                    </div>
-                </div>
-
-                <!-- Post Category Selection Buttons (Appears after photo is loaded) -->
-                <div style="margin-top: 12px; margin-bottom: 8px;">
-                    <label style="font-size: 0.82rem; color: var(--accent-gold); font-weight: 700; display: block; margin-bottom: 6px;">Select Photo Category (For Feed Filter):</label>
-                    <div class="modal-category-buttons-row" id="modal-category-buttons-row" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button type="button" class="category-btn-pill active" data-value="General">🌟 General</button>
-                        <button type="button" class="category-btn-pill" data-value="Happy">😊 Happy</button>
-                        <button type="button" class="category-btn-pill" data-value="Tech & Code">💻 Tech & Code</button>
-                        <button type="button" class="category-btn-pill" data-value="Art & Design">🎨 Art & Design</button>
-                        <button type="button" class="category-btn-pill" data-value="Travel & Lifestyle">✈️ Travel</button>
-                        <button type="button" class="category-btn-pill" data-value="Fitness & Health">🏋️ Fitness</button>
-                        <button type="button" class="category-btn-pill" data-value="Gaming">🎮 Gaming</button>
-                        <button type="button" class="category-btn-pill" data-value="Music">🎵 Music</button>
-                        <button type="button" class="category-btn-pill" data-value="Education">📚 Education</button>
-                        <button type="button" class="category-btn-pill" data-value="Other">✏️ Other</button>
                     </div>
                 </div>
 
