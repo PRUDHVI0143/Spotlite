@@ -27,4 +27,27 @@ describe('Spotlite Modular API Tests', () => {
     const res = await request(app).get('/api/admin/users');
     expect(res.statusCode).toBe(401);
   });
+
+  it('POST /api/auth/register and /api/auth/verify-email full verification flow', async () => {
+    const testEmail = `test_verify_${Date.now()}@example.com`;
+    const testUsername = `user_${Date.now()}`;
+
+    // 1. Register
+    const regRes = await request(app)
+      .post('/api/auth/register')
+      .send({ username: testUsername, email: testEmail, password: 'password123' });
+
+    expect(regRes.statusCode).toBe(201);
+    expect(regRes.body).toHaveProperty('verificationCode');
+    const code = regRes.body.verificationCode;
+
+    // 2. Verify
+    const verifyRes = await request(app)
+      .post('/api/auth/verify-email')
+      .send({ email: testEmail, code: code });
+
+    expect(verifyRes.statusCode).toBe(200);
+    expect(verifyRes.body).toHaveProperty('token');
+    expect(verifyRes.body.user.isVerified).toBe(true);
+  });
 });

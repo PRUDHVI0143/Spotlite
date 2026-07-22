@@ -21,6 +21,9 @@ const UserSchema = new mongoose.Schema({
   isAdmin: { type: Boolean, default: false },
   isVerified: { type: Boolean, default: false },
   isBanned: { type: Boolean, default: false },
+  verificationCode: { type: String, default: '' },
+  verificationCodeExpires: { type: Date, default: null },
+  refreshToken: { type: String, default: '' },
   resetPasswordToken: { type: String, default: null },
   resetPasswordExpires: { type: Date, default: null }
 }, { timestamps: true });

@@ -99,21 +99,27 @@ async function sendVerificationEmail(username, email, code) {
         port: port,
         secure: port === 465,
         auth: { user: smtpUser, pass: smtpPass },
-        tls: { rejectUnauthorized: false }
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 3000,
+        greetingTimeout: 3000,
+        socketTimeout: 3000
       });
 
-      await transporter.sendMail({
+      transporter.sendMail({
         from: process.env.SMTP_FROM || `"Spotlite Support" <${smtpUser}>`,
         to: email,
         subject: `✨ ${code} is your Spotlite verification code`,
         text: textContent,
         html: htmlContent
+      }).then(() => {
+        console.log(`[SMTP SUCCESS] Verification email sent successfully to ${email}`);
+      }).catch(err => {
+        console.error(`[SMTP ERROR] Failed to send email to ${email}:`, err.message);
       });
 
-      console.log(`[SMTP SUCCESS] Verification email sent successfully to ${email}`);
       return { success: true };
     } catch (err) {
-      console.error(`[SMTP ERROR] Failed to send email to ${email}:`, err.message);
+      console.error(`[SMTP ERROR] Failed to initialize mailer:`, err.message);
     }
   }
 
