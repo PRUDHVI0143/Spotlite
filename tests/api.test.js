@@ -1,0 +1,25 @@
+const request = require('supertest');
+const app = require('../server');
+
+describe('Spotlite Modular API Tests', () => {
+  it('GET /api/auth/me without token should return 401 Unauthorized', async () => {
+    const res = await request(app).get('/api/auth/me');
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('POST /api/auth/register with missing fields should return 400 Bad Request', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ username: '', email: '' });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('POST /api/ai/generate-caption should return AI caption', async () => {
+    const res = await request(app)
+      .post('/api/ai/generate-caption')
+      .send({ mood: 'Coding' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.caption).toContain('#coding');
+  });
+});

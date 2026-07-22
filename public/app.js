@@ -1599,10 +1599,10 @@ async function loadFeedPosts() {
             headers: getHeaders()
         });
 
-        const posts = await response.json();
-        if (!response.ok) throw new Error(posts.error || 'Failed to load posts');
+        const postsData = await response.json();
+        if (!response.ok) throw new Error(postsData.error || 'Failed to load posts');
 
-        let filteredPosts = posts;
+        let filteredPosts = Array.isArray(postsData) ? postsData : (postsData && Array.isArray(postsData.posts) ? postsData.posts : []);
 
         if (filteredPosts.length === 0) {
             postsStream.innerHTML = `
@@ -3673,6 +3673,59 @@ async function initMessagesPage() {
 
     sendBtn.addEventListener('click', sendMessage);
 
+    // Chat Attachment Handlers
+    const attachBtn = document.getElementById('chat-attach-file-btn');
+    const fileInput = document.getElementById('chat-file-input');
+    const previewBanner = document.getElementById('chat-attachment-preview');
+    const fileNameSpan = document.getElementById('chat-attachment-name');
+    const removeBtn = document.getElementById('chat-attachment-remove-btn');
+
+    if (attachBtn && fileInput) {
+        attachBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 15 * 1024 * 1024) {
+                alert('File size exceeds 15MB limit.');
+                fileInput.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                let messageType = 'file';
+                if (file.type.startsWith('image/')) messageType = 'image';
+                else if (file.type.startsWith('video/')) messageType = 'video';
+                else if (file.type.startsWith('audio/')) messageType = 'audio';
+
+                pendingChatAttachment = {
+                    fileUrl: evt.target.result,
+                    fileName: file.name,
+                    fileType: file.type,
+                    messageType
+                };
+
+                if (fileNameSpan) fileNameSpan.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                if (previewBanner) previewBanner.style.display = 'flex';
+                sendBtn.classList.add('active');
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+            pendingChatAttachment = null;
+            if (fileInput) fileInput.value = '';
+            if (previewBanner) previewBanner.style.display = 'none';
+            if (textInput && textInput.value.trim() === '') {
+                sendBtn.classList.remove('active');
+            }
+        });
+    }
+
     // Quick heart sender
     const quickHeartBtn = document.getElementById('chat-quick-heart-btn');
     if (quickHeartBtn) {
@@ -3810,7 +3863,7 @@ async function loadMessagesHistory() {
         const currentUser = JSON.parse(localStorage.getItem('user'));
 
         messages.forEach(msg => {
-            const isMe = msg.sender === currentUser.id;
+            const isMe = msg.sender === currentUser.id || (msg.sender && msg.sender._id === currentUser.id);
             const bubble = document.createElement('div');
             
             if (msg.sharedPostId) {
@@ -3833,10 +3886,23 @@ async function loadMessagesHistory() {
                 `;
             } else {
                 bubble.className = `message-bubble ${isMe ? 'me' : 'other'}`;
-                bubble.innerHTML = `
-                    ${escapeHtml(msg.text)}
-                    <span class="message-time">${formatTime(msg.createdAt)}</span>
-                `;
+                let contentHtml = '';
+
+                if (msg.messageType === 'image' || (msg.fileUrl && (msg.fileUrl.startsWith('data:image') || msg.fileUrl.match(/\.(jpeg|jpg|gif|png|webp)/i)))) {
+                    contentHtml += `<img src="${msg.fileUrl}" alt="Photo Attachment" style="max-width: 240px; border-radius: 8px; margin-bottom: 6px; display: block; cursor: pointer;" onclick="window.open('${msg.fileUrl}')">`;
+                } else if (msg.messageType === 'video' || (msg.fileUrl && (msg.fileUrl.startsWith('data:video') || msg.fileUrl.match(/\.(mp4|webm|mov)/i)))) {
+                    contentHtml += `<video src="${msg.fileUrl}" controls style="max-width: 250px; border-radius: 8px; margin-bottom: 6px; display: block;"></video>`;
+                } else if (msg.messageType === 'audio' || msg.audioUrl || (msg.fileUrl && msg.fileUrl.startsWith('data:audio'))) {
+                    contentHtml += `<audio src="${msg.audioUrl || msg.fileUrl}" controls style="max-width: 230px; margin-bottom: 6px; display: block;"></audio>`;
+                } else if (msg.fileUrl) {
+                    contentHtml += `<a href="${msg.fileUrl}" download="${escapeHtml(msg.fileName || 'attachment')}" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 8px; color: var(--accent-gold); font-weight: 600; text-decoration: none; margin-bottom: 6px;">📎 ${escapeHtml(msg.fileName || 'Download File')}</a>`;
+                }
+
+                if (msg.text) {
+                    contentHtml += `<div>${escapeHtml(msg.text)}</div>`;
+                }
+                contentHtml += `<span class="message-time">${formatTime(msg.createdAt)}</span>`;
+                bubble.innerHTML = contentHtml;
             }
             thread.appendChild(bubble);
         });
@@ -3855,20 +3921,34 @@ async function sendMessage() {
     const textInput = document.getElementById('chat-text-input');
     const text = textInput.value.trim();
     const sendBtn = document.getElementById('chat-send-btn');
+    const previewBanner = document.getElementById('chat-attachment-preview');
+    const fileInput = document.getElementById('chat-file-input');
 
-    if (!activeChatReceiverId || text === '') return;
+    if (!activeChatReceiverId || (text === '' && !pendingChatAttachment)) return;
 
     try {
+        const payload = {
+            receiverId: activeChatReceiverId,
+            text
+        };
+
+        if (pendingChatAttachment) {
+            payload.fileUrl = pendingChatAttachment.fileUrl;
+            payload.fileName = pendingChatAttachment.fileName;
+            payload.fileType = pendingChatAttachment.fileType;
+            payload.messageType = pendingChatAttachment.messageType;
+        }
+
         textInput.value = '';
+        pendingChatAttachment = null;
+        if (fileInput) fileInput.value = '';
+        if (previewBanner) previewBanner.style.display = 'none';
         sendBtn.classList.remove('active');
 
         const response = await fetch(`${API_BASE}/messages`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({
-                receiverId: activeChatReceiverId,
-                text
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();
