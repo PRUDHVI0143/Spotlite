@@ -23,8 +23,8 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// 2. Mark Notifications as Read
-router.put('/read', authenticateToken, async (req, res) => {
+// 2. Mark Notifications as Read (handles both /read and /mark-read)
+const markReadHandler = async (req, res) => {
   try {
     await Notification.updateMany(
       { recipient: req.user.id, isRead: false },
@@ -34,6 +34,9 @@ router.put('/read', authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to update notifications.' });
   }
-});
+};
+
+router.put('/read', authenticateToken, markReadHandler);
+router.put('/mark-read', authenticateToken, markReadHandler);
 
 module.exports = router;

@@ -6,8 +6,10 @@ const path = require('path');
 require('dotenv').config();
 
 const User = require('./server/models/User');
+const Story = require('./server/models/Story');
 const { initSocket } = require('./server/socket');
 const { apiLimiter } = require('./server/middleware/rateLimiter');
+const { authenticateToken, verifyAdmin } = require('./server/middleware/auth');
 
 // Import modular routes
 const authRoutes = require('./server/routes/auth');
@@ -20,6 +22,9 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/spotlite_db';
+
+// Trust reverse proxy for Vercel / serverless deployments
+app.set('trust proxy', 1);
 
 // Initialize WebSockets
 initSocket(server);
@@ -110,6 +115,53 @@ app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 
+// Stories Endpoints
+app.post('/api/stories', authenticateToken, async (req, res) => {
+  try {
+    const { image, caption } = req.body;
+    if (!image) return res.status(400).json({ error: 'Image is required for story.' });
+    const story = new Story({ author: req.user.id, image, caption: caption || '' });
+    await story.save();
+    res.status(201).json(story);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create story.' });
+  }
+});
+
+app.get('/api/stories', authenticateToken, async (req, res) => {
+  try {
+    const now = new Date();
+    const stories = await Story.find({ expiresAt: { $gt: now } })
+      .populate('author', 'username avatar isVerified')
+      .sort({ createdAt: -1 });
+    res.json(stories);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch stories.' });
+  }
+});
+
+// Admin User Management & Verification Endpoints
+app.get('/api/admin/users', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const users = await User.find().select('username email avatar isVerified isAdmin isBanned createdAt').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch admin users list.' });
+  }
+});
+
+app.put('/api/admin/users/:id/verify', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    user.isVerified = !user.isVerified;
+    await user.save();
+    res.json({ message: 'User verification status updated.', isVerified: user.isVerified });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update verification status.' });
+  }
+});
+
 // AI Generator Helper Endpoint
 app.post('/api/ai/generate-caption', (req, res) => {
   const { mood, category } = req.body;
@@ -124,13 +176,18 @@ app.post('/api/ai/generate-caption', (req, res) => {
   res.json({ caption });
 });
 
+app.post('/api/ai/suggest-hashtags', (req, res) => {
+  const suggestions = ['#spotlite', '#trending', '#viral', '#vibes', '#lifestyle', '#developer', '#tech', '#mern'];
+  res.json({ hashtags: suggestions });
+});
+
 // Clean Routes & SPA Fallback
 app.get('/profile', (req, res) => res.sendFile(path.join(__dirname, 'public', 'profile.html')));
 app.get('/messages', (req, res) => res.sendFile(path.join(__dirname, 'public', 'messages.html')));
 app.get('/auth', (req, res) => res.sendFile(path.join(__dirname, 'public', 'auth.html')));
 
 app.use((req, res) => {
-  if (req.originalUrl.startsWith('/api')) {
+  if (req.originalUrl.startsWith('/api') || req.path.startsWith('/api')) {
     return res.status(404).json({ error: 'API endpoint not found.' });
   }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

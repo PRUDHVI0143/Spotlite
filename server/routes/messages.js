@@ -6,12 +6,11 @@ const Notification = require('../models/Notification');
 const { authenticateToken } = require('../middleware/auth');
 const { sendDirectMessage, sendNotification } = require('../socket');
 
-// 1. Get Chat Conversations List
-router.get('/conversations', authenticateToken, async (req, res) => {
+// 1. Get Chat Conversations List (handles both /conversations and /conversations/list)
+const conversationsHandler = async (req, res) => {
   try {
     const currentUserId = req.user.id;
 
-    // Find distinct chat contacts
     const messages = await Message.find({
       $or: [{ sender: currentUserId }, { receiver: currentUserId }]
     })
@@ -22,13 +21,13 @@ router.get('/conversations', authenticateToken, async (req, res) => {
     const conversationMap = new Map();
 
     messages.forEach(msg => {
-      const otherUser = msg.sender._id.toString() === currentUserId ? msg.receiver : msg.sender;
+      const otherUser = msg.sender && msg.sender._id.toString() === currentUserId ? msg.receiver : msg.sender;
       if (otherUser && !conversationMap.has(otherUser._id.toString())) {
         conversationMap.set(otherUser._id.toString(), {
           user: otherUser,
           lastMessage: msg.text,
           updatedAt: msg.createdAt,
-          isRead: msg.sender._id.toString() === currentUserId ? true : msg.isRead
+          isRead: msg.sender && msg.sender._id.toString() === currentUserId ? true : msg.isRead
         });
       }
     });
@@ -37,7 +36,10 @@ router.get('/conversations', authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch conversations.' });
   }
-});
+};
+
+router.get('/conversations', authenticateToken, conversationsHandler);
+router.get('/conversations/list', authenticateToken, conversationsHandler);
 
 // 2. Get Direct Messages with a specific user
 router.get('/:userId', authenticateToken, async (req, res) => {
@@ -56,7 +58,6 @@ router.get('/:userId', authenticateToken, async (req, res) => {
       .populate('receiver', 'username avatar')
       .populate('sharedPostId');
 
-    // Mark received messages as read
     await Message.updateMany(
       { sender: targetUserId, receiver: currentUserId, isRead: false },
       { isRead: true }
@@ -96,10 +97,8 @@ router.post('/', authenticateToken, async (req, res) => {
       .populate('receiver', 'username avatar')
       .populate('sharedPostId');
 
-    // Real-time dispatch via Socket.io
     sendDirectMessage(receiverId, populatedMessage);
 
-    // Create notification if needed
     const notif = new Notification({
       recipient: receiverId,
       sender: req.user.id,

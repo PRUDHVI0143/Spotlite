@@ -1,9 +1,9 @@
 const rateLimit = require('express-rate-limit');
 
-// Strict rate limiter for authentication routes (login, signup, verification)
+// Authentication routes rate limiter (50 attempts per 15 mins per IP)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 auth requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -11,12 +11,13 @@ const authLimiter = rateLimit({
   }
 });
 
-// General API rate limiter for write operations
+// General API rate limiter (5000 requests per 15 mins per IP)
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Limit each IP to 200 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 5000, // Very generous limit for serverless reverse proxies
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'GET', // Skip GET requests to prevent polling block
   message: {
     error: 'Too many requests. Please slow down.'
   }

@@ -1,12 +1,25 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
 const { authenticateToken } = require('../middleware/auth');
 const { sendNotification } = require('../socket');
 
-// 1. Search Users
+// 1. Get All Users
+router.get('/all', authenticateToken, async (req, res) => {
+  try {
+    const users = await User.find()
+      .select('username avatar bio isVerified followers')
+      .limit(30);
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch users.' });
+  }
+});
+
+// 2. Search Users
 router.get('/search', async (req, res) => {
   try {
     const q = req.query.q || '';
@@ -27,7 +40,80 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// 2. Get User Profile by Username
+// 3. User Analytics Dashboard
+router.get('/analytics', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const userPosts = await Post.find({ author: userId });
+    let totalLikes = 0;
+    let totalComments = 0;
+    let totalShares = 0;
+    let topPost = null;
+    let maxEngagement = -1;
+
+    userPosts.forEach(post => {
+      const likesCount = post.likes ? post.likes.length : 0;
+      const commentsCount = post.comments ? post.comments.length : 0;
+      const sharesCount = post.shares ? post.shares.length : 0;
+      
+      totalLikes += likesCount;
+      totalComments += commentsCount;
+      totalShares += sharesCount;
+
+      const engagement = likesCount + commentsCount;
+      if (engagement > maxEngagement) {
+        maxEngagement = engagement;
+        topPost = post;
+      }
+    });
+
+    res.json({
+      username: user.username,
+      isVerified: user.isVerified || false,
+      followersCount: user.followers ? user.followers.length : 0,
+      followingCount: user.following ? user.following.length : 0,
+      totalPosts: userPosts.length,
+      totalLikes,
+      totalComments,
+      totalShares,
+      engagementRate: userPosts.length > 0 ? ((totalLikes + totalComments) / userPosts.length).toFixed(1) : '0.0',
+      topPost: topPost ? { _id: topPost._id, image: topPost.image, likesCount: topPost.likes ? topPost.likes.length : 0 } : null
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to calculate analytics.' });
+  }
+});
+
+// 4. Change Password
+router.post('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password are required.' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Incorrect current password.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to change password.' });
+  }
+});
+
+// 5. Get User Profile by Username
 router.get('/profile/:username', async (req, res) => {
   try {
     const username = req.params.username.toLowerCase();
@@ -52,7 +138,7 @@ router.get('/profile/:username', async (req, res) => {
   }
 });
 
-// 3. Update Current User Profile
+// 6. Update Current User Profile
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const { bio, avatar, coverPhoto, website, github, linkedin, accentColor, themeMode } = req.body;
@@ -78,10 +164,10 @@ router.put('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// 4. Follow / Unfollow User
-router.post('/follow/:targetUserId', authenticateToken, async (req, res) => {
+// 7. Follow / Unfollow User (handles both /:targetUserId/follow and /follow/:targetUserId)
+const followHandler = async (req, res) => {
   try {
-    const targetUserId = req.params.targetUserId;
+    const targetUserId = req.params.targetUserId || req.params.id;
     const currentUserId = req.user.id;
 
     if (targetUserId === currentUserId) {
@@ -104,7 +190,6 @@ router.post('/follow/:targetUserId', authenticateToken, async (req, res) => {
       targetUser.followers.push(currentUserId);
       currentUser.following.push(targetUserId);
 
-      // Create notification
       const notif = new Notification({
         recipient: targetUser._id,
         sender: currentUserId,
@@ -127,6 +212,9 @@ router.post('/follow/:targetUserId', authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to update follow status.' });
   }
-});
+};
+
+router.post('/follow/:targetUserId', authenticateToken, followHandler);
+router.post('/:id/follow', authenticateToken, followHandler);
 
 module.exports = router;

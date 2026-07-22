@@ -8,7 +8,6 @@ const { authLimiter } = require('../middleware/rateLimiter');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_spotlite_key';
 
-// Helper to generate access and refresh tokens
 function generateTokens(user) {
   const accessToken = jwt.sign(
     { id: user._id, username: user.username, isAdmin: user.isAdmin },
@@ -35,7 +34,6 @@ router.post('/register', authLimiter, async (req, res) => {
     const cleanUsername = username.trim().toLowerCase();
     const cleanEmail = email.trim().toLowerCase();
 
-    // Check if user already exists
     const existingUser = await User.findOne({ 
       $or: [{ username: cleanUsername }, { email: cleanEmail }] 
     });
@@ -70,7 +68,7 @@ router.post('/register', authLimiter, async (req, res) => {
       message: 'Account registered successfully. Verification code generated.',
       email: user.email,
       requiresVerification: true,
-      verificationCode: verificationCode // Returned for easy local dev testing
+      verificationCode: verificationCode
     });
   } catch (err) {
     console.error('Registration error:', err);
@@ -78,8 +76,8 @@ router.post('/register', authLimiter, async (req, res) => {
   }
 });
 
-// 2. Verify Code
-router.post('/verify', authLimiter, async (req, res) => {
+// 2. Verify Code (handles both /verify and /verify-email)
+const verifyHandler = async (req, res) => {
   try {
     const { email, code } = req.body;
     if (!email || !code) {
@@ -125,9 +123,48 @@ router.post('/verify', authLimiter, async (req, res) => {
     console.error('Verification error:', err);
     res.status(500).json({ error: 'Failed to verify code.' });
   }
+};
+
+router.post('/verify', authLimiter, verifyHandler);
+router.post('/verify-email', authLimiter, verifyHandler);
+
+// 3. Resend Verification Code
+router.post('/resend-code', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verificationCode = verificationCode;
+    user.verificationCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    res.json({ message: 'Verification code resent successfully.', verificationCode });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to resend code.' });
+  }
 });
 
-// 3. Login
+// 4. Cancel Registration
+router.post('/cancel-registration', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required.' });
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (user && !user.isVerified) {
+      await User.deleteOne({ _id: user._id });
+    }
+    res.json({ message: 'Registration cancelled.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to cancel registration.' });
+  }
+});
+
+// 5. Login
 router.post('/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -177,7 +214,7 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 });
 
-// 4. Refresh Token
+// 6. Refresh Token
 router.post('/refresh', async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -204,7 +241,7 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
-// 5. Get Current User Me
+// 7. Get Current User Me
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -refreshToken');
