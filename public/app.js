@@ -700,7 +700,7 @@ if (logoutBtn) {
 // --- SETUP SIDEBAR / MOBILE PROFILE LINKS ---
 function setupNavigationLinks() {
     const currentUser = JSON.parse(localStorage.getItem('user'));
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.username) return;
 
     const sidebarProfile = document.getElementById('sidebar-profile-link');
     const mobileProfile = document.getElementById('mobile-profile-link');
@@ -712,7 +712,9 @@ function setupNavigationLinks() {
     const userNav = document.getElementById('current-user-nav');
     if (userNav) {
         userNav.addEventListener('click', () => {
-            window.location.href = `profile.html?u=${currentUser.username}`;
+            if (currentUser && currentUser.username) {
+                window.location.href = `profile.html?u=${currentUser.username}`;
+            }
         });
     }
 
@@ -1716,16 +1718,20 @@ function createPostCard(post) {
         `;
     }
 
+    const authorObj = (post.author && typeof post.author === 'object') ? post.author : { username: 'spotlite_user', avatar: '' };
+    const authorUsername = authorObj.username || 'spotlite_user';
+    const authorAvatar = authorObj.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${authorUsername}`;
+
     card.innerHTML = `
         <!-- Post Header -->
         <div class="post-header">
-            <div class="post-author-info" onclick="window.location.href='profile.html?u=${post.author.username}'">
+            <div class="post-author-info" onclick="window.location.href='profile.html?u=${encodeURIComponent(authorUsername)}'">
                 <div class="post-avatar-ring">
-                    <img src="${post.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${post.author.username}`}" alt="Avatar" class="post-avatar">
+                    <img src="${authorAvatar}" alt="Avatar" class="post-avatar">
                 </div>
                 <div class="post-header-meta">
                     <span class="post-username" style="display: inline-flex; align-items: center; gap: 6px;">
-                        ${post.author.username}
+                        ${escapeHtml(authorUsername)}
                         ${getCategoryBadgeHTML(post.category)}
                         ${post.isPinned ? '<span class="pin-indicator" title="Pinned Post" style="margin-left: 4px; color: var(--accent-gold); font-size: 0.8rem;">📌</span>' : ''}
                     </span>
@@ -1758,12 +1764,12 @@ function createPostCard(post) {
                 <!-- Like -->
                 <button class="action-btn ${isLiked ? 'liked' : ''}" id="like-btn-${post._id}" title="Like">
                     <svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                    <span class="action-count" id="likes-count-${post._id}">${post.likes.length}</span>
+                    <span class="action-count" id="likes-count-${post._id}">${post.likes ? post.likes.length : 0}</span>
                 </button>
                 <!-- Comment -->
                 <button class="action-btn" id="comment-btn-${post._id}" title="Comment">
                     <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    <span class="action-count">${post.comments.length}</span>
+                    <span class="action-count">${post.comments ? post.comments.length : 0}</span>
                 </button>
                 <!-- Repost -->
                 <button class="action-btn" id="repost-btn-${post._id}" title="Repost">
@@ -1783,8 +1789,8 @@ function createPostCard(post) {
 
         <!-- Caption & Comments -->
         <div class="post-caption-wrapper">
-            ${post.mood ? `<span class="post-mood-tag">${post.mood}</span>` : ''}
-            <span class="caption-username" onclick="window.location.href='profile.html?u=${post.author.username}'">${post.author.username}</span>
+            ${post.mood ? `<span class="post-mood-tag">${escapeHtml(post.mood)}</span>` : ''}
+            <span class="caption-username" onclick="window.location.href='profile.html?u=${encodeURIComponent(authorUsername)}'">${escapeHtml(authorUsername)}</span>
             <span class="caption-text" id="caption-text-${post._id}">${captionShort}</span>
             ${hasTruncation ? `<button class="caption-more-btn" data-full="${encodeURIComponent(caption)}" data-post="${post._id}">more</button>` : ''}
         </div>

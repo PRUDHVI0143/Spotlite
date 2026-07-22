@@ -255,9 +255,11 @@ router.post('/:id/comment', authenticateToken, async (req, res) => {
     if (!post) return res.status(404).json({ error: 'Post not found.' });
 
     const user = await User.findById(req.user.id);
+    const username = (user && user.username) ? user.username : 'spotlite_user';
+
     const newComment = {
       user: req.user.id,
-      username: user.username,
+      username: username,
       text: text.trim(),
       createdAt: new Date()
     };
