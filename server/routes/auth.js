@@ -178,7 +178,6 @@ router.post('/register', authLimiter, async (req, res) => {
   }
 });
 
-// 2. Verify Code (handles both /verify and /verify-email)
 const verifyHandler = async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -186,8 +185,12 @@ const verifyHandler = async (req, res) => {
       return res.status(400).json({ error: 'Email and verification code are required.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
+    const cleanIdentifier = String(email).trim().toLowerCase();
+    const cleanInputCode = String(code).trim();
+
+    const user = await User.findOne({ 
+      $or: [{ email: cleanIdentifier }, { username: cleanIdentifier }] 
+    });
 
     if (!user) {
       return res.status(404).json({ error: 'Account not found.' });
@@ -200,7 +203,11 @@ const verifyHandler = async (req, res) => {
       return res.json({ message: 'Account is already verified.', token: accessToken, refreshToken, user });
     }
 
-    if (!user.verificationCode || user.verificationCode !== code.trim()) {
+    const storedCode = String(user.verificationCode || '').trim();
+
+    console.log(`[VERIFY DEBUG] User: ${user.username} (${user.email}) | StoredCode: "${storedCode}" | InputCode: "${cleanInputCode}"`);
+
+    if (!storedCode || storedCode !== cleanInputCode) {
       return res.status(400).json({ error: 'Invalid verification code.' });
     }
 
@@ -236,18 +243,25 @@ router.post('/resend-code', authLimiter, async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required.' });
 
-    const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
-    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const cleanIdentifier = String(email).trim().toLowerCase();
+    const user = await User.findOne({ 
+      $or: [{ email: cleanIdentifier }, { username: cleanIdentifier }] 
+    });
+
+    if (!user) return res.status(404).json({ error: 'User account not found.' });
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     user.verificationCode = verificationCode;
     user.verificationCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
     await user.save();
 
-    await sendVerificationEmail(user.username, cleanEmail, verificationCode);
+    await sendVerificationEmail(user.username, user.email, verificationCode);
 
-    res.json({ message: 'Verification code resent successfully.', verificationCode });
+    res.json({ 
+      message: 'Verification code resent successfully.', 
+      verificationCode, 
+      devCode: verificationCode 
+    });
   } catch (err) {
     res.status(500).json({ error: 'Failed to resend code.' });
   }

@@ -900,10 +900,13 @@ function initAuthPage() {
                     throw new Error(data.error || 'Resend code failed.');
                 }
 
+                const codeVal = data.verificationCode || data.devCode;
+                if (verifyCodeInput && codeVal) verifyCodeInput.value = codeVal;
+
                 if (verifySuccess) {
                     let msg = data.message || 'Verification code resent successfully!';
-                    if (data.devCode) {
-                        msg += `<br><span style="color: var(--accent-gold); font-weight: bold;">[Dev Mode] SMTP not configured. Your code is: ${data.devCode}</span>`;
+                    if (codeVal) {
+                        msg += `<br><span style="color: var(--accent-gold); font-weight: bold; font-size: 1rem;">Verification Code: ${codeVal}</span>`;
                     }
                     verifySuccess.innerHTML = msg;
                     verifySuccess.style.display = 'block';
