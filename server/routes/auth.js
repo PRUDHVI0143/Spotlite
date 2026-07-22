@@ -82,27 +82,27 @@ async function sendVerificationEmail(username, email, code) {
   console.log(`[MAIL VERIFICATION] Code: ${code}`);
   console.log(`======================================================\n`);
 
+  if (process.env.NODE_ENV === 'test') {
+    return { success: true, reason: 'Test environment bypass' };
+  }
+
   const htmlContent = buildCustomEmailHTML(username, code);
   const textContent = `Hello ${username},\n\nYour Spotlite verification code is: ${code}\n\nThis code expires in 15 minutes.`;
 
-  const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || '';
-  const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
-  const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
+  const rawUser = process.env.SMTP_USER || process.env.EMAIL_USER || 'spotlite.m8@gmail.com';
+  const rawPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || 'ekaxkpavdsxaftbx';
+
+  const smtpUser = rawUser.trim();
+  const smtpPass = rawPass.replace(/\s+/g, '');
 
   if (smtpUser && smtpPass) {
     try {
       const nodemailer = require('nodemailer');
-      const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT) || 587;
       
       const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: port,
-        secure: port === 465,
+        service: 'gmail',
         auth: { user: smtpUser, pass: smtpPass },
-        tls: { rejectUnauthorized: false },
-        connectionTimeout: 3000,
-        greetingTimeout: 3000,
-        socketTimeout: 3000
+        tls: { rejectUnauthorized: false }
       });
 
       transporter.sendMail({
@@ -111,8 +111,8 @@ async function sendVerificationEmail(username, email, code) {
         subject: `✨ ${code} is your Spotlite verification code`,
         text: textContent,
         html: htmlContent
-      }).then(() => {
-        console.log(`[SMTP SUCCESS] Verification email sent successfully to ${email}`);
+      }).then((info) => {
+        console.log(`[SMTP SUCCESS] Verification email sent successfully to ${email} (MessageID: ${info.messageId})`);
       }).catch(err => {
         console.error(`[SMTP ERROR] Failed to send email to ${email}:`, err.message);
       });
@@ -172,11 +172,9 @@ router.post('/register', authLimiter, async (req, res) => {
     await sendVerificationEmail(cleanUsername, cleanEmail, verificationCode);
 
     res.status(201).json({
-      message: 'Account registered successfully. Verification code generated.',
+      message: 'Account registered successfully. A 6-digit verification code has been sent to your email address.',
       email: user.email,
-      requiresVerification: true,
-      verificationCode: verificationCode,
-      devCode: verificationCode
+      requiresVerification: true
     });
   } catch (err) {
     console.error('Registration error:', err);
@@ -264,9 +262,7 @@ router.post('/resend-code', authLimiter, async (req, res) => {
     await sendVerificationEmail(user.username, user.email, verificationCode);
 
     res.json({ 
-      message: 'Verification code resent successfully.', 
-      verificationCode, 
-      devCode: verificationCode 
+      message: 'Verification code resent successfully to your email address.' 
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to resend code.' });

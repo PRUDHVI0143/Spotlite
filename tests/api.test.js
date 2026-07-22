@@ -38,8 +38,10 @@ describe('Spotlite Modular API Tests', () => {
       .send({ username: testUsername, email: testEmail, password: 'password123' });
 
     expect(regRes.statusCode).toBe(201);
-    expect(regRes.body).toHaveProperty('verificationCode');
-    const code = regRes.body.verificationCode;
+    const User = require('../server/models/User');
+    const dbUser = await User.findOne({ email: testEmail });
+    expect(dbUser).not.toBeNull();
+    const code = dbUser.verificationCode;
 
     // 2. Verify
     const verifyRes = await request(app)

@@ -766,11 +766,7 @@ function initAuthPage() {
                         if (signupCard) signupCard.style.display = 'none';
                         if (verifyCard) verifyCard.style.display = 'block';
                          if (verifyError) {
-                            let errText = data.error;
-                            if (data.devCode) {
-                                errText += `<br><span style="color: var(--accent-gold); font-weight: bold;">[Dev Mode] SMTP not configured. Your code is: ${data.devCode}</span>`;
-                            }
-                            verifyError.innerHTML = errText;
+                            verifyError.textContent = data.error || 'Please verify your email address.';
                             verifyError.style.display = 'block';
                          }
                          if (verifySuccess) verifySuccess.style.display = 'none';
@@ -811,21 +807,14 @@ function initAuthPage() {
                 }
 
                 // Redirect to verify code screen
-                const codeVal = data.verificationCode || data.devCode;
-                if (verifyCodeInput && codeVal) verifyCodeInput.value = codeVal;
+                if (verifyCodeInput) verifyCodeInput.value = '';
                 if (verifyEmailHidden) verifyEmailHidden.value = data.email;
                 if (signupCard) signupCard.style.display = 'none';
                 if (loginCard) loginCard.style.display = 'none';
                 if (verifyCard) verifyCard.style.display = 'block';
                 if (verifyError) verifyError.style.display = 'none';
                 if (verifySuccess) {
-                    let msg = 'Registration successful!';
-                    if (codeVal) {
-                        msg += `<br><span style="color: var(--accent-gold); font-weight: bold; font-size: 1rem;">Verification Code: ${codeVal}</span>`;
-                    } else {
-                        msg += ' A verification code has been sent to your email address.';
-                    }
-                    verifySuccess.innerHTML = msg;
+                    verifySuccess.innerHTML = 'Registration successful! A 6-digit verification code has been sent to your email address.';
                     verifySuccess.style.display = 'block';
                 }
             } catch (err) {
@@ -902,15 +891,10 @@ function initAuthPage() {
                     throw new Error(data.error || 'Resend code failed.');
                 }
 
-                const codeVal = data.verificationCode || data.devCode;
-                if (verifyCodeInput && codeVal) verifyCodeInput.value = codeVal;
+                if (verifyCodeInput) verifyCodeInput.value = '';
 
                 if (verifySuccess) {
-                    let msg = data.message || 'Verification code resent successfully!';
-                    if (codeVal) {
-                        msg += `<br><span style="color: var(--accent-gold); font-weight: bold; font-size: 1rem;">Verification Code: ${codeVal}</span>`;
-                    }
-                    verifySuccess.innerHTML = msg;
+                    verifySuccess.innerHTML = data.message || 'A new verification code has been sent to your email address.';
                     verifySuccess.style.display = 'block';
                 }
             } catch (err) {
