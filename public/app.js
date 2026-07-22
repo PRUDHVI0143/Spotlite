@@ -809,15 +809,19 @@ function initAuthPage() {
                 }
 
                 // Redirect to verify code screen
+                const codeVal = data.verificationCode || data.devCode;
+                if (verifyCodeInput && codeVal) verifyCodeInput.value = codeVal;
                 if (verifyEmailHidden) verifyEmailHidden.value = data.email;
                 if (signupCard) signupCard.style.display = 'none';
                 if (loginCard) loginCard.style.display = 'none';
                 if (verifyCard) verifyCard.style.display = 'block';
                 if (verifyError) verifyError.style.display = 'none';
                 if (verifySuccess) {
-                    let msg = 'Registration successful! A verification code has been sent to your email.';
-                    if (data.devCode) {
-                        msg += `<br><span style="color: var(--accent-gold); font-weight: bold;">[Dev Mode] SMTP not configured. Your code is: ${data.devCode}</span>`;
+                    let msg = 'Registration successful!';
+                    if (codeVal) {
+                        msg += `<br><span style="color: var(--accent-gold); font-weight: bold; font-size: 1rem;">Verification Code: ${codeVal}</span>`;
+                    } else {
+                        msg += ' A verification code has been sent to your email address.';
                     }
                     verifySuccess.innerHTML = msg;
                     verifySuccess.style.display = 'block';

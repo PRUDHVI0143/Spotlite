@@ -8,6 +8,7 @@ const { authLimiter } = require('../middleware/rateLimiter');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_spotlite_key';
 
+// Helper to generate access and refresh tokens
 function generateTokens(user) {
   const accessToken = jwt.sign(
     { id: user._id, username: user.username, isAdmin: user.isAdmin },
@@ -20,6 +21,103 @@ function generateTokens(user) {
     { expiresIn: '7d' }
   );
   return { accessToken, refreshToken };
+}
+
+// Custom HTML Email Template Generator for Spotlite
+function buildCustomEmailHTML(username, code) {
+  const digits = (code || '000000').toString().split('');
+  const digitHTML = digits.map(d => `
+    <td align="center" style="padding: 0 4px;">
+      <div style="width: 44px; height: 56px; line-height: 56px; font-family: 'SF Mono', 'Courier New', Courier, monospace; font-size: 30px; font-weight: 900; color: #ffffff; background: linear-gradient(180deg, #222536 0%, #151724 100%); border: 1.5px solid #ffd700; border-radius: 12px; box-shadow: 0 4px 14px rgba(255, 215, 0, 0.2); text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);">
+        ${d}
+      </div>
+    </td>
+  `).join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotlite Verification Code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #08090d; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e0e0e0;">
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 40px auto; background: #0f111a; border-radius: 20px; overflow: hidden; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);">
+    <tr>
+      <td align="center" style="padding: 40px 20px 30px 20px; background: linear-gradient(135deg, #161927 0%, #0a0b12 100%); border-bottom: 2px solid #ffd700;">
+        <div style="font-size: 34px; font-weight: 900; letter-spacing: 2px; color: #ffffff;">
+          <span style="color: #ffd700;">SPOT</span>LITE
+        </div>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #8f93a8; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">Showcase • Connect • Elevate</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 45px 35px 35px 35px;">
+        <h2 style="margin: 0 0 12px 0; color: #ffffff; font-size: 24px; font-weight: 800; text-align: center;">
+          Welcome to Spotlite, <span style="color: #ffd700;">${username}</span>! 🚀
+        </h2>
+        <p style="margin: 0 0 30px 0; color: #9da2b8; font-size: 15px; line-height: 1.6; text-align: center;">
+          Enter the 6-digit verification code below to activate your account.
+        </p>
+        <div style="background: linear-gradient(145deg, #161824, #0d0e17); border: 1px solid #282b3d; border-radius: 16px; padding: 30px 20px; margin: 30px 0; text-align: center;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+            <tr>${digitHTML}</tr>
+          </table>
+          <div style="margin-top: 22px; font-size: 13px; color: #ff6b6b; font-weight: 600;">
+            ⏱ Code expires in <strong>15 minutes</strong>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// Helper to send verification email via Nodemailer / SMTP if configured
+async function sendVerificationEmail(username, email, code) {
+  console.log(`\n======================================================`);
+  console.log(`[MAIL VERIFICATION] To: ${username} (${email})`);
+  console.log(`[MAIL VERIFICATION] Code: ${code}`);
+  console.log(`======================================================\n`);
+
+  const htmlContent = buildCustomEmailHTML(username, code);
+  const textContent = `Hello ${username},\n\nYour Spotlite verification code is: ${code}\n\nThis code expires in 15 minutes.`;
+
+  const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || '';
+  const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
+  const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
+
+  if (smtpUser && smtpPass) {
+    try {
+      const nodemailer = require('nodemailer');
+      const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT) || 587;
+      
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: port,
+        secure: port === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+        tls: { rejectUnauthorized: false }
+      });
+
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || `"Spotlite Support" <${smtpUser}>`,
+        to: email,
+        subject: `✨ ${code} is your Spotlite verification code`,
+        text: textContent,
+        html: htmlContent
+      });
+
+      console.log(`[SMTP SUCCESS] Verification email sent successfully to ${email}`);
+      return { success: true };
+    } catch (err) {
+      console.error(`[SMTP ERROR] Failed to send email to ${email}:`, err.message);
+    }
+  }
+
+  return { success: false, reason: 'SMTP credentials not configured' };
 }
 
 // 1. Register
@@ -64,11 +162,15 @@ router.post('/register', authLimiter, async (req, res) => {
 
     await user.save();
 
+    // Send verification email via SMTP if configured
+    await sendVerificationEmail(cleanUsername, cleanEmail, verificationCode);
+
     res.status(201).json({
       message: 'Account registered successfully. Verification code generated.',
       email: user.email,
       requiresVerification: true,
-      verificationCode: verificationCode
+      verificationCode: verificationCode,
+      devCode: verificationCode
     });
   } catch (err) {
     console.error('Registration error:', err);
@@ -134,13 +236,16 @@ router.post('/resend-code', authLimiter, async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required.' });
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     user.verificationCode = verificationCode;
     user.verificationCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
     await user.save();
+
+    await sendVerificationEmail(user.username, cleanEmail, verificationCode);
 
     res.json({ message: 'Verification code resent successfully.', verificationCode });
   } catch (err) {
