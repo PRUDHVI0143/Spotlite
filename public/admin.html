@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotlite • Admin Dashboard</title>
+    <link rel="icon" type="image/png" href="spotlite.png">
+    <link rel="stylesheet" href="style.css?v=5.0">
+    <style>
+        .admin-dashboard-container {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 30px 20px 80px 20px;
+        }
+
+        .admin-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .admin-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: var(--spotlite-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .admin-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .admin-controls-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .admin-search-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 10px 16px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .admin-filter-select {
+            padding: 10px 16px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .admin-users-table-container {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow-x: auto;
+        }
+
+        .admin-users-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .admin-users-table th {
+            background-color: var(--bg-secondary);
+            padding: 14px 18px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .admin-users-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        .admin-users-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .admin-user-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .admin-user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--border-color);
+        }
+
+        .admin-action-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            margin-right: 6px;
+        }
+
+        .btn-verify {
+            background: rgba(255, 203, 5, 0.15);
+            color: var(--accent-gold);
+            border-color: rgba(255, 203, 5, 0.3);
+        }
+        .btn-verify:hover { background: var(--accent-gold); color: #000; }
+
+        .btn-ban {
+            background: rgba(255, 56, 56, 0.15);
+            color: var(--accent-red);
+            border-color: rgba(255, 56, 56, 0.3);
+        }
+        .btn-ban:hover { background: var(--accent-red); color: #fff; }
+
+        .btn-role {
+            background: rgba(124, 58, 237, 0.15);
+            color: #a78bfa;
+            border-color: rgba(124, 58, 237, 0.3);
+        }
+        .btn-role:hover { background: #7c3aed; color: #fff; }
+
+        .btn-delete {
+            background: rgba(255, 255, 255, 0.08);
+            color: #888;
+        }
+        .btn-delete:hover { background: #ff3838; color: #fff; }
+
+        .badge-status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-admin { background: rgba(255, 203, 5, 0.2); color: var(--accent-gold); }
+        .badge-banned { background: rgba(255, 56, 56, 0.2); color: var(--accent-red); }
+        .badge-verified { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .badge-user { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Main Navigation">
+            <div class="sidebar-logo">
+                <a href="index.html" class="brand-header-container">
+                    <img src="spotlite.png" alt="Spotlite Logo" class="brand-logo-img">
+                    <span class="insta-logo-text">Spotlite</span>
+                </a>
+            </div>
+            <ul class="sidebar-menu">
+                <li class="menu-item">
+                    <a href="index.html" aria-label="Home">
+                        <svg viewBox="0 0 24 24"><path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A3 3 0 0 1 15 16.545V22h-5.995v-5.455Z" fill="none"/><path d="M12 .726a1 1 0 0 0-1.28.053l-8.995 8.16A1 1 0 0 0 2.414 10.5H5v10.5a1 1 0 0 0 1 1h4v-5.455a2 2 0 0 1 2-2 2 2 0 0 1 2 2V22h4a1 1 0 0 0 1-1V10.5h2.586a1 1 0 0 0 .689-1.56l-8.995-8.161A1 1 0 0 0 12 .726Z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                        <span>Home</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="messages.html" aria-label="Messages">
+                        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2" fill="none"/></svg>
+                        <span>Messages</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#" id="sidebar-profile-link" aria-label="Profile">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke-width="2"/><path d="M6 19.5c1-2.5 3-4.5 6-4.5s5 2 6 4.5" stroke-width="2"/></svg>
+                        <span>Profile</span>
+                    </a>
+                </li>
+                <!-- Admin Dashboard (Only visible for Admins) -->
+                <li class="menu-item active" id="sidebar-admin-item">
+                    <a href="admin.html" aria-label="Admin Dashboard" aria-current="page">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span>Admin Panel</span>
+                    </a>
+                </li>
+                <li class="menu-item" style="margin-top: auto;">
+                    <button id="logout-btn" aria-label="Log Out">
+                        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke-width="2"/><line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/></svg>
+                        <span>Log Out</span>
+                    </button>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div class="admin-dashboard-container">
+                <div class="admin-header">
+                    <div>
+                        <h1 class="admin-title">Account Management Dashboard</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Manage user permissions, verification status, and account security.</p>
+                    </div>
+                </div>
+
+                <!-- Stats Overview Grid -->
+                <div class="admin-stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Total Accounts</span>
+                        <span class="stat-value" id="stat-total-users">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Verified Accounts</span>
+                        <span class="stat-value" id="stat-verified-users" style="color: #10b981;">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Banned Accounts</span>
+                        <span class="stat-value" id="stat-banned-users" style="color: var(--accent-red);">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Administrators</span>
+                        <span class="stat-value" id="stat-admin-users" style="color: var(--accent-gold);">0</span>
+                    </div>
+                </div>
+
+                <!-- Search & Filters -->
+                <div class="admin-controls-bar">
+                    <input type="text" class="admin-search-input" id="admin-search-input" placeholder="Search by username or email address...">
+                    <select class="admin-filter-select" id="admin-filter-select">
+                        <option value="all">All Accounts</option>
+                        <option value="verified">Verified Only</option>
+                        <option value="banned">Banned Only</option>
+                        <option value="admins">Admins Only</option>
+                    </select>
+                </div>
+
+                <!-- User Accounts Table -->
+                <div class="admin-users-table-container">
+                    <table class="admin-users-table">
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th>Email</th>
+                                <th>Joined Date</th>
+                                <th>Roles & Badges</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-tbody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading accounts list...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof initAdminPage === 'function') {
+                initAdminPage();
+            }
+        });
+    </script>
+</body>
+</html>

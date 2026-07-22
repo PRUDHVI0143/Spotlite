@@ -17,6 +17,7 @@ const postRoutes = require('./server/routes/posts');
 const userRoutes = require('./server/routes/users');
 const messageRoutes = require('./server/routes/messages');
 const notificationRoutes = require('./server/routes/notifications');
+const adminRoutes = require('./server/routes/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -114,6 +115,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Stories Endpoints
 app.post('/api/stories', authenticateToken, async (req, res) => {
@@ -140,28 +142,6 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
   }
 });
 
-// Admin User Management & Verification Endpoints
-app.get('/api/admin/users', authenticateToken, verifyAdmin, async (req, res) => {
-  try {
-    const users = await User.find().select('username email avatar isVerified isAdmin isBanned createdAt').sort({ createdAt: -1 });
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch admin users list.' });
-  }
-});
-
-app.put('/api/admin/users/:id/verify', authenticateToken, verifyAdmin, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ error: 'User not found.' });
-    user.isVerified = !user.isVerified;
-    await user.save();
-    res.json({ message: 'User verification status updated.', isVerified: user.isVerified });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update verification status.' });
-  }
-});
-
 // AI Generator Helper Endpoint
 app.post('/api/ai/generate-caption', (req, res) => {
   const { mood, category } = req.body;
@@ -185,6 +165,7 @@ app.post('/api/ai/suggest-hashtags', (req, res) => {
 app.get('/profile', (req, res) => res.sendFile(path.join(__dirname, 'public', 'profile.html')));
 app.get('/messages', (req, res) => res.sendFile(path.join(__dirname, 'public', 'messages.html')));
 app.get('/auth', (req, res) => res.sendFile(path.join(__dirname, 'public', 'auth.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
 app.use((req, res) => {
   if (req.originalUrl.startsWith('/api') || req.path.startsWith('/api')) {

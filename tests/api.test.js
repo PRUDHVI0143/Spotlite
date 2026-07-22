@@ -22,4 +22,9 @@ describe('Spotlite Modular API Tests', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.caption).toContain('#coding');
   });
+
+  it('GET /api/admin/users without token should return 401 Unauthorized', async () => {
+    const res = await request(app).get('/api/admin/users');
+    expect(res.statusCode).toBe(401);
+  });
 });

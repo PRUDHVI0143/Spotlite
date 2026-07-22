@@ -4253,3 +4253,187 @@ async function sendVoiceMessage(receiverId, audioUrl) {
         if (typeof showToast === 'function') showToast('Failed to send voice note');
     }
 }
+
+// Check admin role globally and expose sidebar Admin Panel if admin
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+        if (currentUser && currentUser.isAdmin) {
+            const adminItem = document.getElementById('sidebar-admin-item');
+            if (adminItem) adminItem.classList.remove('d-none');
+        }
+    } catch (e) {}
+});
+
+// -------------------------------------------------------------
+// ADMIN DASHBOARD & USER MANAGEMENT
+// -------------------------------------------------------------
+let adminUsersData = [];
+
+async function initAdminPage() {
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    if (!currentUser || !currentUser.isAdmin) {
+        alert('Access denied. Administrator privileges required.');
+        window.location.href = 'index.html';
+        return;
+    }
+
+    const adminItem = document.getElementById('sidebar-admin-item');
+    if (adminItem) adminItem.classList.remove('d-none');
+
+    const searchInput = document.getElementById('admin-search-input');
+    const filterSelect = document.getElementById('admin-filter-select');
+
+    if (searchInput) searchInput.addEventListener('input', renderAdminUsersTable);
+    if (filterSelect) filterSelect.addEventListener('change', renderAdminUsersTable);
+
+    await loadAdminUsersList();
+}
+
+async function loadAdminUsersList() {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/admin/users`, {
+            headers: getHeaders()
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch accounts list');
+
+        adminUsersData = data.users || [];
+
+        // Update Dashboard Summary Counters
+        if (data.stats) {
+            const totalEl = document.getElementById('stat-total-users');
+            const verifiedEl = document.getElementById('stat-verified-users');
+            const bannedEl = document.getElementById('stat-banned-users');
+            const adminEl = document.getElementById('stat-admin-users');
+
+            if (totalEl) totalEl.textContent = data.stats.totalUsers;
+            if (verifiedEl) verifiedEl.textContent = data.stats.verifiedCount;
+            if (bannedEl) bannedEl.textContent = data.stats.bannedCount;
+            if (adminEl) adminEl.textContent = data.stats.adminCount;
+        }
+
+        renderAdminUsersTable();
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--accent-red); padding:20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function renderAdminUsersTable() {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+
+    const query = (document.getElementById('admin-search-input')?.value || '').toLowerCase().trim();
+    const filter = document.getElementById('admin-filter-select')?.value || 'all';
+
+    let filtered = adminUsersData.filter(u => {
+        const matchesQuery = u.username.toLowerCase().includes(query) || (u.email && u.email.toLowerCase().includes(query));
+        if (!matchesQuery) return false;
+
+        if (filter === 'verified') return u.isVerified;
+        if (filter === 'banned') return u.isBanned;
+        if (filter === 'admins') return u.isAdmin;
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:30px;">No account records found.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(u => {
+        const dateStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A';
+        const avatarUrl = u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`;
+        
+        let badgesHtml = '';
+        if (u.isAdmin) badgesHtml += `<span class="badge-status badge-admin">Admin</span> `;
+        if (u.isVerified) badgesHtml += `<span class="badge-status badge-verified">Verified</span> `;
+        if (u.isBanned) badgesHtml += `<span class="badge-status badge-banned">Banned</span> `;
+        if (!badgesHtml) badgesHtml = `<span class="badge-status badge-user">User</span>`;
+
+        return `
+            <tr>
+                <td>
+                    <div class="admin-user-cell">
+                        <img src="${avatarUrl}" alt="" class="admin-user-avatar">
+                        <div>
+                            <div style="font-weight:700;">${escapeHtml(u.username)}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(u.bio || '')}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>${escapeHtml(u.email || 'N/A')}</td>
+                <td>${dateStr}</td>
+                <td>${badgesHtml}</td>
+                <td>
+                    <button class="admin-action-btn btn-verify" onclick="toggleAdminVerify('${u._id}')" title="Toggle Verification">
+                        ${u.isVerified ? 'Unverify' : 'Verify'}
+                    </button>
+                    <button class="admin-action-btn btn-ban" onclick="toggleAdminBan('${u._id}')" title="Ban/Unban Account">
+                        ${u.isBanned ? 'Unban' : 'Ban'}
+                    </button>
+                    <button class="admin-action-btn btn-role" onclick="toggleAdminRole('${u._id}')" title="Toggle Admin Role">
+                        ${u.isAdmin ? 'Revoke Admin' : 'Make Admin'}
+                    </button>
+                    <button class="admin-action-btn btn-delete" onclick="deleteAdminUser('${u._id}', '${escapeHtml(u.username)}')" title="Delete Account">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function toggleAdminVerify(userId) {
+    try {
+        const res = await fetch(`${API_BASE}/admin/users/${userId}/verify`, { method: 'PUT', headers: getHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (typeof showToast === 'function') showToast(data.message);
+        await loadAdminUsersList();
+    } catch (err) {
+        alert('Action failed: ' + err.message);
+    }
+}
+
+async function toggleAdminBan(userId) {
+    try {
+        const res = await fetch(`${API_BASE}/admin/users/${userId}/ban`, { method: 'PUT', headers: getHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (typeof showToast === 'function') showToast(data.message);
+        await loadAdminUsersList();
+    } catch (err) {
+        alert('Action failed: ' + err.message);
+    }
+}
+
+async function toggleAdminRole(userId) {
+    try {
+        const res = await fetch(`${API_BASE}/admin/users/${userId}/role`, { method: 'PUT', headers: getHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (typeof showToast === 'function') showToast(data.message);
+        await loadAdminUsersList();
+    } catch (err) {
+        alert('Action failed: ' + err.message);
+    }
+}
+
+async function deleteAdminUser(userId, username) {
+    if (!confirm(`Are you sure you want to permanently delete account @${username}? This action cannot be undone.`)) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/users/${userId}`, { method: 'DELETE', headers: getHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (typeof showToast === 'function') showToast(data.message);
+        await loadAdminUsersList();
+    } catch (err) {
+        alert('Action failed: ' + err.message);
+    }
+}
