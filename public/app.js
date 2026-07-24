@@ -4787,9 +4787,9 @@ function initWebRTCEvents() {
         socket.on('call-rejected', (data) => handleIncomingSignal({ type: 'reject', ...data }));
     }
 
-    // Start background REST poller every 2 seconds globally
+    // Start background REST poller every 1 second globally for fast serverless signaling
     if (!signalPollingInterval) {
-        signalPollingInterval = setInterval(pollCallSignals, 2000);
+        signalPollingInterval = setInterval(pollCallSignals, 1000);
     }
 }
 

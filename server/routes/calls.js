@@ -1,51 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
+const CallSignal = require('../models/CallSignal');
 const { getIO } = require('../socket');
 
-// In-memory call signaling queue for serverless fallback
-const callSignalsMap = new Map();
-
-// Helper to push signal to queue
-function pushSignal(recipientId, signalData) {
-  const strId = String(recipientId);
-  if (!callSignalsMap.has(strId)) {
-    callSignalsMap.set(strId, []);
-  }
-  const queue = callSignalsMap.get(strId);
-  queue.push({
-    ...signalData,
-    timestamp: Date.now()
-  });
-  // Keep queue size manageable
-  if (queue.length > 50) queue.shift();
-}
-
 // 1. Send Call Signal (Offer, Answer, ICE candidate, End, Reject)
-router.post('/signal', authenticateToken, (req, res) => {
+router.post('/signal', authenticateToken, async (req, res) => {
   try {
     const { recipientId, type, offer, answer, candidate, callType, callerInfo } = req.body;
     if (!recipientId || !type) {
       return res.status(400).json({ error: 'recipientId and signal type are required.' });
     }
 
-    const senderId = req.user.id;
-    const signalData = {
-      senderId,
-      recipientId,
+    const senderId = req.user.id || req.user._id;
+
+    // Persist signal in MongoDB for multi-instance Serverless compatibility
+    const newSignal = new CallSignal({
+      sender: senderId,
+      recipient: recipientId,
       type,
       offer,
       answer,
       candidate,
-      callType,
-      callerInfo,
-      createdAt: new Date()
-    };
+      callType: callType || 'video',
+      callerInfo: callerInfo || {}
+    });
 
-    // Store signal in fallback queue
-    pushSignal(recipientId, signalData);
+    await newSignal.save();
 
-    // Also attempt Socket.io broadcast if available
+    // Also attempt real-time Socket.io broadcast if active
     try {
       const io = getIO();
       if (io) {
@@ -62,32 +45,46 @@ router.post('/signal', authenticateToken, (req, res) => {
         }
       }
     } catch (e) {
-      // Socket not active or serverless, REST queue handles it
+      // Socket not active or serverless, MongoDB queue handles it
     }
 
-    res.json({ success: true, message: 'Signal queued successfully.' });
+    res.json({ success: true, message: 'Signal stored in database successfully.' });
   } catch (err) {
-    console.error('Call signal error:', err);
-    res.status(500).json({ error: 'Failed to send signal.' });
+    console.error('Call signal database error:', err);
+    res.status(500).json({ error: 'Failed to send call signal.' });
   }
 });
 
-// 2. Poll Call Signals (For Serverless Fallback)
-router.get('/signals', authenticateToken, (req, res) => {
+// 2. Poll Pending Call Signals from MongoDB (Serverless Compatible)
+router.get('/signals', authenticateToken, async (req, res) => {
   try {
-    const userId = String(req.user.id);
-    const queue = callSignalsMap.get(userId) || [];
-    
-    // Filter out signals older than 2 minutes
-    const now = Date.now();
-    const activeSignals = queue.filter(s => (now - s.timestamp) < 120000);
+    const userId = req.user.id || req.user._id;
 
-    // Clear queue after retrieval
-    callSignalsMap.set(userId, []);
+    // Fetch pending signals for current user
+    const pendingSignals = await CallSignal.find({ recipient: userId }).sort({ createdAt: 1 });
 
-    res.json(activeSignals);
+    if (pendingSignals.length > 0) {
+      // Delete fetched signals so they are only processed once
+      const idsToDelete = pendingSignals.map(s => s._id);
+      await CallSignal.deleteMany({ _id: { $in: idsToDelete } });
+    }
+
+    // Format output
+    const formatted = pendingSignals.map(s => ({
+      senderId: s.sender.toString(),
+      recipientId: s.recipient.toString(),
+      type: s.type,
+      offer: s.offer,
+      answer: s.answer,
+      candidate: s.candidate,
+      callType: s.callType,
+      callerInfo: s.callerInfo
+    }));
+
+    res.json(formatted);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to poll call signals.' });
+    console.error('Poll signals error:', err);
+    res.status(500).json({ error: 'Failed to fetch call signals.' });
   }
 });
 
