@@ -4468,53 +4468,109 @@ function ensureCallModalsExist() {
     if (!document.getElementById('webrtc-call-modal')) {
         const div = document.createElement('div');
         div.innerHTML = `
-        <!-- WEBRTC VIDEO/AUDIO CALL MODAL -->
-        <div class="modal-overlay" id="webrtc-call-modal" style="display: none; z-index: 200000; background: rgba(5, 7, 12, 0.92); backdrop-filter: blur(12px); flex-direction: column; align-items: center; justify-content: center; position: fixed; inset: 0;">
-            <div style="position: relative; width: 90%; max-width: 800px; height: 80vh; background: #0f111a; border: 1.5px solid rgba(255, 215, 0, 0.3); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.8); display: flex; flex-direction: column;">
-                <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; background: #08090d;"></video>
-                <div style="position: absolute; top: 20px; right: 20px; width: 180px; height: 130px; background: #161824; border: 2px solid var(--accent-gold); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 10;">
-                    <video id="local-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
-                </div>
-                <div style="position: absolute; top: 25px; left: 25px; z-index: 10; display: flex; align-items: center; gap: 14px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); padding: 10px 18px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);">
-                    <img src="" id="call-peer-avatar" style="width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--accent-gold); object-fit: cover;">
+        <!-- WHATSAPP FULLSCREEN WEBRTC VIDEO/AUDIO CALL INTERFACE -->
+        <div class="modal-overlay" id="webrtc-call-modal" style="display: none; z-index: 200000; background: #0b141a; flex-direction: column; position: fixed; inset: 0; width: 100vw; height: 100vh; overflow: hidden; font-family: 'Inter', -apple-system, sans-serif;">
+            
+            <!-- WhatsApp Call Header Bar -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; height: 70px; background: linear-gradient(180deg, rgba(11, 20, 26, 0.95) 0%, rgba(11, 20, 26, 0) 100%); z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 0 24px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; color: #00a884; cursor: pointer;" title="End-to-End Encrypted">🔒</div>
                     <div>
-                        <h4 id="call-peer-username" style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">Spotlite User</h4>
-                        <span id="call-status-text" style="font-size: 0.8rem; color: #ffd700; font-weight: 600;">Calling...</span>
+                        <div id="call-peer-username" style="color: #e9edef; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.3px;">@username</div>
+                        <div id="call-status-text" style="font-size: 0.8rem; color: #00a884; font-weight: 600;">Spotlite WebRTC Call • 00:00</div>
                     </div>
                 </div>
-                <div style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; align-items: center; gap: 20px; background: rgba(15, 17, 26, 0.85); backdrop-filter: blur(12px); padding: 14px 28px; border-radius: 50px; border: 1px solid rgba(255,215,0,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                    <button id="toggle-audio-btn" style="width: 50px; height: 50px; border-radius: 50%; border: none; background: #222536; color: #fff; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Toggle Microphone">🎙️</button>
-                    <button id="toggle-video-btn" style="width: 50px; height: 50px; border-radius: 50%; border: none; background: #222536; color: #fff; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Toggle Camera">📹</button>
-                    <button id="end-call-btn" style="width: 56px; height: 56px; border-radius: 50%; border: none; background: #ff4757; color: #fff; font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);" title="End Call">📞</button>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 0.75rem; color: #8696a0; background: rgba(255,255,255,0.06); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">HD 720p P2P</span>
                 </div>
+            </div>
+
+            <!-- WhatsApp Video Stage / Audio Fallback Canvas -->
+            <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #111b21;">
+                
+                <!-- Remote Video Stream -->
+                <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; background: #0b141a;"></video>
+                
+                <!-- Audio Call Avatar Screen (Shown if video is disabled) -->
+                <div id="call-audio-avatar-container" style="display: none; position: absolute; inset: 0; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #182229 0%, #0b141a 100%); z-index: 5;">
+                    <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+                        <div style="position: absolute; width: 180px; height: 180px; border-radius: 50%; border: 2px solid #00a884; opacity: 0.4; animation: whatsappPulse 2s infinite;"></div>
+                        <div style="position: absolute; width: 230px; height: 230px; border-radius: 50%; border: 1.5px solid #00a884; opacity: 0.2; animation: whatsappPulse 2s infinite 0.5s;"></div>
+                        <img src="" id="call-audio-avatar" style="width: 130px; height: 130px; border-radius: 50%; border: 3px solid #00a884; object-fit: cover; box-shadow: 0 12px 40px rgba(0, 168, 132, 0.4); z-index: 2;">
+                    </div>
+                    <h2 id="call-audio-username" style="color: #e9edef; margin: 24px 0 6px 0; font-size: 1.4rem; font-weight: 700;">Username</h2>
+                    <p style="color: #8696a0; font-size: 0.9rem; margin: 0;">WhatsApp Voice Call</p>
+                </div>
+
+                <!-- Floating Picture-in-Picture Local Camera Feed -->
+                <div id="local-video-container" style="position: absolute; bottom: 100px; right: 24px; width: 160px; height: 210px; background: #1f2c34; border: 2px solid #00a884; border-radius: 18px; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,0.7); z-index: 15; transition: all 0.3s ease;">
+                    <video id="local-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                </div>
+            </div>
+
+            <!-- WhatsApp Floating Control Dock -->
+            <div style="position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 20px; background: rgba(17, 27, 33, 0.92); backdrop-filter: blur(20px); padding: 14px 28px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 40px rgba(0,0,0,0.8);">
+                <button id="toggle-audio-btn" style="width: 52px; height: 52px; border-radius: 50%; border: none; background: #2a3942; color: #e9edef; font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Mute Microphone">🎙️</button>
+                <button id="toggle-video-btn" style="width: 52px; height: 52px; border-radius: 50%; border: none; background: #2a3942; color: #e9edef; font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Toggle Camera">📹</button>
+                <button id="end-call-btn" style="width: 60px; height: 60px; border-radius: 50%; border: none; background: #ea0038; color: #ffffff; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(234, 0, 56, 0.5); transition: transform 0.2s;" title="End Call">📞</button>
             </div>
         </div>
 
-        <!-- FULLSCREEN INCOMING CALL DIALOG -->
-        <div class="modal-overlay" id="incoming-call-modal" style="display: none; z-index: 200001; background: rgba(0,0,0,0.88); backdrop-filter: blur(10px); flex-direction: column; align-items: center; justify-content: center; position: fixed; inset: 0;">
-            <div style="background: #0f111a; border: 2px solid #ffd700; border-radius: 28px; padding: 36px 44px; text-align: center; width: 90%; max-width: 400px; box-shadow: 0 25px 60px rgba(255, 215, 0, 0.25); animation: pulseGlow 2s infinite;">
-                <img src="" id="incoming-caller-avatar" style="width: 96px; height: 96px; border-radius: 50%; border: 3px solid #ffd700; object-fit: cover; margin-bottom: 18px; box-shadow: 0 8px 24px rgba(255,215,0,0.4);">
-                <h3 id="incoming-caller-username" style="color: #fff; margin: 0 0 6px 0; font-weight: 800; font-size: 1.3rem;">Caller Username</h3>
-                <p id="incoming-call-type" style="color: #ffd700; margin: 0 0 30px 0; font-size: 0.95rem; font-weight: 600;">Incoming Spotlite Call...</p>
-                <div style="display: flex; align-items: center; justify-content: center; gap: 28px;">
-                    <button id="decline-call-btn" style="width: 64px; height: 64px; border-radius: 50%; border: none; background: #ff4757; color: #fff; font-size: 1.6rem; cursor: pointer; box-shadow: 0 6px 20px rgba(255,71,87,0.5);" title="Decline">✖</button>
-                    <button id="accept-call-btn" style="width: 64px; height: 64px; border-radius: 50%; border: none; background: #2ed573; color: #fff; font-size: 1.6rem; cursor: pointer; box-shadow: 0 6px 20px rgba(46,213,115,0.6);" title="Accept">📞</button>
+        <!-- WHATSAPP FULLSCREEN INCOMING CALL DIALOG -->
+        <div class="modal-overlay" id="incoming-call-modal" style="display: none; z-index: 200001; background: #0b141a; flex-direction: column; align-items: center; justify-content: space-between; position: fixed; inset: 0; width: 100vw; height: 100vh; padding: 60px 24px; box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif;">
+            
+            <div style="text-align: center; margin-top: 40px;">
+                <div style="color: #00a884; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">🔒 WhatsApp End-to-End Encrypted</div>
+                <h2 id="incoming-call-type" style="color: #e9edef; margin: 0; font-size: 1.5rem; font-weight: 800;">Incoming Spotlite Call</h2>
+            </div>
+
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+                <div style="position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+                    <div style="position: absolute; width: 170px; height: 170px; border-radius: 50%; border: 2px solid #00a884; opacity: 0.4; animation: whatsappPulse 1.8s infinite;"></div>
+                    <div style="position: absolute; width: 220px; height: 220px; border-radius: 50%; border: 1.5px solid #00a884; opacity: 0.2; animation: whatsappPulse 1.8s infinite 0.4s;"></div>
+                    <img src="" id="incoming-caller-avatar" style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid #00a884; object-fit: cover; box-shadow: 0 10px 35px rgba(0,168,132,0.4); z-index: 2;">
+                </div>
+                <h3 id="incoming-caller-username" style="color: #ffffff; margin: 0 0 8px 0; font-weight: 800; font-size: 1.6rem;">Caller Username</h3>
+                <p style="color: #8696a0; font-size: 0.95rem; margin: 0;">Ringing...</p>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: center; gap: 48px; margin-bottom: 30px;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <button id="decline-call-btn" style="width: 68px; height: 68px; border-radius: 50%; border: none; background: #ea0038; color: #fff; font-size: 1.7rem; cursor: pointer; box-shadow: 0 8px 25px rgba(234,0,56,0.5); transition: transform 0.2s;" title="Decline">✖</button>
+                    <span style="color: #8696a0; font-size: 0.8rem; font-weight: 600;">Decline</span>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <button id="accept-call-btn" style="width: 68px; height: 68px; border-radius: 50%; border: none; background: #00a884; color: #fff; font-size: 1.7rem; cursor: pointer; box-shadow: 0 8px 25px rgba(0,168,132,0.6); animation: whatsappBounce 1.5s infinite; transition: transform 0.2s;" title="Accept">📞</button>
+                    <span style="color: #00a884; font-size: 0.8rem; font-weight: 700;">Accept</span>
                 </div>
             </div>
         </div>
 
         <!-- WHATSAPP-STYLE FLOATING TOP NOTIFICATION CARD -->
-        <div id="whatsapp-call-banner" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 999999; background: #0f111a; border: 1.5px solid #ffd700; border-radius: 20px; padding: 12px 20px; align-items: center; gap: 16px; box-shadow: 0 15px 40px rgba(0,0,0,0.85); min-width: 320px; max-width: 440px;">
-            <img id="whatsapp-caller-avatar" src="" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid #ffd700; object-fit: cover;">
+        <div id="whatsapp-call-banner" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 999999; background: #111b21; border: 1.5px solid #00a884; border-radius: 24px; padding: 14px 22px; align-items: center; gap: 16px; box-shadow: 0 18px 50px rgba(0,0,0,0.9); min-width: 320px; max-width: 440px;">
+            <img id="whatsapp-caller-avatar" src="" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00a884; object-fit: cover;">
             <div style="flex: 1; overflow: hidden;">
-                <div id="whatsapp-caller-name" style="font-weight: 800; color: #ffffff; font-size: 1rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">@username</div>
-                <div id="whatsapp-call-subtitle" style="font-size: 0.8rem; color: #ffd700; font-weight: 600;">📲 Incoming Spotlite Video Call...</div>
+                <div id="whatsapp-caller-name" style="font-weight: 800; color: #e9edef; font-size: 1.05rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">@username</div>
+                <div id="whatsapp-call-subtitle" style="font-size: 0.82rem; color: #00a884; font-weight: 600;">📲 WhatsApp Video Call...</div>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <button onclick="declineIncomingCall()" style="background: #ff4757; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Decline">✕</button>
-                <button onclick="acceptIncomingCall()" style="background: #2ed573; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(46,213,115,0.6);" title="Accept">📞</button>
+            <div style="display: flex; gap: 12px;">
+                <button onclick="declineIncomingCall()" style="background: #ea0038; color: white; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Decline">✕</button>
+                <button onclick="acceptIncomingCall()" style="background: #00a884; color: white; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,168,132,0.6);" title="Accept">📞</button>
             </div>
         </div>
+
+        <!-- WhatsApp Keyframe Animations -->
+        <style>
+            @keyframes whatsappPulse {
+                0% { transform: scale(0.9); opacity: 0.6; }
+                50% { transform: scale(1.15); opacity: 0.2; }
+                100% { transform: scale(0.9); opacity: 0.6; }
+            }
+            @keyframes whatsappBounce {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-6px); }
+            }
+        </style>
         `;
         document.body.appendChild(div);
 
@@ -4525,13 +4581,25 @@ function ensureCallModalsExist() {
         document.getElementById('toggle-audio-btn')?.addEventListener('click', () => {
             if (localStream) {
                 const track = localStream.getAudioTracks()[0];
-                if (track) track.enabled = !track.enabled;
+                if (track) {
+                    track.enabled = !track.enabled;
+                    const btn = document.getElementById('toggle-audio-btn');
+                    if (btn) btn.style.background = track.enabled ? '#2a3942' : '#ea0038';
+                }
             }
         });
         document.getElementById('toggle-video-btn')?.addEventListener('click', () => {
             if (localStream) {
                 const track = localStream.getVideoTracks()[0];
-                if (track) track.enabled = !track.enabled;
+                if (track) {
+                    track.enabled = !track.enabled;
+                    const btn = document.getElementById('toggle-video-btn');
+                    if (btn) btn.style.background = track.enabled ? '#2a3942' : '#ea0038';
+                    
+                    // Toggle audio avatar container if video disabled
+                    const audioContainer = document.getElementById('call-audio-avatar-container');
+                    if (audioContainer) audioContainer.style.display = track.enabled ? 'none' : 'flex';
+                }
             }
         });
     }
@@ -4841,11 +4909,18 @@ async function startWebRTCCall(audioOnly = false) {
         const peerAvatar = document.getElementById('call-peer-avatar');
         const peerUsername = document.getElementById('call-peer-username');
         const callStatus = document.getElementById('call-status-text');
+        const audioAvatar = document.getElementById('call-audio-avatar');
+        const audioUsername = document.getElementById('call-audio-username');
+        const audioContainer = document.getElementById('call-audio-avatar-container');
 
         if (modal) {
-            peerAvatar.src = activeChatUser.avatar || 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=user';
-            peerUsername.textContent = `@${activeChatUser.username}`;
-            callStatus.textContent = 'Ringing... Waiting for answer';
+            const avatarUrl = activeChatUser.avatar || 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=user';
+            if (peerAvatar) peerAvatar.src = avatarUrl;
+            if (peerUsername) peerUsername.textContent = `@${activeChatUser.username}`;
+            if (callStatus) callStatus.textContent = 'Ringing... Waiting for answer';
+            if (audioAvatar) audioAvatar.src = avatarUrl;
+            if (audioUsername) audioUsername.textContent = `@${activeChatUser.username}`;
+            if (audioContainer) audioContainer.style.display = audioOnly ? 'flex' : 'none';
             modal.style.display = 'flex';
         }
     } catch (err) {
@@ -4908,11 +4983,20 @@ async function acceptIncomingCall() {
         const peerAvatar = document.getElementById('call-peer-avatar');
         const peerUsername = document.getElementById('call-peer-username');
         const callStatus = document.getElementById('call-status-text');
+        const audioAvatar = document.getElementById('call-audio-avatar');
+        const audioUsername = document.getElementById('call-audio-username');
+        const audioContainer = document.getElementById('call-audio-avatar-container');
 
         if (callModal) {
-            peerAvatar.src = (incomingCallData.callerInfo && incomingCallData.callerInfo.avatar) ? incomingCallData.callerInfo.avatar : '';
-            peerUsername.textContent = (incomingCallData.callerInfo && incomingCallData.callerInfo.username) ? `@${incomingCallData.callerInfo.username}` : 'Spotlite User';
-            callStatus.textContent = 'Connected • 00:00';
+            const avatarUrl = (incomingCallData.callerInfo && incomingCallData.callerInfo.avatar) ? incomingCallData.callerInfo.avatar : 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=user';
+            const usernameStr = (incomingCallData.callerInfo && incomingCallData.callerInfo.username) ? `@${incomingCallData.callerInfo.username}` : 'Spotlite User';
+            
+            if (peerAvatar) peerAvatar.src = avatarUrl;
+            if (peerUsername) peerUsername.textContent = usernameStr;
+            if (callStatus) callStatus.textContent = 'Connected • 00:00';
+            if (audioAvatar) audioAvatar.src = avatarUrl;
+            if (audioUsername) audioUsername.textContent = usernameStr;
+            if (audioContainer) audioContainer.style.display = isAudioOnly ? 'flex' : 'none';
             callModal.style.display = 'flex';
         }
     } catch (err) {
