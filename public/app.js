@@ -3805,6 +3805,7 @@ async function loadConversationsInbox() {
 // Opens the DM chat window for a user
 async function openChatWindow(user) {
     activeChatReceiverId = user._id;
+    window.activeChatRecipient = user;
 
     // Toggle panels
     document.getElementById('chat-empty-state').style.display = 'none';
@@ -4430,3 +4431,308 @@ async function deleteAdminUser(userId, username) {
         alert('Action failed: ' + err.message);
     }
 }
+
+// -------------------------------------------------------------
+// SPOTLITE PWA SERVICE WORKER REGISTRATION
+// -------------------------------------------------------------
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('[PWA] ServiceWorker registered with scope:', reg.scope))
+            .catch(err => console.log('[PWA] ServiceWorker registration failed:', err));
+    });
+}
+
+// -------------------------------------------------------------
+// SPOTLITE WEBRTC AUDIO & VIDEO CALLING MODULE
+// -------------------------------------------------------------
+let peerConnection = null;
+let localStream = null;
+let activeCallTargetId = null;
+let incomingCallData = null;
+
+const rtcConfig = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
+
+function initWebRTCEvents() {
+    const socket = window.socket;
+    if (!socket) return;
+
+    socket.on('incoming-call', (data) => {
+        incomingCallData = data;
+        const modal = document.getElementById('incoming-call-modal');
+        const avatar = document.getElementById('incoming-caller-avatar');
+        const username = document.getElementById('incoming-caller-username');
+        const callType = document.getElementById('incoming-call-type');
+
+        if (modal) {
+            avatar.src = (data.callerInfo && data.callerInfo.avatar) ? data.callerInfo.avatar : 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=caller';
+            username.textContent = (data.callerInfo && data.callerInfo.username) ? `@${data.callerInfo.username}` : 'Spotlite User';
+            callType.textContent = `Incoming ${data.callType === 'audio' ? 'Audio 📞' : 'Video 📹'} Call...`;
+            modal.style.display = 'flex';
+        }
+    });
+
+    socket.on('call-answered', async ({ answer }) => {
+        if (peerConnection) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            const statusText = document.getElementById('call-status-text');
+            if (statusText) statusText.textContent = 'Connected • 00:00';
+        }
+    });
+
+    socket.on('ice-candidate', async ({ candidate }) => {
+        if (peerConnection && candidate) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (e) {
+                console.error('Error adding ICE candidate:', e);
+            }
+        }
+    });
+
+    socket.on('call-ended', () => {
+        cleanupCallUI();
+        if (typeof showToast === 'function') showToast('Call ended.');
+    });
+
+    socket.on('call-rejected', () => {
+        cleanupCallUI();
+        if (typeof showToast === 'function') showToast('Call declined.');
+    });
+}
+
+async function startWebRTCCall(audioOnly = false) {
+    let activeChatUser = window.activeChatRecipient;
+    if (!activeChatUser && typeof activeChatReceiverId !== 'undefined' && activeChatReceiverId) {
+        const usernameEl = document.getElementById('active-chat-username');
+        const avatarEl = document.getElementById('active-chat-avatar');
+        activeChatUser = {
+            _id: activeChatReceiverId,
+            username: usernameEl ? usernameEl.textContent : 'User',
+            avatar: avatarEl ? avatarEl.src : ''
+        };
+    }
+
+    if (!activeChatUser || (!activeChatUser._id && !activeChatUser.id)) {
+        alert('Please select and open a chat conversation to start a call.');
+        return;
+    }
+
+    activeCallTargetId = activeChatUser._id || activeChatUser.id;
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: !audioOnly,
+            audio: true
+        });
+
+        const localVid = document.getElementById('local-video');
+        if (localVid) localVid.srcObject = localStream;
+
+        peerConnection = new RTCPeerConnection(rtcConfig);
+
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = (event) => {
+            const remoteVid = document.getElementById('remote-video');
+            if (remoteVid && event.streams[0]) {
+                remoteVid.srcObject = event.streams[0];
+            }
+        };
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate && window.socket) {
+                window.socket.emit('ice-candidate', {
+                    targetId: activeCallTargetId,
+                    candidate: event.candidate
+                });
+            }
+        };
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        if (window.socket) {
+            window.socket.emit('call-user', {
+                recipientId: activeCallTargetId,
+                offer: offer,
+                callType: audioOnly ? 'audio' : 'video',
+                callerInfo: {
+                    username: currentUser.username,
+                    avatar: currentUser.avatar
+                }
+            });
+        }
+
+        // Display Call Modal
+        const modal = document.getElementById('webrtc-call-modal');
+        const peerAvatar = document.getElementById('call-peer-avatar');
+        const peerUsername = document.getElementById('call-peer-username');
+        const callStatus = document.getElementById('call-status-text');
+
+        if (modal) {
+            peerAvatar.src = activeChatUser.avatar || 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=user';
+            peerUsername.textContent = `@${activeChatUser.username}`;
+            callStatus.textContent = 'Ringing...';
+            modal.style.display = 'flex';
+        }
+    } catch (err) {
+        console.error('Failed to access camera/microphone:', err);
+        alert('Could not access camera/microphone for calling: ' + err.message);
+    }
+}
+
+async function acceptIncomingCall() {
+    if (!incomingCallData) return;
+
+    const modalInc = document.getElementById('incoming-call-modal');
+    if (modalInc) modalInc.style.display = 'none';
+
+    activeCallTargetId = incomingCallData.callerId;
+    const isAudioOnly = incomingCallData.callType === 'audio';
+
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: !isAudioOnly,
+            audio: true
+        });
+
+        const localVid = document.getElementById('local-video');
+        if (localVid) localVid.srcObject = localStream;
+
+        peerConnection = new RTCPeerConnection(rtcConfig);
+
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = (event) => {
+            const remoteVid = document.getElementById('remote-video');
+            if (remoteVid && event.streams[0]) {
+                remoteVid.srcObject = event.streams[0];
+            }
+        };
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate && window.socket) {
+                window.socket.emit('ice-candidate', {
+                    targetId: activeCallTargetId,
+                    candidate: event.candidate
+                });
+            }
+        };
+
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+
+        if (window.socket) {
+            window.socket.emit('make-answer', {
+                targetId: activeCallTargetId,
+                answer: answer
+            });
+        }
+
+        // Show Call Modal
+        const callModal = document.getElementById('webrtc-call-modal');
+        const peerAvatar = document.getElementById('call-peer-avatar');
+        const peerUsername = document.getElementById('call-peer-username');
+        const callStatus = document.getElementById('call-status-text');
+
+        if (callModal) {
+            peerAvatar.src = (incomingCallData.callerInfo && incomingCallData.callerInfo.avatar) ? incomingCallData.callerInfo.avatar : '';
+            peerUsername.textContent = (incomingCallData.callerInfo && incomingCallData.callerInfo.username) ? `@${incomingCallData.callerInfo.username}` : 'Spotlite User';
+            callStatus.textContent = 'Connected • 00:00';
+            callModal.style.display = 'flex';
+        }
+    } catch (err) {
+        console.error('Error accepting call:', err);
+        alert('Failed to establish call stream: ' + err.message);
+    }
+}
+
+function declineIncomingCall() {
+    const modalInc = document.getElementById('incoming-call-modal');
+    if (modalInc) modalInc.style.display = 'none';
+
+    if (incomingCallData && window.socket) {
+        window.socket.emit('reject-call', { targetId: incomingCallData.callerId });
+    }
+    incomingCallData = null;
+}
+
+function endActiveCall() {
+    if (activeCallTargetId && window.socket) {
+        window.socket.emit('end-call', { targetId: activeCallTargetId });
+    }
+    cleanupCallUI();
+}
+
+function cleanupCallUI() {
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    activeCallTargetId = null;
+    incomingCallData = null;
+
+    const callModal = document.getElementById('webrtc-call-modal');
+    const incomingModal = document.getElementById('incoming-call-modal');
+    if (callModal) callModal.style.display = 'none';
+    if (incomingModal) incomingModal.style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Bind Call Action Listeners
+    const startAudioBtn = document.getElementById('start-audio-call-btn');
+    const startVideoBtn = document.getElementById('start-video-call-btn');
+    const endCallBtn = document.getElementById('end-call-btn');
+    const acceptCallBtn = document.getElementById('accept-call-btn');
+    const declineCallBtn = document.getElementById('decline-call-btn');
+    const toggleAudioBtn = document.getElementById('toggle-audio-btn');
+    const toggleVideoBtn = document.getElementById('toggle-video-btn');
+
+    if (startAudioBtn) startAudioBtn.addEventListener('click', () => startWebRTCCall(true));
+    if (startVideoBtn) startVideoBtn.addEventListener('click', () => startWebRTCCall(false));
+    if (endCallBtn) endCallBtn.addEventListener('click', endActiveCall);
+    if (acceptCallBtn) acceptCallBtn.addEventListener('click', acceptIncomingCall);
+    if (declineCallBtn) declineCallBtn.addEventListener('click', declineIncomingCall);
+
+    if (toggleAudioBtn) {
+        toggleAudioBtn.addEventListener('click', () => {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    toggleAudioBtn.style.background = audioTrack.enabled ? '#222536' : '#ff4757';
+                }
+            }
+        });
+    }
+
+    if (toggleVideoBtn) {
+        toggleVideoBtn.addEventListener('click', () => {
+            if (localStream) {
+                const videoTrack = localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    videoTrack.enabled = !videoTrack.enabled;
+                    toggleVideoBtn.style.background = videoTrack.enabled ? '#222536' : '#ff4757';
+                }
+            }
+        });
+    }
+
+    // Delay WebRTC socket event attachment slightly to ensure socket connects
+    setTimeout(() => {
+        initWebRTCEvents();
+    }, 1000);
+});
+

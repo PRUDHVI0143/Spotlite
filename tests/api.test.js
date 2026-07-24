@@ -52,4 +52,60 @@ describe('Spotlite Modular API Tests', () => {
     expect(verifyRes.body).toHaveProperty('token');
     expect(verifyRes.body.user.isVerified).toBe(true);
   });
+
+  it('Full E2E user lifecycle: login, create post, like, comment, story, and fetch notifications', async () => {
+    // 1. Login default admin
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+
+    expect(loginRes.statusCode).toBe(200);
+    const token = loginRes.body.token;
+    expect(token).toBeDefined();
+
+    // 2. Create Post
+    const postRes = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        caption: 'Automated Test Post #spotlite',
+        image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        category: 'Tech'
+      });
+    expect(postRes.statusCode).toBe(201);
+    const postId = postRes.body._id;
+
+    // 3. Like Post
+    const likeRes = await request(app)
+      .post(`/api/posts/${postId}/like`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(likeRes.statusCode).toBe(200);
+    expect(likeRes.body.isLiked).toBe(true);
+
+    // 4. Add Comment
+    const commentRes = await request(app)
+      .post(`/api/posts/${postId}/comment`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ text: 'Great spotlite post!' });
+    expect(commentRes.statusCode).toBe(201);
+
+    // 5. Create Story
+    const storyRes = await request(app)
+      .post('/api/stories')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', caption: 'Test Story' });
+    expect(storyRes.statusCode).toBe(201);
+
+    // 6. Fetch Notifications
+    const notifRes = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', `Bearer ${token}`);
+    expect(notifRes.statusCode).toBe(200);
+
+    // 7. Suggest Hashtags
+    const tagRes = await request(app).post('/api/ai/suggest-hashtags');
+    expect(tagRes.statusCode).toBe(200);
+    expect(tagRes.body.hashtags).toContain('#spotlite');
+  });
 });
+

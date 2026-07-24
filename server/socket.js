@@ -56,6 +56,38 @@ function initSocket(server) {
       io.to(`user:${recipientId}`).emit('user_typing', { senderId: userId, typing: false });
     });
 
+    // WebRTC Real-Time Calling Signaling
+    socket.on('call-user', ({ recipientId, offer, callType, callerInfo }) => {
+      io.to(`user:${recipientId}`).emit('incoming-call', {
+        callerId: userId,
+        offer,
+        callType,
+        callerInfo
+      });
+    });
+
+    socket.on('make-answer', ({ targetId, answer }) => {
+      io.to(`user:${targetId}`).emit('call-answered', {
+        answer,
+        answererId: userId
+      });
+    });
+
+    socket.on('ice-candidate', ({ targetId, candidate }) => {
+      io.to(`user:${targetId}`).emit('ice-candidate', {
+        candidate,
+        senderId: userId
+      });
+    });
+
+    socket.on('end-call', ({ targetId }) => {
+      io.to(`user:${targetId}`).emit('call-ended', { senderId: userId });
+    });
+
+    socket.on('reject-call', ({ targetId }) => {
+      io.to(`user:${targetId}`).emit('call-rejected', { senderId: userId });
+    });
+
     socket.on('disconnect', () => {
       if (userId && userSocketsMap.has(userId)) {
         const userSockets = userSocketsMap.get(userId);
