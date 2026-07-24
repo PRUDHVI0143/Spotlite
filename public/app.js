@@ -4444,13 +4444,16 @@ if ('serviceWorker' in navigator) {
 }
 
 // -------------------------------------------------------------
-// SPOTLITE WEBRTC AUDIO & VIDEO CALLING MODULE (DUAL-MODE REST + SOCKETS)
+// SPOTLITE WHATSAPP-STYLE INCOMING CALL & WEBRTC MODULE
 // -------------------------------------------------------------
 let peerConnection = null;
 let localStream = null;
 let activeCallTargetId = null;
 let incomingCallData = null;
 let signalPollingInterval = null;
+let ringtoneAudioContext = null;
+let ringtoneOscillator = null;
+let ringtoneInterval = null;
 
 const rtcConfig = {
     iceServers: [
@@ -4460,7 +4463,125 @@ const rtcConfig = {
     ]
 };
 
-// Helper: Send signal over both Socket and REST endpoint (ensures compatibility with Vercel serverless)
+// Auto-inject WhatsApp-style Call Banner and Modals dynamically on ANY page if missing
+function ensureCallModalsExist() {
+    if (!document.getElementById('webrtc-call-modal')) {
+        const div = document.createElement('div');
+        div.innerHTML = `
+        <!-- WEBRTC VIDEO/AUDIO CALL MODAL -->
+        <div class="modal-overlay" id="webrtc-call-modal" style="display: none; z-index: 200000; background: rgba(5, 7, 12, 0.92); backdrop-filter: blur(12px); flex-direction: column; align-items: center; justify-content: center; position: fixed; inset: 0;">
+            <div style="position: relative; width: 90%; max-width: 800px; height: 80vh; background: #0f111a; border: 1.5px solid rgba(255, 215, 0, 0.3); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.8); display: flex; flex-direction: column;">
+                <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; background: #08090d;"></video>
+                <div style="position: absolute; top: 20px; right: 20px; width: 180px; height: 130px; background: #161824; border: 2px solid var(--accent-gold); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 10;">
+                    <video id="local-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                </div>
+                <div style="position: absolute; top: 25px; left: 25px; z-index: 10; display: flex; align-items: center; gap: 14px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); padding: 10px 18px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);">
+                    <img src="" id="call-peer-avatar" style="width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--accent-gold); object-fit: cover;">
+                    <div>
+                        <h4 id="call-peer-username" style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">Spotlite User</h4>
+                        <span id="call-status-text" style="font-size: 0.8rem; color: #ffd700; font-weight: 600;">Calling...</span>
+                    </div>
+                </div>
+                <div style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; align-items: center; gap: 20px; background: rgba(15, 17, 26, 0.85); backdrop-filter: blur(12px); padding: 14px 28px; border-radius: 50px; border: 1px solid rgba(255,215,0,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                    <button id="toggle-audio-btn" style="width: 50px; height: 50px; border-radius: 50%; border: none; background: #222536; color: #fff; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Toggle Microphone">🎙️</button>
+                    <button id="toggle-video-btn" style="width: 50px; height: 50px; border-radius: 50%; border: none; background: #222536; color: #fff; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Toggle Camera">📹</button>
+                    <button id="end-call-btn" style="width: 56px; height: 56px; border-radius: 50%; border: none; background: #ff4757; color: #fff; font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);" title="End Call">📞</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FULLSCREEN INCOMING CALL DIALOG -->
+        <div class="modal-overlay" id="incoming-call-modal" style="display: none; z-index: 200001; background: rgba(0,0,0,0.88); backdrop-filter: blur(10px); flex-direction: column; align-items: center; justify-content: center; position: fixed; inset: 0;">
+            <div style="background: #0f111a; border: 2px solid #ffd700; border-radius: 28px; padding: 36px 44px; text-align: center; width: 90%; max-width: 400px; box-shadow: 0 25px 60px rgba(255, 215, 0, 0.25); animation: pulseGlow 2s infinite;">
+                <img src="" id="incoming-caller-avatar" style="width: 96px; height: 96px; border-radius: 50%; border: 3px solid #ffd700; object-fit: cover; margin-bottom: 18px; box-shadow: 0 8px 24px rgba(255,215,0,0.4);">
+                <h3 id="incoming-caller-username" style="color: #fff; margin: 0 0 6px 0; font-weight: 800; font-size: 1.3rem;">Caller Username</h3>
+                <p id="incoming-call-type" style="color: #ffd700; margin: 0 0 30px 0; font-size: 0.95rem; font-weight: 600;">Incoming Spotlite Call...</p>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 28px;">
+                    <button id="decline-call-btn" style="width: 64px; height: 64px; border-radius: 50%; border: none; background: #ff4757; color: #fff; font-size: 1.6rem; cursor: pointer; box-shadow: 0 6px 20px rgba(255,71,87,0.5);" title="Decline">✖</button>
+                    <button id="accept-call-btn" style="width: 64px; height: 64px; border-radius: 50%; border: none; background: #2ed573; color: #fff; font-size: 1.6rem; cursor: pointer; box-shadow: 0 6px 20px rgba(46,213,115,0.6);" title="Accept">📞</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- WHATSAPP-STYLE FLOATING TOP NOTIFICATION CARD -->
+        <div id="whatsapp-call-banner" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 999999; background: #0f111a; border: 1.5px solid #ffd700; border-radius: 20px; padding: 12px 20px; align-items: center; gap: 16px; box-shadow: 0 15px 40px rgba(0,0,0,0.85); min-width: 320px; max-width: 440px;">
+            <img id="whatsapp-caller-avatar" src="" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid #ffd700; object-fit: cover;">
+            <div style="flex: 1; overflow: hidden;">
+                <div id="whatsapp-caller-name" style="font-weight: 800; color: #ffffff; font-size: 1rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">@username</div>
+                <div id="whatsapp-call-subtitle" style="font-size: 0.8rem; color: #ffd700; font-weight: 600;">📲 Incoming Spotlite Video Call...</div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="declineIncomingCall()" style="background: #ff4757; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Decline">✕</button>
+                <button onclick="acceptIncomingCall()" style="background: #2ed573; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(46,213,115,0.6);" title="Accept">📞</button>
+            </div>
+        </div>
+        `;
+        document.body.appendChild(div);
+
+        // Bind control listeners
+        document.getElementById('end-call-btn')?.addEventListener('click', endActiveCall);
+        document.getElementById('accept-call-btn')?.addEventListener('click', acceptIncomingCall);
+        document.getElementById('decline-call-btn')?.addEventListener('click', declineIncomingCall);
+        document.getElementById('toggle-audio-btn')?.addEventListener('click', () => {
+            if (localStream) {
+                const track = localStream.getAudioTracks()[0];
+                if (track) track.enabled = !track.enabled;
+            }
+        });
+        document.getElementById('toggle-video-btn')?.addEventListener('click', () => {
+            if (localStream) {
+                const track = localStream.getVideoTracks()[0];
+                if (track) track.enabled = !track.enabled;
+            }
+        });
+    }
+}
+
+// WhatsApp-style Ringtone Audio Feedback Synthesizer
+function playRingtone() {
+    try {
+        stopRingtone();
+        ringtoneAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const ringStep = () => {
+            if (!ringtoneAudioContext) return;
+            const osc = ringtoneAudioContext.createOscillator();
+            const gain = ringtoneAudioContext.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(850, ringtoneAudioContext.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(440, ringtoneAudioContext.currentTime + 0.4);
+            gain.gain.setValueAtTime(0.2, ringtoneAudioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ringtoneAudioContext.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(ringtoneAudioContext.destination);
+            osc.start();
+            osc.stop(ringtoneAudioContext.currentTime + 0.4);
+        };
+
+        ringStep();
+        ringtoneInterval = setInterval(ringStep, 2000);
+    } catch (e) {
+        console.log('Ringtone sound error:', e);
+    }
+}
+
+function stopRingtone() {
+    if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+    }
+    if (ringtoneAudioContext) {
+        try { ringtoneAudioContext.close(); } catch (e) {}
+        ringtoneAudioContext = null;
+    }
+}
+
+// Request Desktop/Mobile Native Push Notifications
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+}
+
+// Send signal over Socket and REST endpoint
 async function sendCallSignal(type, payload = {}) {
     const data = {
         recipientId: payload.targetId || payload.recipientId || activeCallTargetId,
@@ -4468,12 +4589,10 @@ async function sendCallSignal(type, payload = {}) {
         ...payload
     };
 
-    // 1. Socket emit if connected
     if (window.socket && window.socket.connected) {
         window.socket.emit(type === 'offer' ? 'call-user' : type === 'answer' ? 'make-answer' : type === 'ice' ? 'ice-candidate' : type === 'end' ? 'end-call' : 'reject-call', data);
     }
 
-    // 2. REST API endpoint fallback
     try {
         await fetch(`${API_BASE}/calls/signal`, {
             method: 'POST',
@@ -4485,7 +4604,7 @@ async function sendCallSignal(type, payload = {}) {
     }
 }
 
-// REST Signal Poller for serverless environments
+// REST Signal Poller for serverless fallback
 async function pollCallSignals() {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -4504,6 +4623,8 @@ async function pollCallSignals() {
 }
 
 async function handleIncomingSignal(data) {
+    ensureCallModalsExist();
+
     if (data.type === 'offer') {
         incomingCallData = {
             callerId: data.senderId,
@@ -4511,18 +4632,51 @@ async function handleIncomingSignal(data) {
             callType: data.callType,
             callerInfo: data.callerInfo
         };
+
+        playRingtone();
+
+        const callerName = (data.callerInfo && data.callerInfo.username) ? `@${data.callerInfo.username}` : 'Spotlite User';
+        const callerAvatar = (data.callerInfo && data.callerInfo.avatar) ? data.callerInfo.avatar : 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=caller';
+        const callTypeLabel = `Incoming ${data.callType === 'audio' ? 'Audio 📞' : 'Video 📹'} Call...`;
+
+        // 1. WhatsApp Top Banner
+        const banner = document.getElementById('whatsapp-call-banner');
+        const bAvatar = document.getElementById('whatsapp-caller-avatar');
+        const bName = document.getElementById('whatsapp-caller-name');
+        const bSub = document.getElementById('whatsapp-call-subtitle');
+
+        if (banner) {
+            if (bAvatar) bAvatar.src = callerAvatar;
+            if (bName) bName.textContent = callerName;
+            if (bSub) bSub.textContent = `📲 ${callTypeLabel}`;
+            banner.style.display = 'flex';
+        }
+
+        // 2. Fullscreen Ringing Modal
         const modal = document.getElementById('incoming-call-modal');
-        const avatar = document.getElementById('incoming-caller-avatar');
-        const username = document.getElementById('incoming-caller-username');
-        const callType = document.getElementById('incoming-call-type');
+        const mAvatar = document.getElementById('incoming-caller-avatar');
+        const mName = document.getElementById('incoming-caller-username');
+        const mSub = document.getElementById('incoming-call-type');
 
         if (modal) {
-            avatar.src = (data.callerInfo && data.callerInfo.avatar) ? data.callerInfo.avatar : 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=caller';
-            username.textContent = (data.callerInfo && data.callerInfo.username) ? `@${data.callerInfo.username}` : 'Spotlite User';
-            callType.textContent = `Incoming ${data.callType === 'audio' ? 'Audio 📞' : 'Video 📹'} Call...`;
+            if (mAvatar) mAvatar.src = callerAvatar;
+            if (mName) mName.textContent = callerName;
+            if (mSub) mSub.textContent = callTypeLabel;
             modal.style.display = 'flex';
         }
+
+        // 3. System Native Notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(`Incoming Call from ${callerName}`, {
+                body: `${callTypeLabel} - Click to answer!`,
+                icon: callerAvatar
+            });
+        }
     } else if (data.type === 'answer') {
+        stopRingtone();
+        const banner = document.getElementById('whatsapp-call-banner');
+        if (banner) banner.style.display = 'none';
+
         if (peerConnection && data.answer) {
             try {
                 if (peerConnection.signalingState !== 'stable') {
@@ -4543,15 +4697,19 @@ async function handleIncomingSignal(data) {
             }
         }
     } else if (data.type === 'end') {
+        stopRingtone();
         cleanupCallUI();
         if (typeof showToast === 'function') showToast('Call ended.');
     } else if (data.type === 'reject') {
+        stopRingtone();
         cleanupCallUI();
         if (typeof showToast === 'function') showToast('Call declined.');
     }
 }
 
 function initWebRTCEvents() {
+    ensureCallModalsExist();
+
     const socket = window.socket;
     if (socket) {
         socket.on('incoming-call', (data) => handleIncomingSignal({ type: 'offer', ...data }));
@@ -4561,29 +4719,27 @@ function initWebRTCEvents() {
         socket.on('call-rejected', (data) => handleIncomingSignal({ type: 'reject', ...data }));
     }
 
-    // Start background REST poller every 2 seconds
+    // Start background REST poller every 2 seconds globally
     if (!signalPollingInterval) {
         signalPollingInterval = setInterval(pollCallSignals, 2000);
     }
 }
 
-// Helper: Safely acquire user media stream with automatic fallback for "Device in use" hardware locks
+// Safely acquire user media stream with fallback
 async function obtainUserMediaStream(audioOnly = false) {
-    // 1. Try full video + audio
     try {
         return await navigator.mediaDevices.getUserMedia({ video: !audioOnly, audio: true });
     } catch (e1) {
         console.warn('[WebRTC] Full media stream failed:', e1.message);
     }
 
-    // 2. Try audio-only if video is locked or in use
     try {
         return await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
     } catch (e2) {
         console.warn('[WebRTC] Audio-only media stream failed:', e2.message);
     }
 
-    // 3. Fallback: Synthesize media stream via Canvas & Web Audio API so call connects even when hardware camera/mic is locked by another app
+    // Virtual stream fallback for hardware locks
     const canvas = document.createElement('canvas');
     canvas.width = 640;
     canvas.height = 480;
@@ -4599,7 +4755,6 @@ async function obtainUserMediaStream(audioOnly = false) {
     ctx.fillText('(Hardware camera in use by another app)', 320, 260);
 
     const canvasStream = canvas.captureStream(15);
-
     try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
@@ -4608,9 +4763,7 @@ async function obtainUserMediaStream(audioOnly = false) {
         osc.start();
         const synthAudioTrack = dst.stream.getAudioTracks()[0];
         if (synthAudioTrack) canvasStream.addTrack(synthAudioTrack);
-    } catch (e) {
-        // Silent audio synth fallback
-    }
+    } catch (e) {}
 
     if (typeof showToast === 'function') {
         showToast('Camera/Mic in use by another app. Using Spotlite Virtual Stream.');
@@ -4619,6 +4772,8 @@ async function obtainUserMediaStream(audioOnly = false) {
 }
 
 async function startWebRTCCall(audioOnly = false) {
+    ensureCallModalsExist();
+
     let activeChatUser = window.activeChatRecipient;
     if (!activeChatUser && typeof activeChatReceiverId !== 'undefined' && activeChatReceiverId) {
         const usernameEl = document.getElementById('active-chat-username');
@@ -4638,7 +4793,6 @@ async function startWebRTCCall(audioOnly = false) {
     activeCallTargetId = activeChatUser._id || activeChatUser.id;
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-    // Prevent calling self
     if ((currentUser._id || currentUser.id) === activeCallTargetId) {
         alert('You cannot start a call with yourself. Please select another user to test calling.');
         return;
@@ -4683,7 +4837,6 @@ async function startWebRTCCall(audioOnly = false) {
             }
         });
 
-        // Display Call Modal
         const modal = document.getElementById('webrtc-call-modal');
         const peerAvatar = document.getElementById('call-peer-avatar');
         const peerUsername = document.getElementById('call-peer-username');
@@ -4702,10 +4855,16 @@ async function startWebRTCCall(audioOnly = false) {
 }
 
 async function acceptIncomingCall() {
-    if (!incomingCallData) return;
+    ensureCallModalsExist();
+    stopRingtone();
+
+    const banner = document.getElementById('whatsapp-call-banner');
+    if (banner) banner.style.display = 'none';
 
     const modalInc = document.getElementById('incoming-call-modal');
     if (modalInc) modalInc.style.display = 'none';
+
+    if (!incomingCallData) return;
 
     activeCallTargetId = incomingCallData.callerId;
     const isAudioOnly = incomingCallData.callType === 'audio';
@@ -4745,7 +4904,6 @@ async function acceptIncomingCall() {
             answer: answer
         });
 
-        // Show Call Modal
         const callModal = document.getElementById('webrtc-call-modal');
         const peerAvatar = document.getElementById('call-peer-avatar');
         const peerUsername = document.getElementById('call-peer-username');
@@ -4764,6 +4922,11 @@ async function acceptIncomingCall() {
 }
 
 function declineIncomingCall() {
+    stopRingtone();
+
+    const banner = document.getElementById('whatsapp-call-banner');
+    if (banner) banner.style.display = 'none';
+
     const modalInc = document.getElementById('incoming-call-modal');
     if (modalInc) modalInc.style.display = 'none';
 
@@ -4774,6 +4937,7 @@ function declineIncomingCall() {
 }
 
 function endActiveCall() {
+    stopRingtone();
     if (activeCallTargetId) {
         sendCallSignal('end', { targetId: activeCallTargetId });
     }
@@ -4781,6 +4945,7 @@ function endActiveCall() {
 }
 
 function cleanupCallUI() {
+    stopRingtone();
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
@@ -4794,54 +4959,25 @@ function cleanupCallUI() {
 
     const callModal = document.getElementById('webrtc-call-modal');
     const incomingModal = document.getElementById('incoming-call-modal');
+    const banner = document.getElementById('whatsapp-call-banner');
+
     if (callModal) callModal.style.display = 'none';
     if (incomingModal) incomingModal.style.display = 'none';
+    if (banner) banner.style.display = 'none';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Bind Call Action Listeners
+    ensureCallModalsExist();
+
     const startAudioBtn = document.getElementById('start-audio-call-btn');
     const startVideoBtn = document.getElementById('start-video-call-btn');
-    const endCallBtn = document.getElementById('end-call-btn');
-    const acceptCallBtn = document.getElementById('accept-call-btn');
-    const declineCallBtn = document.getElementById('decline-call-btn');
-    const toggleAudioBtn = document.getElementById('toggle-audio-btn');
-    const toggleVideoBtn = document.getElementById('toggle-video-btn');
-
     if (startAudioBtn) startAudioBtn.addEventListener('click', () => startWebRTCCall(true));
     if (startVideoBtn) startVideoBtn.addEventListener('click', () => startWebRTCCall(false));
-    if (endCallBtn) endCallBtn.addEventListener('click', endActiveCall);
-    if (acceptCallBtn) acceptCallBtn.addEventListener('click', acceptIncomingCall);
-    if (declineCallBtn) declineCallBtn.addEventListener('click', declineIncomingCall);
 
-    if (toggleAudioBtn) {
-        toggleAudioBtn.addEventListener('click', () => {
-            if (localStream) {
-                const audioTrack = localStream.getAudioTracks()[0];
-                if (audioTrack) {
-                    audioTrack.enabled = !audioTrack.enabled;
-                    toggleAudioBtn.style.background = audioTrack.enabled ? '#222536' : '#ff4757';
-                }
-            }
-        });
-    }
-
-    if (toggleVideoBtn) {
-        toggleVideoBtn.addEventListener('click', () => {
-            if (localStream) {
-                const videoTrack = localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    videoTrack.enabled = !videoTrack.enabled;
-                    toggleVideoBtn.style.background = videoTrack.enabled ? '#222536' : '#ff4757';
-                }
-            }
-        });
-    }
-
-    // Attach WebRTC socket & REST poller listeners
     setTimeout(() => {
         initWebRTCEvents();
-    }, 1000);
+    }, 500);
 });
+
 
 
