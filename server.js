@@ -18,6 +18,7 @@ const userRoutes = require('./server/routes/users');
 const messageRoutes = require('./server/routes/messages');
 const notificationRoutes = require('./server/routes/notifications');
 const adminRoutes = require('./server/routes/admin');
+const callRoutes = require('./server/routes/calls');
 
 const app = express();
 const server = http.createServer(app);
@@ -116,6 +117,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/calls', callRoutes);
 
 // Stories Endpoints
 app.post('/api/stories', authenticateToken, async (req, res) => {

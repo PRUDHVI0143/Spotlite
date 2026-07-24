@@ -4444,26 +4444,73 @@ if ('serviceWorker' in navigator) {
 }
 
 // -------------------------------------------------------------
-// SPOTLITE WEBRTC AUDIO & VIDEO CALLING MODULE
+// SPOTLITE WEBRTC AUDIO & VIDEO CALLING MODULE (DUAL-MODE REST + SOCKETS)
 // -------------------------------------------------------------
 let peerConnection = null;
 let localStream = null;
 let activeCallTargetId = null;
 let incomingCallData = null;
+let signalPollingInterval = null;
 
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
     ]
 };
 
-function initWebRTCEvents() {
-    const socket = window.socket;
-    if (!socket) return;
+// Helper: Send signal over both Socket and REST endpoint (ensures compatibility with Vercel serverless)
+async function sendCallSignal(type, payload = {}) {
+    const data = {
+        recipientId: payload.targetId || payload.recipientId || activeCallTargetId,
+        type: type,
+        ...payload
+    };
 
-    socket.on('incoming-call', (data) => {
-        incomingCallData = data;
+    // 1. Socket emit if connected
+    if (window.socket && window.socket.connected) {
+        window.socket.emit(type === 'offer' ? 'call-user' : type === 'answer' ? 'make-answer' : type === 'ice' ? 'ice-candidate' : type === 'end' ? 'end-call' : 'reject-call', data);
+    }
+
+    // 2. REST API endpoint fallback
+    try {
+        await fetch(`${API_BASE}/calls/signal`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        });
+    } catch (e) {
+        console.error('REST signal fallback error:', e);
+    }
+}
+
+// REST Signal Poller for serverless environments
+async function pollCallSignals() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/calls/signals`, { headers: getHeaders() });
+        if (!res.ok) return;
+        const signals = await res.json();
+
+        for (const sig of signals) {
+            handleIncomingSignal(sig);
+        }
+    } catch (e) {
+        // Silent poll error handling
+    }
+}
+
+async function handleIncomingSignal(data) {
+    if (data.type === 'offer') {
+        incomingCallData = {
+            callerId: data.senderId,
+            offer: data.offer,
+            callType: data.callType,
+            callerInfo: data.callerInfo
+        };
         const modal = document.getElementById('incoming-call-modal');
         const avatar = document.getElementById('incoming-caller-avatar');
         const username = document.getElementById('incoming-caller-username');
@@ -4475,35 +4522,49 @@ function initWebRTCEvents() {
             callType.textContent = `Incoming ${data.callType === 'audio' ? 'Audio 📞' : 'Video 📹'} Call...`;
             modal.style.display = 'flex';
         }
-    });
-
-    socket.on('call-answered', async ({ answer }) => {
-        if (peerConnection) {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-            const statusText = document.getElementById('call-status-text');
-            if (statusText) statusText.textContent = 'Connected • 00:00';
-        }
-    });
-
-    socket.on('ice-candidate', async ({ candidate }) => {
-        if (peerConnection && candidate) {
+    } else if (data.type === 'answer') {
+        if (peerConnection && data.answer) {
             try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                if (peerConnection.signalingState !== 'stable') {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                }
+                const statusText = document.getElementById('call-status-text');
+                if (statusText) statusText.textContent = 'Connected • 00:00';
+            } catch (e) {
+                console.error('Error setting remote description answer:', e);
+            }
+        }
+    } else if (data.type === 'ice') {
+        if (peerConnection && data.candidate) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             } catch (e) {
                 console.error('Error adding ICE candidate:', e);
             }
         }
-    });
-
-    socket.on('call-ended', () => {
+    } else if (data.type === 'end') {
         cleanupCallUI();
         if (typeof showToast === 'function') showToast('Call ended.');
-    });
-
-    socket.on('call-rejected', () => {
+    } else if (data.type === 'reject') {
         cleanupCallUI();
         if (typeof showToast === 'function') showToast('Call declined.');
-    });
+    }
+}
+
+function initWebRTCEvents() {
+    const socket = window.socket;
+    if (socket) {
+        socket.on('incoming-call', (data) => handleIncomingSignal({ type: 'offer', ...data }));
+        socket.on('call-answered', (data) => handleIncomingSignal({ type: 'answer', ...data }));
+        socket.on('ice-candidate', (data) => handleIncomingSignal({ type: 'ice', ...data }));
+        socket.on('call-ended', (data) => handleIncomingSignal({ type: 'end', ...data }));
+        socket.on('call-rejected', (data) => handleIncomingSignal({ type: 'reject', ...data }));
+    }
+
+    // Start background REST poller every 2 seconds
+    if (!signalPollingInterval) {
+        signalPollingInterval = setInterval(pollCallSignals, 2000);
+    }
 }
 
 async function startWebRTCCall(audioOnly = false) {
@@ -4526,11 +4587,26 @@ async function startWebRTCCall(audioOnly = false) {
     activeCallTargetId = activeChatUser._id || activeChatUser.id;
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
+    // Prevent calling self
+    if ((currentUser._id || currentUser.id) === activeCallTargetId) {
+        alert('You cannot start a call with yourself. Please select another user to test calling.');
+        return;
+    }
+
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: !audioOnly,
-            audio: true
-        });
+        // Attempt media capture with fallback to audio-only if camera is unavailable
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: !audioOnly,
+                audio: true
+            });
+        } catch (mediaErr) {
+            console.warn('Video access failed, falling back to audio only:', mediaErr);
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true
+            });
+        }
 
         const localVid = document.getElementById('local-video');
         if (localVid) localVid.srcObject = localStream;
@@ -4547,8 +4623,8 @@ async function startWebRTCCall(audioOnly = false) {
         };
 
         peerConnection.onicecandidate = (event) => {
-            if (event.candidate && window.socket) {
-                window.socket.emit('ice-candidate', {
+            if (event.candidate) {
+                sendCallSignal('ice', {
                     targetId: activeCallTargetId,
                     candidate: event.candidate
                 });
@@ -4558,17 +4634,15 @@ async function startWebRTCCall(audioOnly = false) {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
-        if (window.socket) {
-            window.socket.emit('call-user', {
-                recipientId: activeCallTargetId,
-                offer: offer,
-                callType: audioOnly ? 'audio' : 'video',
-                callerInfo: {
-                    username: currentUser.username,
-                    avatar: currentUser.avatar
-                }
-            });
-        }
+        await sendCallSignal('offer', {
+            recipientId: activeCallTargetId,
+            offer: offer,
+            callType: audioOnly ? 'audio' : 'video',
+            callerInfo: {
+                username: currentUser.username,
+                avatar: currentUser.avatar
+            }
+        });
 
         // Display Call Modal
         const modal = document.getElementById('webrtc-call-modal');
@@ -4579,12 +4653,12 @@ async function startWebRTCCall(audioOnly = false) {
         if (modal) {
             peerAvatar.src = activeChatUser.avatar || 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=user';
             peerUsername.textContent = `@${activeChatUser.username}`;
-            callStatus.textContent = 'Ringing...';
+            callStatus.textContent = 'Ringing... Waiting for answer';
             modal.style.display = 'flex';
         }
     } catch (err) {
         console.error('Failed to access camera/microphone:', err);
-        alert('Could not access camera/microphone for calling: ' + err.message);
+        alert('Could not access microphone/camera for calling: ' + err.message);
     }
 }
 
@@ -4598,10 +4672,17 @@ async function acceptIncomingCall() {
     const isAudioOnly = incomingCallData.callType === 'audio';
 
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: !isAudioOnly,
-            audio: true
-        });
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: !isAudioOnly,
+                audio: true
+            });
+        } catch (mediaErr) {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true
+            });
+        }
 
         const localVid = document.getElementById('local-video');
         if (localVid) localVid.srcObject = localStream;
@@ -4618,8 +4699,8 @@ async function acceptIncomingCall() {
         };
 
         peerConnection.onicecandidate = (event) => {
-            if (event.candidate && window.socket) {
-                window.socket.emit('ice-candidate', {
+            if (event.candidate) {
+                sendCallSignal('ice', {
                     targetId: activeCallTargetId,
                     candidate: event.candidate
                 });
@@ -4630,12 +4711,10 @@ async function acceptIncomingCall() {
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
 
-        if (window.socket) {
-            window.socket.emit('make-answer', {
-                targetId: activeCallTargetId,
-                answer: answer
-            });
-        }
+        await sendCallSignal('answer', {
+            targetId: activeCallTargetId,
+            answer: answer
+        });
 
         // Show Call Modal
         const callModal = document.getElementById('webrtc-call-modal');
@@ -4659,15 +4738,15 @@ function declineIncomingCall() {
     const modalInc = document.getElementById('incoming-call-modal');
     if (modalInc) modalInc.style.display = 'none';
 
-    if (incomingCallData && window.socket) {
-        window.socket.emit('reject-call', { targetId: incomingCallData.callerId });
+    if (incomingCallData) {
+        sendCallSignal('reject', { targetId: incomingCallData.callerId });
     }
     incomingCallData = null;
 }
 
 function endActiveCall() {
-    if (activeCallTargetId && window.socket) {
-        window.socket.emit('end-call', { targetId: activeCallTargetId });
+    if (activeCallTargetId) {
+        sendCallSignal('end', { targetId: activeCallTargetId });
     }
     cleanupCallUI();
 }
@@ -4730,9 +4809,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Delay WebRTC socket event attachment slightly to ensure socket connects
+    // Attach WebRTC socket & REST poller listeners
     setTimeout(() => {
         initWebRTCEvents();
     }, 1000);
 });
+
 
