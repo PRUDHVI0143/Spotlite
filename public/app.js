@@ -4567,6 +4567,57 @@ function initWebRTCEvents() {
     }
 }
 
+// Helper: Safely acquire user media stream with automatic fallback for "Device in use" hardware locks
+async function obtainUserMediaStream(audioOnly = false) {
+    // 1. Try full video + audio
+    try {
+        return await navigator.mediaDevices.getUserMedia({ video: !audioOnly, audio: true });
+    } catch (e1) {
+        console.warn('[WebRTC] Full media stream failed:', e1.message);
+    }
+
+    // 2. Try audio-only if video is locked or in use
+    try {
+        return await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+    } catch (e2) {
+        console.warn('[WebRTC] Audio-only media stream failed:', e2.message);
+    }
+
+    // 3. Fallback: Synthesize media stream via Canvas & Web Audio API so call connects even when hardware camera/mic is locked by another app
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0f111a';
+    ctx.fillRect(0, 0, 640, 480);
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 22px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('📷 Spotlite Virtual Stream', 320, 230);
+    ctx.fillStyle = '#8f93a8';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillText('(Hardware camera in use by another app)', 320, 260);
+
+    const canvasStream = canvas.captureStream(15);
+
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const dst = audioCtx.createMediaStreamDestination();
+        osc.connect(dst);
+        osc.start();
+        const synthAudioTrack = dst.stream.getAudioTracks()[0];
+        if (synthAudioTrack) canvasStream.addTrack(synthAudioTrack);
+    } catch (e) {
+        // Silent audio synth fallback
+    }
+
+    if (typeof showToast === 'function') {
+        showToast('Camera/Mic in use by another app. Using Spotlite Virtual Stream.');
+    }
+    return canvasStream;
+}
+
 async function startWebRTCCall(audioOnly = false) {
     let activeChatUser = window.activeChatRecipient;
     if (!activeChatUser && typeof activeChatReceiverId !== 'undefined' && activeChatReceiverId) {
@@ -4594,19 +4645,7 @@ async function startWebRTCCall(audioOnly = false) {
     }
 
     try {
-        // Attempt media capture with fallback to audio-only if camera is unavailable
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: !audioOnly,
-                audio: true
-            });
-        } catch (mediaErr) {
-            console.warn('Video access failed, falling back to audio only:', mediaErr);
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: false,
-                audio: true
-            });
-        }
+        localStream = await obtainUserMediaStream(audioOnly);
 
         const localVid = document.getElementById('local-video');
         if (localVid) localVid.srcObject = localStream;
@@ -4672,17 +4711,7 @@ async function acceptIncomingCall() {
     const isAudioOnly = incomingCallData.callType === 'audio';
 
     try {
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: !isAudioOnly,
-                audio: true
-            });
-        } catch (mediaErr) {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: false,
-                audio: true
-            });
-        }
+        localStream = await obtainUserMediaStream(isAudioOnly);
 
         const localVid = document.getElementById('local-video');
         if (localVid) localVid.srcObject = localStream;
