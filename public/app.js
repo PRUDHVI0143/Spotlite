@@ -5340,17 +5340,40 @@ let ringerOsc1 = null;
 let ringerOsc2 = null;
 let ringerInterval = null;
 
+let customRingtoneAudio = null;
+
 function playCallRingtone() {
     stopCallRingtone();
+    
+    // Check for custom ringtone file (public/ringtone.mp3 or public/ringtone.wav)
+    try {
+        customRingtoneAudio = new Audio('/ringtone.mp3');
+        customRingtoneAudio.loop = true;
+        const playPromise = customRingtoneAudio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                // If ringtone.mp3 is missing or blocked, fallback to Web Audio Synth
+                customRingtoneAudio = null;
+                startSynthRingtone();
+            });
+        }
+        return;
+    } catch (e) {
+        customRingtoneAudio = null;
+    }
+    
+    startSynthRingtone();
+}
+
+function startSynthRingtone() {
     try {
         ringerAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let ringing = true;
         
         const pulse = () => {
             if (!ringerAudioCtx || ringerAudioCtx.state === 'closed') return;
             const now = ringerAudioCtx.currentTime;
             
-            // European dual harmonic ringer tone (425Hz + 450Hz)
+            // Dual harmonic ringer tone (425Hz + 450Hz)
             const osc1 = ringerAudioCtx.createOscillator();
             const osc2 = ringerAudioCtx.createOscillator();
             const gain = ringerAudioCtx.createGain();
@@ -5381,6 +5404,13 @@ function playCallRingtone() {
 }
 
 function stopCallRingtone() {
+    if (customRingtoneAudio) {
+        try {
+            customRingtoneAudio.pause();
+            customRingtoneAudio.currentTime = 0;
+        } catch (e) {}
+        customRingtoneAudio = null;
+    }
     if (ringerInterval) {
         clearInterval(ringerInterval);
         ringerInterval = null;
@@ -5390,6 +5420,7 @@ function stopCallRingtone() {
         ringerAudioCtx = null;
     }
 }
+
 
 async function toggleScreenShare() {
     if (!peerConnection) {
