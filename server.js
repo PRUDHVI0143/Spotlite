@@ -19,6 +19,7 @@ const messageRoutes = require('./server/routes/messages');
 const notificationRoutes = require('./server/routes/notifications');
 const adminRoutes = require('./server/routes/admin');
 const callRoutes = require('./server/routes/calls');
+const newRoute = require(path.join(__dirname, 'server', 'routes', 'New_route.js'));
 
 const app = express();
 const server = http.createServer(app);
@@ -118,6 +119,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/calls', callRoutes);
+app.use('/api/new-route', newRoute);
 
 // Stories Endpoints
 app.post('/api/stories', authenticateToken, async (req, res) => {
@@ -168,6 +170,9 @@ app.get('/profile', (req, res) => res.sendFile(path.join(__dirname, 'public', 'p
 app.get('/messages', (req, res) => res.sendFile(path.join(__dirname, 'public', 'messages.html')));
 app.get('/auth', (req, res) => res.sendFile(path.join(__dirname, 'public', 'auth.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/call', (req, res) => res.sendFile(path.join(__dirname, 'public', 'call.html')));
+app.get('/call-demo', (req, res) => res.sendFile(path.join(__dirname, 'public', 'call.html')));
+
 
 app.use((req, res) => {
   if (req.originalUrl.startsWith('/api') || req.path.startsWith('/api')) {

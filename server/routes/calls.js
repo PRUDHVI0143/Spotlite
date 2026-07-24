@@ -99,7 +99,27 @@ router.get('/signals', authenticateToken, async (req, res) => {
   }
 });
 
-// 3. Get call history between two users
+// 3. Get all recent call history for current user
+router.get('/history', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const history = await CallHistory.find({
+      $or: [
+        { caller: userId },
+        { callee: userId }
+      ]
+    })
+      .sort({ startedAt: -1 })
+      .limit(50)
+      .populate('caller callee', 'username avatar');
+
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get user call history.' });
+  }
+});
+
+// 4. Get call history between two users
 router.get('/history/:peerId', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -122,3 +142,4 @@ router.get('/history/:peerId', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+

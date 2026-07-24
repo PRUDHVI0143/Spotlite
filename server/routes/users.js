@@ -7,6 +7,26 @@ const Notification = require('../models/Notification');
 const { authenticateToken } = require('../middleware/auth');
 const { sendNotification } = require('../socket');
 
+// Save or update 24-hour status note
+router.post('/note', authenticateToken, async (req, res) => {
+  try {
+    const { text } = req.body;
+    const userId = req.user.id || req.user._id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    user.note = {
+      text: (text || '').trim().substring(0, 60),
+      updatedAt: new Date()
+    };
+    await user.save();
+
+    res.json({ success: true, note: user.note });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update note.' });
+  }
+});
+
 // 1. Get All Users
 router.get('/all', authenticateToken, async (req, res) => {
   try {

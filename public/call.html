@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotlite — Calls Hub & Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Outfit', 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .studio-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .demo-btn-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+        }
+
+        .hub-action-btn {
+            padding: 14px 20px;
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .hub-action-btn:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-gold);
+            box-shadow: 0 4px 20px rgba(255, 203, 5, 0.2);
+        }
+
+        .hub-action-btn.primary {
+            background: var(--spotlite-gradient);
+            color: #000;
+            border: none;
+        }
+
+        .hub-action-btn.danger {
+            background: #ea0038;
+            color: #fff;
+            border: none;
+        }
+
+        .test-stream-box {
+            width: 100%;
+            height: 320px;
+            background: #0b141a;
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .test-stream-box video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SPOTLITE GLOBAL SIDEBAR / NAV HEADER -->
+    <nav class="sidebar" style="position: fixed; top: 0; left: 0; bottom: 0; width: 240px; background: var(--bg-secondary); border-right: 1px solid var(--border-color); padding: 24px 16px; display: flex; flex-direction: column; justify-content: space-between; z-index: 1000;">
+        <div>
+            <div class="logo-wrapper" style="display: flex; align-items: center; gap: 10px; margin-bottom: 30px; padding-left: 10px;">
+                <img src="/spotlite.png" alt="Spotlite" style="width: 36px; height: 36px; border-radius: 8px;">
+                <span style="font-weight: 800; font-size: 1.4rem; background: var(--spotlite-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Spotlite</span>
+            </div>
+
+            <ul class="nav-menu" style="list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 0;">
+                <li><a href="/" class="menu-item" style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; color: var(--text-secondary); text-decoration: none; font-weight: 600; border-radius: 12px;"><span style="font-size: 1.2rem;">🏠</span> Home</a></li>
+                <li><a href="/messages" class="menu-item" style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; color: var(--text-secondary); text-decoration: none; font-weight: 600; border-radius: 12px;"><span style="font-size: 1.2rem;">💬</span> Direct Chat</a></li>
+                <li><a href="/call" class="menu-item active" style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; color: var(--accent-gold); background: rgba(255,203,5,0.1); text-decoration: none; font-weight: 700; border-radius: 12px;"><span style="font-size: 1.2rem;">📞</span> Call Studio</a></li>
+                <li><a href="/profile" class="menu-item" style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; color: var(--text-secondary); text-decoration: none; font-weight: 600; border-radius: 12px;"><span style="font-size: 1.2rem;">👤</span> Profile</a></li>
+            </ul>
+        </div>
+
+        <div style="padding: 10px; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.8rem; text-align: center;">
+            Spotlite WebRTC v2.0 🔒 Encrypted
+        </div>
+    </nav>
+
+    <!-- MAIN CALL HUB CONTENT -->
+    <main style="margin-left: 240px; padding: 40px; flex: 1;">
+        <div class="call-hub-container">
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 6px;">📞 Spotlite Call Studio & Hub</h1>
+                    <p style="color: var(--text-secondary); font-size: 0.95rem;">High Definition WebRTC P2P Voice, Video, & Screen Sharing Studio.</p>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="font-size: 0.8rem; background: rgba(0,168,132,0.15); color: #00a884; font-weight: 700; padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(0,168,132,0.3);">🟢 WebRTC Ready</span>
+                </div>
+            </div>
+
+            <!-- TAB CONTROLS -->
+            <div class="call-tab-nav">
+                <button class="call-tab-btn active" onclick="switchCallTab('studio')">📹 Live Call Tester</button>
+                <button class="call-tab-btn" onclick="switchCallTab('chamber')">🎙️ Pre-call Device Test</button>
+                <button class="call-tab-btn" onclick="switchCallTab('history')">📜 Recent Call Logs</button>
+            </div>
+
+            <!-- TAB 1: LIVE CALL STUDIO -->
+            <div id="tab-studio" class="studio-card">
+                <h3 style="font-size: 1.1rem; font-weight: 700;">Interactive Demo & Test Controls</h3>
+                <p style="color: var(--text-secondary); font-size: 0.88rem;">Trigger incoming calls, active audio/video feeds, and test sound synthesis in real-time.</p>
+
+                <div class="demo-btn-grid">
+                    <button class="hub-action-btn primary" onclick="triggerDemoBanner()">📲 Floating Top Banner</button>
+                    <button class="hub-action-btn" onclick="triggerDemoIncoming()">📞 Fullscreen Incoming Ringing</button>
+                    <button class="hub-action-btn" onclick="triggerDemoActiveVideo()">📹 Active Video Call Modal</button>
+                    <button class="hub-action-btn" onclick="triggerDemoActiveAudio()">🎙️ Active Audio Call Modal</button>
+                    <button class="hub-action-btn" onclick="toggleScreenShare()">🖥️ Test Screen Share</button>
+                    <button class="hub-action-btn danger" onclick="closeDemoModals()">✕ Close Active Call</button>
+                </div>
+            </div>
+
+            <!-- TAB 2: DEVICE TEST CHAMBER -->
+            <div id="tab-chamber" class="studio-card" style="display: none;">
+                <h3 style="font-size: 1.1rem; font-weight: 700;">Pre-call Device Chamber</h3>
+                <p style="color: var(--text-secondary); font-size: 0.88rem;">Test your camera, microphone volume level, and speaker output before connecting.</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div class="test-stream-box">
+                            <video id="chamber-preview-video" autoplay playsinline muted></video>
+                            <div id="chamber-video-placeholder" style="color: var(--text-muted); font-size: 0.9rem; text-align: center; display: none;">
+                                📷 Camera preview inactive
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 12px;">
+                            <button class="hub-action-btn primary" style="flex:1;" onclick="startChamberCam()">Start Camera Check</button>
+                            <button class="hub-action-btn" style="flex:1;" onclick="stopChamberCam()">Stop Camera</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h4 style="font-weight: 700; margin-bottom: 8px;">Microphone Input Level</h4>
+                            <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 12px;">Speak into your microphone to verify live volume input levels.</p>
+                            <div class="mic-meter-bar">
+                                <div id="chamber-mic-fill" class="mic-meter-fill"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                                <span>Mute</span>
+                                <span>Optimal</span>
+                                <span>Peak</span>
+                            </div>
+                        </div>
+
+                        <div style="padding-top: 20px; border-top: 1px solid var(--border-color);">
+                            <h4 style="font-weight: 700; margin-bottom: 8px;">Speaker & Sound Test</h4>
+                            <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 12px;">Play harmonic audio chime to test speaker audio output.</p>
+                            <button class="hub-action-btn" onclick="testChamberAudio()">🔊 Play Sound Test Chime</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: RECENT CALL LOGS -->
+            <div id="tab-history" class="studio-card" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700;">Recent Call Logs</h3>
+                    <button class="hub-action-btn" onclick="loadAllCallHistory('call-history-list')" style="padding: 6px 14px; font-size: 0.82rem;">🔄 Refresh</button>
+                </div>
+                <div id="call-history-list" style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="/app.js"></script>
+    <script>
+        function switchCallTab(tab) {
+            document.querySelectorAll('.call-tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('tab-studio').style.display = 'none';
+            document.getElementById('tab-chamber').style.display = 'none';
+            document.getElementById('tab-history').style.display = 'none';
+
+            if (tab === 'studio') {
+                document.querySelectorAll('.call-tab-btn')[0].classList.add('active');
+                document.getElementById('tab-studio').style.display = 'flex';
+            } else if (tab === 'chamber') {
+                document.querySelectorAll('.call-tab-btn')[1].classList.add('active');
+                document.getElementById('tab-chamber').style.display = 'flex';
+            } else if (tab === 'history') {
+                document.querySelectorAll('.call-tab-btn')[2].classList.add('active');
+                document.getElementById('tab-history').style.display = 'flex';
+                loadAllCallHistory('call-history-list');
+            }
+        }
+
+        function triggerDemoBanner() {
+            closeDemoModals();
+            const banner = document.getElementById('whatsapp-call-banner');
+            if (banner) {
+                const nameEl = document.getElementById('whatsapp-caller-name');
+                const avatarEl = document.getElementById('whatsapp-caller-avatar');
+                if (nameEl) nameEl.textContent = '@chohan';
+                if (avatarEl) avatarEl.src = 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=chohan';
+                banner.style.display = 'flex';
+            }
+            playCallRingtone();
+        }
+
+        function triggerDemoIncoming() {
+            closeDemoModals();
+            const modal = document.getElementById('incoming-call-modal');
+            if (modal) {
+                const nameEl = document.getElementById('incoming-caller-username');
+                const avatarEl = document.getElementById('incoming-caller-avatar');
+                if (nameEl) nameEl.textContent = '@chohan';
+                if (avatarEl) avatarEl.src = 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=chohan';
+                modal.style.display = 'flex';
+            }
+            playCallRingtone();
+        }
+
+        function triggerDemoActiveVideo() {
+            closeDemoModals();
+            stopCallRingtone();
+            const modal = document.getElementById('webrtc-call-modal');
+            if (modal) {
+                const nameEl = document.getElementById('call-peer-username');
+                if (nameEl) nameEl.textContent = '@chohan';
+                document.getElementById('call-audio-avatar-container').style.display = 'none';
+                modal.style.display = 'flex';
+            }
+        }
+
+        function triggerDemoActiveAudio() {
+            closeDemoModals();
+            stopCallRingtone();
+            const modal = document.getElementById('webrtc-call-modal');
+            if (modal) {
+                const nameEl = document.getElementById('call-peer-username');
+                const audioAvatar = document.getElementById('call-audio-avatar');
+                const audioUsername = document.getElementById('call-audio-username');
+                if (nameEl) nameEl.textContent = '@chohan';
+                if (audioUsername) audioUsername.textContent = '@chohan';
+                if (audioAvatar) audioAvatar.src = 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=chohan';
+                document.getElementById('call-audio-avatar-container').style.display = 'flex';
+                modal.style.display = 'flex';
+            }
+        }
+
+        function closeDemoModals() {
+            stopCallRingtone();
+            const banner = document.getElementById('whatsapp-call-banner');
+            const incoming = document.getElementById('incoming-call-modal');
+            const callModal = document.getElementById('webrtc-call-modal');
+            if (banner) banner.style.display = 'none';
+            if (incoming) incoming.style.display = 'none';
+            if (callModal) callModal.style.display = 'none';
+        }
+
+        let chamberStream = null;
+        let chamberAudioCtx = null;
+        let chamberAnimFrame = null;
+
+        async function startChamberCam() {
+            try {
+                chamberStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const videoEl = document.getElementById('chamber-preview-video');
+                videoEl.srcObject = chamberStream;
+                document.getElementById('chamber-video-placeholder').style.display = 'none';
+
+                // Mic meter setup
+                chamberAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const source = chamberAudioCtx.createMediaStreamSource(chamberStream);
+                const analyser = chamberAudioCtx.createAnalyser();
+                analyser.fftSize = 64;
+                source.connect(analyser);
+
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                const fillEl = document.getElementById('chamber-mic-fill');
+
+                const updateMeter = () => {
+                    analyser.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                    const avg = sum / dataArray.length;
+                    const val = Math.min(100, Math.round((avg / 128) * 100));
+                    if (fillEl) fillEl.style.width = `${val}%`;
+                    chamberAnimFrame = requestAnimationFrame(updateMeter);
+                };
+                updateMeter();
+            } catch (err) {
+                alert('Could not access microphone/camera: ' + err.message);
+            }
+        }
+
+        function stopChamberCam() {
+            if (chamberStream) {
+                chamberStream.getTracks().forEach(t => t.stop());
+                chamberStream = null;
+            }
+            if (chamberAnimFrame) cancelAnimationFrame(chamberAnimFrame);
+            if (chamberAudioCtx) { chamberAudioCtx.close(); chamberAudioCtx = null; }
+            document.getElementById('chamber-mic-fill').style.width = '0%';
+            const videoEl = document.getElementById('chamber-preview-video');
+            if (videoEl) videoEl.srcObject = null;
+        }
+
+        function testChamberAudio() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 1);
+            } catch(e){}
+        }
+    </script>
+</body>
+</html>

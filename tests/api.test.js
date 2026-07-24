@@ -107,5 +107,23 @@ describe('Spotlite Modular API Tests', () => {
     expect(tagRes.statusCode).toBe(200);
     expect(tagRes.body.hashtags).toContain('#spotlite');
   });
+
+  it('GET /api/new-route should return 200 OK', async () => {
+    const res = await request(app).get('/api/new-route');
+    expect(res.statusCode).toBe(200);
+    expect(res.text).toBe('New route');
+  });
+
+  it('GET /api/calls/history without token should return 401 Unauthorized', async () => {
+    const res = await request(app).get('/api/calls/history');
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('POST /api/users/note without token should return 401 Unauthorized', async () => {
+    const res = await request(app).post('/api/users/note').send({ text: 'Hello Spotlite' });
+    expect(res.statusCode).toBe(401);
+  });
 });
+
+
 

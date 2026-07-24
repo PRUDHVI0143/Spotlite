@@ -1443,19 +1443,101 @@ function showSpotliteToast(msg) {
     }, 2600);
 }
 
+// Instagram-Style 24-Hour Note Prompt & Modal
+async function openNoteModal() {
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const existingNote = currentUser.note ? currentUser.note.text || '' : '';
+    
+    showPromptModal('Share a Thought / Note 💬 (max 60 chars)', existingNote, async (newText) => {
+        const text = newText.trim().substring(0, 60);
+        try {
+            const res = await fetch(`${API_BASE}/users/note`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ text })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to update note');
+            
+            currentUser.note = data.note;
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            showSpotliteToast('Note updated! 💬');
+            loadStoriesBar();
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+}
+
+// Full-Resolution Profile Avatar Viewer Modal
+function openAvatarViewerModal(avatarUrl, username) {
+    if (!avatarUrl) return;
+    const existing = document.querySelector('.avatar-viewer-overlay');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'avatar-viewer-overlay';
+    modal.innerHTML = `
+        <div class="avatar-viewer-card">
+            <h3 style="color: var(--text-primary); font-weight: 800; font-size: 1.2rem; margin: 0;">@${escapeHtml(username || 'user')}</h3>
+            <img src="${avatarUrl}" alt="Avatar Full View">
+            <button class="hub-action-btn primary" id="close-avatar-viewer-btn" style="width: 100%; border-radius: 14px; margin-top: 10px;">Close View</button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('#close-avatar-viewer-btn').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+// Attach Long Press & Click listeners to profile images across the app
+function setupAvatarViewerListeners() {
+    document.querySelectorAll('.profile-avatar-img, .user-card-avatar, #profile-user-avatar').forEach(img => {
+        let timer = null;
+        let isLongPress = false;
+
+        const startPress = () => {
+            isLongPress = false;
+            timer = setTimeout(() => {
+                isLongPress = true;
+                const username = document.getElementById('profile-username')?.textContent || 'user';
+                openAvatarViewerModal(img.src, username);
+            }, 400);
+        };
+
+        const endPress = () => {
+            if (timer) clearTimeout(timer);
+        };
+
+        img.addEventListener('mousedown', startPress);
+        img.addEventListener('mouseup', endPress);
+        img.addEventListener('mouseleave', endPress);
+        img.addEventListener('touchstart', startPress, { passive: true });
+        img.addEventListener('touchend', endPress);
+        img.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const username = document.getElementById('profile-username')?.textContent || 'user';
+            openAvatarViewerModal(img.src, username);
+        });
+    });
+}
+
 // Load real dynamic user stories bar
 async function loadStoriesBar() {
     const storiesContainer = document.getElementById('stories-container');
     if (!storiesContainer) return;
 
-    const currentUser = JSON.parse(localStorage.getItem('user'));
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     const userAvatar = currentUser && currentUser.avatar 
         ? currentUser.avatar 
         : `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentUser ? currentUser.username : 'me'}`;
+    const userNoteText = currentUser.note ? currentUser.note.text : '';
 
     let html = `
-        <div class="story-item" id="add-story-trigger" title="Share a new spotlite post">
-            <div class="story-avatar-wrapper user-story-add">
+        <div class="story-item" id="user-note-trigger" style="position: relative;" title="Click to update your 24h Note">
+            ${userNoteText ? `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">${escapeHtml(userNoteText)}</div>` : `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">+ Note...</div>`}
+            <div class="story-avatar-wrapper user-story-add" onclick="openModal()">
                 <img src="${userAvatar}" class="story-avatar-img" alt="Your story">
                 <div class="add-story-badge">+</div>
             </div>
@@ -1468,8 +1550,10 @@ async function loadStoriesBar() {
         const users = await response.json();
         if (Array.isArray(users) && users.length > 0) {
             users.slice(0, 12).forEach(u => {
+                const noteText = u.note ? u.note.text : '';
                 html += `
-                    <div class="story-item" onclick="openStoryViewerModal('${u.username}', '${u.avatar || ''}')">
+                    <div class="story-item" style="position: relative;" onclick="openStoryViewerModal('${u.username}', '${u.avatar || ''}')">
+                        ${noteText ? `<div class="story-note-bubble">${escapeHtml(noteText)}</div>` : ''}
                         <div class="story-avatar-wrapper">
                             <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" class="story-avatar-img" alt="${u.username}">
                         </div>
@@ -1484,8 +1568,7 @@ async function loadStoriesBar() {
 
     storiesContainer.innerHTML = html;
 
-    const addBtn = document.getElementById('add-story-trigger');
-    if (addBtn) addBtn.addEventListener('click', openModal);
+    setTimeout(setupAvatarViewerListeners, 300);
 }
 
 // Story Viewer Overlay Modal
@@ -1810,6 +1893,40 @@ function createPostCard(post) {
     const heartPop = card.querySelector('.like-heart-pop');
     const shareBtn = card.querySelector('.share-trigger-btn');
     const bookmarkBtn = card.querySelector(`#bookmark-btn-${post._id}`);
+
+    // Inline Comment Submit Function
+    async function submitInlineComment() {
+        if (!commentInput) return;
+        const text = commentInput.value.trim();
+        if (!text) return;
+        try {
+            if (commentSubmit) commentSubmit.disabled = true;
+            const res = await fetch(`${API_BASE}/posts/${post._id}/comment`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ text })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to post comment');
+            commentInput.value = '';
+            showSpotliteToast('Comment posted! 💬');
+            const countSpan = card.querySelector(`#comment-btn-${post._id} .action-count`);
+            if (countSpan && data.comments) countSpan.textContent = data.comments.length;
+            if (typeof playActionSound === 'function') playActionSound('comment');
+        } catch (err) {
+            alert(err.message || 'Failed to post comment');
+        } finally {
+            if (commentSubmit) commentSubmit.disabled = false;
+        }
+    }
+
+    if (commentSubmit) commentSubmit.addEventListener('click', submitInlineComment);
+    if (commentInput) commentInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitInlineComment();
+        }
+    });
 
     // Caption "more" toggle
     const moreBtn = card.querySelector('.caption-more-btn');
@@ -5217,6 +5334,158 @@ async function loadCallHistory(peerId) {
     }
 }
 
+// Web Audio Call Ringtone & Ringback Synthesizer
+let ringerAudioCtx = null;
+let ringerOsc1 = null;
+let ringerOsc2 = null;
+let ringerInterval = null;
+
+function playCallRingtone() {
+    stopCallRingtone();
+    try {
+        ringerAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let ringing = true;
+        
+        const pulse = () => {
+            if (!ringerAudioCtx || ringerAudioCtx.state === 'closed') return;
+            const now = ringerAudioCtx.currentTime;
+            
+            // European dual harmonic ringer tone (425Hz + 450Hz)
+            const osc1 = ringerAudioCtx.createOscillator();
+            const osc2 = ringerAudioCtx.createOscillator();
+            const gain = ringerAudioCtx.createGain();
+            
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(425, now);
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(450, now);
+            
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+            
+            osc1.connect(gain);
+            osc2.connect(gain);
+            gain.connect(ringerAudioCtx.destination);
+            
+            osc1.start(now);
+            osc2.start(now);
+            osc1.stop(now + 1.2);
+            osc2.stop(now + 1.2);
+        };
+        
+        pulse();
+        ringerInterval = setInterval(pulse, 2400);
+    } catch (e) {
+        console.warn('Web Audio ringer exception:', e);
+    }
+}
+
+function stopCallRingtone() {
+    if (ringerInterval) {
+        clearInterval(ringerInterval);
+        ringerInterval = null;
+    }
+    if (ringerAudioCtx) {
+        try { ringerAudioCtx.close(); } catch(e) {}
+        ringerAudioCtx = null;
+    }
+}
+
+async function toggleScreenShare() {
+    if (!peerConnection) {
+        if (typeof showToast === 'function') showToast('No active WebRTC connection for screen share.');
+        return;
+    }
+    try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenTrack = screenStream.getVideoTracks()[0];
+        if (screenTrack) {
+            const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) {
+                sender.replaceTrack(screenTrack);
+            }
+            const localVid = document.getElementById('local-video');
+            if (localVid) localVid.srcObject = screenStream;
+            
+            screenTrack.onended = () => {
+                if (localStream) {
+                    const videoTrack = localStream.getVideoTracks()[0];
+                    if (sender && videoTrack) sender.replaceTrack(videoTrack);
+                    if (localVid) localVid.srcObject = localStream;
+                }
+            };
+            if (typeof showToast === 'function') showToast('Screen sharing started 🖥️');
+        }
+    } catch (err) {
+        console.warn('Screen share failed or cancelled:', err);
+    }
+}
+
+// Fetch all call history for Call Hub page
+async function loadAllCallHistory(containerId = 'call-history-list') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    try {
+        const res = await fetch(`${API_BASE}/calls/history`, { headers: getHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch call history');
+        const records = await res.json();
+        
+        if (records.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <div style="font-size: 2.5rem; margin-bottom: 10px;">📞</div>
+                    <p style="font-weight: 600; margin-bottom: 4px;">No call history found</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);">Your recent audio & video call logs will appear here.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const myId = String(currentUser._id || currentUser.id || '');
+        
+        container.innerHTML = records.map(rec => {
+            const isOutgoing = String(rec.caller?._id || rec.caller) === myId;
+            const peer = isOutgoing ? rec.callee : rec.caller;
+            const peerName = peer?.username ? `@${peer.username}` : 'Unknown User';
+            const peerAvatar = peer?.avatar || 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=user';
+            const icon = rec.callType === 'audio' ? '📞' : '📹';
+            const isMissed = rec.status === 'rejected' || rec.status === 'missed';
+            const statusLabel = isMissed ? 'Missed Call' : (isOutgoing ? 'Outgoing' : 'Incoming');
+            const statusColor = isMissed ? '#ea0038' : '#00a884';
+            const dur = formatCallDuration(rec.duration);
+            const dateStr = new Date(rec.startedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            
+            return `
+                <div class="call-history-card">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <img src="${peerAvatar}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid ${statusColor};">
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-primary); font-size: 1rem;">${peerName}</div>
+                            <div style="font-size: 0.8rem; color: ${statusColor}; font-weight: 600;">
+                                ${icon} ${statusLabel} ${dur ? '· ' + dur : ''}
+                            </div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">${dateStr}</div>
+                        </div>
+                    </div>
+                    <button onclick="startCallWithPeer('${peer?._id || ''}', '${peer?.username || ''}', '${peerAvatar}')" style="background: var(--spotlite-gradient); color: #000; border: none; border-radius: 20px; padding: 8px 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        ${icon} Redial
+                    </button>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.warn('Load call history error:', err);
+    }
+}
+
+function startCallWithPeer(peerId, username, avatar) {
+    if (!peerId) return;
+    window.activeChatRecipient = { _id: peerId, username, avatar };
+    startWebRTCCall(false);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     ensureCallModalsExist();
     bindCallModalButtons();
@@ -5236,6 +5505,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initWebRTCEvents();
     }, 500);
 });
+
 
 
 

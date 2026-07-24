@@ -16,6 +16,10 @@ const UserSchema = new mongoose.Schema({
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
   pinnedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
+  note: {
+    text: { type: String, default: '', maxLength: 60 },
+    updatedAt: { type: Date, default: null }
+  },
   spotlightMode: { type: Boolean, default: false },
   isPrivate: { type: Boolean, default: false },
   isAdmin: { type: Boolean, default: false },
