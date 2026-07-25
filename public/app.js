@@ -1172,6 +1172,30 @@ function setupCreatePostModal() {
         });
     }
 
+    // Quick Post Creator Box trigger on Home Feed
+    const quickPostTrigger = document.getElementById('quick-post-trigger');
+    if (quickPostTrigger) {
+        quickPostTrigger.addEventListener('click', (e) => {
+            openModal();
+            const chip = e.target.closest('.quick-action-chip');
+            if (chip) {
+                const chipText = chip.textContent.toLowerCase();
+                if (chipText.includes('photo')) {
+                    fileInput.click();
+                } else if (chipText.includes('mood')) {
+                    const moodSelectTop = document.getElementById('post-mood-select-top');
+                    if (moodSelectTop) moodSelectTop.focus();
+                } else if (chipText.includes('location')) {
+                    const locInput = document.getElementById('post-location-input');
+                    if (locInput) locInput.focus();
+                } else if (chipText.includes('category')) {
+                    const catRow = document.getElementById('modal-category-buttons-row');
+                    if (catRow) catRow.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+    }
+
     // Event Listeners
     if (openBtn) openBtn.addEventListener('click', openModal);
     if (mobileOpenBtn) mobileOpenBtn.addEventListener('click', openModal);
@@ -1392,10 +1416,13 @@ function loadCurrentUserCard() {
     if (!user) return;
 
     const avatar = document.getElementById('current-user-avatar');
+    const quickPostAvatar = document.getElementById('quick-post-user-avatar');
     const username = document.getElementById('current-user-username');
     const bio = document.getElementById('current-user-bio');
 
-    if (avatar) avatar.src = user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`;
+    const userAvatarUrl = user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`;
+    if (avatar) avatar.src = userAvatarUrl;
+    if (quickPostAvatar) quickPostAvatar.src = userAvatarUrl;
     if (username) username.textContent = user.username;
     if (bio) bio.textContent = user.bio ? (user.bio.length > 30 ? user.bio.substring(0, 30) + '...' : user.bio) : 'Spotlite user';
 }
