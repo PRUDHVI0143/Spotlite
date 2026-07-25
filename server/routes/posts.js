@@ -281,13 +281,40 @@ router.post('/:id/comment', authenticateToken, async (req, res) => {
       sendNotification(post.author.toString(), populatedNotif);
     }
 
-    res.status(201).json(post.comments);
+    const updatedPost = await Post.findById(post._id).populate('comments.user', 'username avatar');
+    res.status(201).json(updatedPost ? updatedPost.comments : post.comments);
   } catch (err) {
     res.status(500).json({ error: 'Failed to add comment.' });
   }
 });
 
-// 12. Delete Post
+// 12. Delete Comment
+router.delete('/:id/comment/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ error: 'Comment not found.' });
+
+    // Check authorization: comment owner, post author, or admin
+    const isCommentOwner = comment.user && comment.user.toString() === req.user.id;
+    const isPostAuthor = post.author.toString() === req.user.id;
+    if (!isCommentOwner && !isPostAuthor && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized to delete this comment.' });
+    }
+
+    comment.deleteOne();
+    await post.save();
+
+    const updatedPost = await Post.findById(post._id).populate('comments.user', 'username avatar');
+    res.json(updatedPost ? updatedPost.comments : post.comments);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete comment.' });
+  }
+});
+
+// 13. Delete Post
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);

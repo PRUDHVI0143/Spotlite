@@ -27,13 +27,30 @@ router.post('/note', authenticateToken, async (req, res) => {
   }
 });
 
+// Helper: Filter note if older than 24 hours
+function getActiveNote(note) {
+  if (!note || !note.text || !note.updatedAt) return null;
+  const now = new Date();
+  const noteDate = new Date(note.updatedAt);
+  const diffHours = (now - noteDate) / (1000 * 60 * 60);
+  return diffHours < 24 ? note : null;
+}
+
 // 1. Get All Users
 router.get('/all', authenticateToken, async (req, res) => {
   try {
     const users = await User.find()
-      .select('username avatar bio isVerified followers')
+      .select('username avatar bio isVerified followers note')
       .limit(30);
-    res.json(users);
+    
+    // Attach clean 24h note
+    const processed = users.map(u => {
+      const uObj = u.toObject();
+      uObj.note = getActiveNote(uObj.note);
+      return uObj;
+    });
+
+    res.json(processed);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users.' });
   }
@@ -51,10 +68,16 @@ router.get('/search', async (req, res) => {
         { bio: { $regex: q, $options: 'i' } }
       ]
     })
-      .select('username avatar bio isVerified followers')
+      .select('username avatar bio isVerified followers note')
       .limit(10);
 
-    res.json(users);
+    const processed = users.map(u => {
+      const uObj = u.toObject();
+      uObj.note = getActiveNote(uObj.note);
+      return uObj;
+    });
+
+    res.json(processed);
   } catch (err) {
     res.status(500).json({ error: 'Search failed.' });
   }
@@ -146,8 +169,11 @@ router.get('/profile/:username', async (req, res) => {
 
     const posts = await Post.find({ author: user._id }).sort({ createdAt: -1 });
 
+    const userObj = user.toObject();
+    userObj.note = getActiveNote(userObj.note);
+
     res.json({
-      user,
+      user: userObj,
       posts,
       postsCount: posts.length,
       followersCount: user.followers.length,

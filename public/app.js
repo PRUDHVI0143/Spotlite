@@ -1468,6 +1468,7 @@ async function openNoteModal() {
         }
     });
 }
+window.openNoteModal = openNoteModal;
 
 // Full-Resolution Profile Avatar Viewer Modal
 function openAvatarViewerModal(avatarUrl, username) {
@@ -2418,48 +2419,57 @@ async function loadStoriesBar() {
     if (!container) return;
 
     try {
-        const response = await fetch(`${API_BASE}/users`, { headers: getHeaders() });
+        const response = await fetch(`${API_BASE}/users/all`, { headers: getHeaders() });
         const users = await response.json();
-        if (!response.ok || !users.length) {
+        if (!response.ok || !Array.isArray(users)) {
             container.style.display = 'none';
             return;
         }
 
-        // Always show the logged-in user's own story bubble first
         const currentUser = JSON.parse(localStorage.getItem('user'));
         container.innerHTML = '';
 
+        // Always show logged-in user's own story bubble with note trigger first
         if (currentUser) {
+            const myNoteText = currentUser.note ? currentUser.note.text : '';
             const myBubble = document.createElement('div');
             myBubble.className = 'story-item';
-            myBubble.onclick = () => window.location.href = `profile.html?u=${currentUser.username}`;
+            myBubble.style.position = 'relative';
+            myBubble.title = 'Click note bubble to edit note';
             myBubble.innerHTML = `
-                <div class="story-avatar-wrapper story-avatar-wrapper--own">
+                ${myNoteText 
+                    ? `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">${escapeHtml(myNoteText)}</div>` 
+                    : `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">+ Note...</div>`}
+                <div class="story-avatar-wrapper story-avatar-wrapper--own" onclick="window.location.href='profile.html?u=${currentUser.username}'">
                     <img src="${currentUser.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentUser.username}`}" alt="Your story" class="story-avatar">
                 </div>
-                <span class="story-username">You</span>
+                <span class="story-username" style="color: var(--accent-gold); font-weight: 700;">You</span>
             `;
             container.appendChild(myBubble);
         }
 
-        // Add other real users (exclude self)
+        // Add other users (exclude self)
         users
             .filter(u => !currentUser || u.username !== currentUser.username)
-            .slice(0, 10)
+            .slice(0, 15)
             .forEach(user => {
+                const userNoteText = user.note ? user.note.text : '';
                 const item = document.createElement('div');
                 item.className = 'story-item';
+                item.style.position = 'relative';
                 item.onclick = () => window.location.href = `profile.html?u=${user.username}`;
                 item.innerHTML = `
+                    ${userNoteText ? `<div class="story-note-bubble">${escapeHtml(userNoteText)}</div>` : ''}
                     <div class="story-avatar-wrapper">
                         <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}" alt="${user.username}" class="story-avatar">
                     </div>
-                    <span class="story-username">${user.username}</span>
+                    <span class="story-username">${escapeHtml(user.username)}</span>
                 `;
                 container.appendChild(item);
             });
 
         if (container.children.length === 0) container.style.display = 'none';
+        else container.style.display = 'flex';
     } catch (err) {
         console.error('Stories bar error:', err);
         container.style.display = 'none';
@@ -3143,6 +3153,153 @@ async function loadProfileGrid(username) {
     } catch (err) {
         console.error('Error fetching grid posts:', err);
     }
+}
+
+// Load Saved Posts Grid
+async function loadProfileSavedGrid() {
+    const grid = document.getElementById('profile-saved-grid');
+    if (!grid) return;
+
+    try {
+        grid.innerHTML = '<p style="color:var(--text-secondary); text-align:center; grid-column: 1/-1; padding: 40px 0;">Loading saved posts...</p>';
+        const res = await fetch(`${API_BASE}/posts/saved`, { headers: getHeaders() });
+        const posts = await res.json();
+        if (!res.ok) throw new Error(posts.error);
+
+        if (!posts || posts.length === 0) {
+            grid.innerHTML = `
+                <div style="text-align: center; padding: 60px 0; width: 100%; grid-column: 1/-1;">
+                    <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--text-secondary)" stroke-width="1.5" fill="none" style="margin-bottom: 12px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                    <h3>No Saved Posts Yet</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Save posts to easily view them here later.</p>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = '';
+        posts.forEach(post => {
+            const item = document.createElement('div');
+            item.className = 'grid-post-item';
+            item.innerHTML = `
+                <img src="${post.image}" alt="Saved post" class="grid-post-img">
+                <div class="grid-post-overlay">
+                    <div class="overlay-stat">
+                        <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                        <span>${post.likes ? post.likes.length : 0}</span>
+                    </div>
+                    <div class="overlay-stat">
+                        <svg viewBox="0 0 24 24" stroke="white" fill="white"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span>${post.comments ? post.comments.length : 0}</span>
+                    </div>
+                </div>
+            `;
+            item.addEventListener('click', () => openPostDetailModal(post._id));
+            grid.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Error loading saved grid:', err);
+        grid.innerHTML = '<p style="color:var(--accent-red); text-align:center; grid-column:1/-1;">Failed to load saved posts.</p>';
+    }
+}
+
+// Load Liked Posts Grid
+async function loadProfileLikedGrid() {
+    const grid = document.getElementById('profile-posts-grid');
+    if (!grid) return;
+
+    try {
+        grid.innerHTML = '<p style="color:var(--text-secondary); text-align:center; grid-column: 1/-1; padding: 40px 0;">Loading liked posts...</p>';
+        const res = await fetch(`${API_BASE}/posts/feed`, { headers: getHeaders() });
+        const data = await res.json();
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const currentUserId = currentUser.id || currentUser._id;
+        
+        let allPosts = Array.isArray(data) ? data : (data.posts || []);
+        const likedPosts = allPosts.filter(p => p.likes && p.likes.some(l => (l._id || l) === currentUserId));
+
+        if (likedPosts.length === 0) {
+            grid.innerHTML = `
+                <div style="text-align: center; padding: 60px 0; width: 100%; grid-column: 1/-1;">
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="var(--text-secondary)" style="margin-bottom: 12px;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <h3>No Liked Posts Yet</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Posts you like will be displayed here.</p>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = '';
+        likedPosts.forEach(post => {
+            const item = document.createElement('div');
+            item.className = 'grid-post-item';
+            item.innerHTML = `
+                <img src="${post.image}" alt="Liked post" class="grid-post-img">
+                <div class="grid-post-overlay">
+                    <div class="overlay-stat">
+                        <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                        <span>${post.likes.length}</span>
+                    </div>
+                    <div class="overlay-stat">
+                        <svg viewBox="0 0 24 24" stroke="white" fill="white"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span>${post.comments.length}</span>
+                    </div>
+                </div>
+            `;
+            item.addEventListener('click', () => openPostDetailModal(post._id));
+            grid.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Error loading liked grid:', err);
+    }
+}
+
+function setupProfileTabs() {
+    const postsBtn = document.getElementById('tab-posts-btn');
+    const devBtn = document.getElementById('tab-dev-info-btn');
+    const qaBtn = document.getElementById('tab-qa-btn');
+    const savedBtn = document.getElementById('tab-saved-btn');
+    const likedBtn = document.getElementById('tab-liked-btn');
+
+    const postsGrid = document.getElementById('profile-posts-grid');
+    const savedGrid = document.getElementById('profile-saved-grid');
+    const devContainer = document.getElementById('profile-dev-container');
+    const qaContainer = document.getElementById('profile-qa-container');
+    const controlsBar = document.getElementById('profile-post-controls-bar');
+
+    function setActiveTab(activeBtn, targetView) {
+        [postsBtn, devBtn, qaBtn, savedBtn, likedBtn].forEach(btn => {
+            if (btn) btn.classList.remove('active');
+        });
+        if (activeBtn) activeBtn.classList.add('active');
+
+        if (postsGrid) postsGrid.style.display = 'none';
+        if (savedGrid) savedGrid.style.display = 'none';
+        if (devContainer) devContainer.style.display = 'none';
+        if (qaContainer) qaContainer.style.display = 'none';
+        if (controlsBar) controlsBar.style.display = 'none';
+
+        if (targetView === 'posts') {
+            if (postsGrid) postsGrid.style.display = 'grid';
+            if (controlsBar) controlsBar.style.display = 'flex';
+        } else if (targetView === 'saved') {
+            if (savedGrid) savedGrid.style.display = 'grid';
+            loadProfileSavedGrid();
+        } else if (targetView === 'liked') {
+            if (postsGrid) postsGrid.style.display = 'grid';
+            loadProfileLikedGrid();
+        } else if (targetView === 'dev') {
+            if (devContainer) devContainer.style.display = 'block';
+        } else if (targetView === 'qa') {
+            if (qaContainer) qaContainer.style.display = 'block';
+        }
+    }
+
+    if (postsBtn) postsBtn.onclick = () => setActiveTab(postsBtn, 'posts');
+    if (devBtn) devBtn.onclick = () => setActiveTab(devBtn, 'dev');
+    if (qaBtn) qaBtn.onclick = () => setActiveTab(qaBtn, 'qa');
+    if (savedBtn) savedBtn.onclick = () => setActiveTab(savedBtn, 'saved');
+    if (likedBtn) likedBtn.onclick = () => setActiveTab(likedBtn, 'liked');
 }
 
 // Edit Profile Modal Handling
@@ -4077,6 +4234,9 @@ async function sendMessage() {
         // Refresh thread and inbox list
         await loadMessagesHistory();
         await loadConversationsInbox();
+
+        const thread = document.getElementById('active-chat-thread');
+        if (thread) thread.scrollTop = thread.scrollHeight;
     } catch (err) {
         alert('Failed to send message: ' + err.message);
     }
