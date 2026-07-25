@@ -158,7 +158,8 @@
                     <!-- Active Chat (hidden by default) -->
                     <div class="chat-window-active" id="chat-window-active" style="display: none; flex-direction: column; height: 100%;">
                         <div class="chat-header" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border-color);">
-                            <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <button id="mobile-back-to-inbox-btn" aria-label="Back to Messages" style="background: none; border: none; color: var(--accent-gold); font-weight: 800; font-size: 1.3rem; cursor: pointer; padding: 0 4px; display: none;">←</button>
                                 <img src="" alt="Avatar" class="chat-header-avatar" id="active-chat-avatar">
                                 <span class="chat-header-username" id="active-chat-username">username</span>
                             </div>
@@ -485,6 +486,46 @@
                 <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
                     <button id="cancel-group-modal-btn" class="btn-cancel">Cancel</button>
                     <button id="submit-create-group-btn" class="btn-save-glow">Create Group ✨</button>
+                </div>
+            </div>
+        </div>
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" style="display: none;">
+        <div class="modal-content" style="max-width: 480px; background: rgba(18, 22, 28, 0.98); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.85);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                <h3 style="margin: 0; font-size: 1.15rem; color: var(--accent-gold); font-weight: 800; display: flex; align-items: center; gap: 8px;">⚙️ System Settings & Theme</h3>
+                <button id="close-settings-modal-btn" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 18px;">
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 8px;">Theme Accent Glow</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="theme-accent-opt active" data-theme="gold" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid var(--accent-gold); background: rgba(255,203,5,0.15); color: #ffcb05; font-weight: 700; cursor: pointer;">✨ Gold Glow</button>
+                        <button class="theme-accent-opt" data-theme="purple" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid #a855f7; background: rgba(168,85,247,0.15); color: #c084fc; font-weight: 700; cursor: pointer;">🔮 Cyber Violet</button>
+                        <button class="theme-accent-opt" data-theme="emerald" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid #10b981; background: rgba(16,185,129,0.15); color: #34d399; font-weight: 700; cursor: pointer;">🌿 Emerald</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="font-size: 0.9rem; color: var(--text-primary); display: block;">Push Notifications</strong>
+                        <span style="font-size: 0.78rem; color: var(--text-muted);">Receive alerts for likes, comments & messages</span>
+                    </div>
+                    <input type="checkbox" id="settings-notif-toggle" checked style="width: 20px; height: 20px; accent-color: var(--accent-gold); cursor: pointer;">
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="font-size: 0.9rem; color: var(--text-primary); display: block;">Message Chimes & Sounds</strong>
+                        <span style="font-size: 0.78rem; color: var(--text-muted);">Audio chimes on incoming calls and messages</span>
+                    </div>
+                    <input type="checkbox" id="settings-sound-toggle" checked style="width: 20px; height: 20px; accent-color: var(--accent-gold); cursor: pointer;">
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                    <a href="auth.html" style="color: var(--accent-red); font-weight: 700; font-size: 0.88rem; text-decoration: none;">🚪 Log Out Account</a>
+                    <button id="save-settings-btn" class="btn-save-glow">Save Preferences ✨</button>
                 </div>
             </div>
         </div>

@@ -130,8 +130,9 @@
         <!-- Main Content Area -->
         <main class="main-content">
             <div class="content-container" style="flex-direction: column; max-width: 935px;">
-                <!-- Animated Profile Cover Banner -->
+                <!-- Animated Profile Cover Banner (Image or Video) -->
                 <div class="profile-cover-banner" id="profile-cover-banner">
+                    <div id="profile-cover-media-container" style="position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; border-radius: 20px;"></div>
                     <div class="cover-gradient-overlay"></div>
                     <div class="cover-sparkles">✨</div>
                 </div>
@@ -540,6 +541,17 @@
                     </div>
                 </div>
 
+                <!-- Cover Banner Upload Section -->
+                <div class="form-section-title" style="margin-top: 14px;">🖼️ Profile Cover Banner (Image or Video)</div>
+                <div class="form-group">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="edit-cover-photo-url" class="compact-input" placeholder="https://example.com/banner.mp4 or banner.jpg">
+                        <label for="edit-cover-file-input" style="background: var(--spotlite-gradient); color: #000; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; white-space: nowrap;">Upload 📁</label>
+                        <input type="file" id="edit-cover-file-input" accept="image/*,video/*" style="display: none;">
+                    </div>
+                    <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; display: block;">Supports JPG, PNG, GIF, or MP4/WEBM looping background video.</span>
+                </div>
+
                 <div class="form-section-title" style="margin-top: 14px;">🎨 Customization & Developer</div>
 
                 <div class="form-grid-2">
@@ -752,6 +764,46 @@
             <p style="color: var(--text-muted); text-align: center; padding: 40px 20px; font-size: 0.9rem;">
                 Type a name or username to search people.
             </p>
+        </div>
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" style="display: none;">
+        <div class="modal-content" style="max-width: 480px; background: rgba(18, 22, 28, 0.98); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.85);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                <h3 style="margin: 0; font-size: 1.15rem; color: var(--accent-gold); font-weight: 800; display: flex; align-items: center; gap: 8px;">⚙️ System Settings & Theme</h3>
+                <button id="close-settings-modal-btn" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 18px;">
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 8px;">Theme Accent Glow</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="theme-accent-opt active" data-theme="gold" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid var(--accent-gold); background: rgba(255,203,5,0.15); color: #ffcb05; font-weight: 700; cursor: pointer;">✨ Gold Glow</button>
+                        <button class="theme-accent-opt" data-theme="purple" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid #a855f7; background: rgba(168,85,247,0.15); color: #c084fc; font-weight: 700; cursor: pointer;">🔮 Cyber Violet</button>
+                        <button class="theme-accent-opt" data-theme="emerald" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid #10b981; background: rgba(16,185,129,0.15); color: #34d399; font-weight: 700; cursor: pointer;">🌿 Emerald</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="font-size: 0.9rem; color: var(--text-primary); display: block;">Push Notifications</strong>
+                        <span style="font-size: 0.78rem; color: var(--text-muted);">Receive alerts for likes, comments & messages</span>
+                    </div>
+                    <input type="checkbox" id="settings-notif-toggle" checked style="width: 20px; height: 20px; accent-color: var(--accent-gold); cursor: pointer;">
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="font-size: 0.9rem; color: var(--text-primary); display: block;">Message Chimes & Sounds</strong>
+                        <span style="font-size: 0.78rem; color: var(--text-muted);">Audio chimes on incoming calls and messages</span>
+                    </div>
+                    <input type="checkbox" id="settings-sound-toggle" checked style="width: 20px; height: 20px; accent-color: var(--accent-gold); cursor: pointer;">
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                    <a href="auth.html" style="color: var(--accent-red); font-weight: 700; font-size: 0.88rem; text-decoration: none;">🚪 Log Out Account</a>
+                    <button id="save-settings-btn" class="btn-save-glow">Save Preferences ✨</button>
+                </div>
+            </div>
         </div>
     </div>
 

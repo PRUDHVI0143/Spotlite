@@ -847,19 +847,35 @@ function setupNavigationLinks() {
     });
 
     // Wire mobile settings button
-    document.querySelectorAll('#mobile-settings-btn').forEach(btn => {
+    document.querySelectorAll('#mobile-settings-btn, #sidebar-settings-btn').forEach(btn => {
         btn.onclick = () => {
             const settingsModal = document.getElementById('settings-modal');
             if (settingsModal) {
                 settingsModal.style.display = 'flex';
-            } else {
-                alert('⚙️ Settings & Preferences:\n- Account Security\n- Notification Preferences\n- Theme Accents');
             }
         };
     });
 
     setupSearchSliderPanel();
     setupNotificationsSliderPanel();
+    setupSettingsModal();
+}
+
+function setupSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    const closeBtn = document.getElementById('close-settings-modal-btn');
+    const saveBtn = document.getElementById('save-settings-btn');
+
+    if (!modal) return;
+
+    if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
+
+    if (saveBtn) {
+        saveBtn.onclick = () => {
+            alert('⚙️ Preferences saved successfully!');
+            modal.style.display = 'none';
+        };
+    }
 }
 
 // =============================================================
@@ -3024,6 +3040,110 @@ function setupQASubmission(userId) {
     };
 }
 
+// =============================================================
+// PROFILE PAGE LOGIC (profile.html)
+// =============================================================
+async function initProfilePage() {
+    setupNavigationLinks();
+    const params = new URLSearchParams(window.location.search);
+    let username = params.get('u');
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+
+    if (!username && currentUser) {
+        username = currentUser.username;
+    }
+
+    if (!username) {
+        window.location.href = 'auth.html';
+        return;
+    }
+
+    await loadProfileHeader(username);
+    await loadProfileGrid(username);
+    setupEditProfileModal();
+}
+
+function setupEditProfileModal() {
+    const editBtn = document.getElementById('open-edit-profile-btn');
+    const modal = document.getElementById('edit-profile-modal-overlay');
+    const closeBtn = document.getElementById('close-edit-profile-btn');
+    const saveBtn = document.getElementById('save-profile-btn');
+    const coverUrlInput = document.getElementById('edit-cover-photo-url');
+    const coverFileInput = document.getElementById('edit-cover-file-input');
+    const avatarUrlInput = document.getElementById('edit-avatar-url');
+    const avatarFileInput = document.getElementById('edit-avatar-file-input');
+    const bioInput = document.getElementById('edit-bio');
+    const bioLinkInput = document.getElementById('edit-bio-link');
+
+    if (!modal) return;
+
+    if (editBtn) {
+        editBtn.onclick = () => {
+            modal.style.display = 'flex';
+            if (currentProfileUser) {
+                if (bioInput) bioInput.value = currentProfileUser.bio || '';
+                if (bioLinkInput) bioLinkInput.value = currentProfileUser.bioLink || currentProfileUser.website || '';
+                if (avatarUrlInput) avatarUrlInput.value = currentProfileUser.avatar || '';
+                if (coverUrlInput) coverUrlInput.value = currentProfileUser.coverPhoto || '';
+            }
+        };
+    }
+
+    if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
+
+    if (coverFileInput && coverUrlInput) {
+        coverFileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                coverUrlInput.value = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+    }
+
+    if (avatarFileInput && avatarUrlInput) {
+        avatarFileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                avatarUrlInput.value = evt.target.result;
+                const preview = document.getElementById('edit-avatar-preview');
+                if (preview) preview.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+    }
+
+    if (saveBtn) {
+        saveBtn.onclick = async () => {
+            try {
+                const bio = bioInput ? bioInput.value.trim() : '';
+                const website = bioLinkInput ? bioLinkInput.value.trim() : '';
+                const avatar = avatarUrlInput ? avatarUrlInput.value.trim() : '';
+                const coverPhoto = coverUrlInput ? coverUrlInput.value.trim() : '';
+
+                const res = await fetch(`${API_BASE}/users/profile`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ bio, website, avatar, coverPhoto })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to update profile');
+
+                alert('✨ Profile updated successfully!');
+                modal.style.display = 'none';
+                window.location.reload();
+            } catch (err) {
+                alert(err.message || 'Failed to update profile.');
+            }
+        };
+    }
+}
+
 // Loads profile header details
 async function loadProfileHeader(username) {
     try {
@@ -3037,6 +3157,22 @@ async function loadProfileHeader(username) {
         profileUserObjectId = data.id;
         currentProfileUser = data;
         applyThemeClass(data.profileTheme);
+
+        // Render Cover Banner (Image or Video)
+        const bannerContainer = document.getElementById('profile-cover-media-container');
+        if (bannerContainer) {
+            if (data.coverPhoto) {
+                const url = data.coverPhoto.trim();
+                const isVideo = url.endsWith('.mp4') || url.endsWith('.webm') || url.startsWith('data:video/');
+                if (isVideo) {
+                    bannerContainer.innerHTML = `<video src="${url}" autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>`;
+                } else {
+                    bannerContainer.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;" alt="Cover Banner">`;
+                }
+            } else {
+                bannerContainer.innerHTML = '';
+            }
+        }
 
         // Populate elements
         document.getElementById('profile-user-avatar').src = data.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${data.username}`;
@@ -5796,6 +5932,256 @@ async function toggleScreenShare() {
     } catch (err) {
         console.warn('Screen share failed or cancelled:', err);
     }
+}
+
+// =============================================================
+// MESSAGES PAGE & REAL-TIME CHAT LOGIC (messages.html)
+// =============================================================
+let activeChatReceiverId = null;
+let activeChatRecipient = null;
+
+async function initMessagesPage() {
+    setupNavigationLinks();
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    if (!currentUser) {
+        window.location.href = 'auth.html';
+        return;
+    }
+
+    if (typeof initSocketConnection === 'function') {
+        initSocketConnection();
+    }
+
+    await loadConversationsInbox();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUsername = urlParams.get('u');
+    if (targetUsername) {
+        try {
+            const res = await fetch(`${API_BASE}/users/profile/${targetUsername.toLowerCase()}`, { headers: getHeaders() });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.user) {
+                    openChatWithUser(data.user);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to auto-open direct chat:', err);
+        }
+    }
+
+    const sendBtn = document.getElementById('chat-send-btn');
+    const textInput = document.getElementById('chat-text-input');
+    const attachBtn = document.getElementById('chat-attach-file-btn');
+    const fileInput = document.getElementById('chat-file-input');
+    const heartBtn = document.getElementById('chat-quick-heart-btn');
+    const mobileBackBtn = document.getElementById('mobile-back-to-inbox-btn');
+
+    if (mobileBackBtn) {
+        mobileBackBtn.onclick = () => {
+            const layout = document.querySelector('.messages-layout');
+            if (layout) layout.classList.remove('mobile-chat-open');
+            activeChatReceiverId = null;
+        };
+    }
+
+    if (sendBtn) {
+        sendBtn.onclick = () => sendChatMessage();
+    }
+    if (textInput) {
+        textInput.onkeypress = (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        };
+    }
+    if (attachBtn && fileInput) {
+        attachBtn.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => handleChatFileSelect(e);
+    }
+    if (heartBtn) {
+        heartBtn.onclick = () => sendChatMessage('❤️');
+    }
+
+    if (window.socket) {
+        window.socket.off('direct_message');
+        window.socket.on('direct_message', (msg) => {
+            const senderId = msg.sender._id || msg.sender;
+            if (activeChatReceiverId && String(senderId) === String(activeChatReceiverId)) {
+                appendChatMessageToThread(msg);
+                scrollChatToBottom();
+            }
+            loadConversationsInbox();
+        });
+    }
+}
+
+async function loadConversationsInbox() {
+    const container = document.getElementById('conversations-inbox-list');
+    if (!container) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/messages/conversations`, { headers: getHeaders() });
+        const conversations = await res.json();
+        if (!res.ok) throw new Error(conversations.error);
+
+        if (!Array.isArray(conversations) || conversations.length === 0) {
+            container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 16px; font-size: 0.88rem;">No messages yet. Start a new chat!</p>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        conversations.forEach(c => {
+            const u = c.user;
+            if (!u) return;
+            const item = document.createElement('div');
+            item.className = `inbox-item ${activeChatReceiverId === u._id ? 'active' : ''}`;
+            item.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;';
+            item.innerHTML = `
+                <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--accent-gold);" alt="">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <strong style="font-size: 0.92rem; color: var(--text-primary);">${escapeHtml(u.username)}</strong>
+                        <span style="font-size: 0.72rem; color: var(--text-muted);">${c.updatedAt ? new Date(c.updatedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}</span>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 2px 0 0 0;" class="text-truncate">${escapeHtml(c.lastMessage || 'Sent an attachment')}</p>
+                </div>
+            `;
+            item.onclick = () => openChatWithUser(u);
+            container.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Failed to load conversations:', err);
+    }
+}
+
+async function openChatWithUser(user) {
+    activeChatReceiverId = user._id || user.id;
+    activeChatRecipient = user;
+    window.activeChatRecipient = user;
+
+    const emptyState = document.getElementById('chat-empty-state');
+    const activeWindow = document.getElementById('chat-window-active');
+    const avatarEl = document.getElementById('active-chat-avatar');
+    const usernameEl = document.getElementById('active-chat-username');
+    const layout = document.querySelector('.messages-layout');
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (activeWindow) activeWindow.style.display = 'flex';
+
+    if (avatarEl) avatarEl.src = user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`;
+    if (usernameEl) usernameEl.textContent = `@${user.username}`;
+
+    if (layout) layout.classList.add('mobile-chat-open');
+
+    await loadChatMessages(activeChatReceiverId);
+}
+
+async function loadChatMessages(userId) {
+    const thread = document.getElementById('active-chat-thread');
+    if (!thread) return;
+
+    thread.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Loading chat...</p>`;
+    try {
+        const res = await fetch(`${API_BASE}/messages/${userId}`, { headers: getHeaders() });
+        const messages = await res.json();
+        if (!res.ok) throw new Error(messages.error);
+
+        thread.innerHTML = '';
+        messages.forEach(msg => appendChatMessageToThread(msg));
+        scrollChatToBottom();
+    } catch (err) {
+        thread.innerHTML = `<p style="color: var(--accent-red); text-align: center; padding: 20px;">Could not load messages.</p>`;
+    }
+}
+
+function appendChatMessageToThread(msg) {
+    const thread = document.getElementById('active-chat-thread');
+    if (!thread) return;
+
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const myId = String(currentUser._id || currentUser.id || '');
+    const senderId = String(msg.sender._id || msg.sender);
+    const isMine = senderId === myId;
+
+    const msgBubble = document.createElement('div');
+    msgBubble.className = `chat-bubble ${isMine ? 'mine' : 'theirs'}`;
+    msgBubble.style.cssText = `max-width: 70%; padding: 10px 14px; border-radius: 18px; margin: 6px 0; font-size: 0.9rem; align-self: ${isMine ? 'flex-end' : 'flex-start'}; background: ${isMine ? 'var(--spotlite-gradient)' : 'var(--bg-input)'}; color: ${isMine ? '#000' : 'var(--text-primary)'}; font-weight: ${isMine ? '600' : '400'}; box-shadow: var(--shadow-sm);`;
+
+    let contentHtml = '';
+    if (msg.fileUrl) {
+        if (msg.fileType && msg.fileType.startsWith('image/')) {
+            contentHtml += `<img src="${msg.fileUrl}" style="max-width: 100%; border-radius: 12px; margin-bottom: 6px; display: block;">`;
+        } else {
+            contentHtml += `<a href="${msg.fileUrl}" target="_blank" style="color: inherit; text-decoration: underline; font-weight: 700; display: flex; align-items: center; gap: 6px;">📎 ${escapeHtml(msg.fileName || 'Attachment')}</a>`;
+        }
+    }
+    if (msg.text) {
+        contentHtml += `<div>${escapeHtml(msg.text)}</div>`;
+    }
+
+    msgBubble.innerHTML = contentHtml;
+    thread.appendChild(msgBubble);
+}
+
+function scrollChatToBottom() {
+    const thread = document.getElementById('active-chat-thread');
+    if (thread) thread.scrollTop = thread.scrollHeight;
+}
+
+async function sendChatMessage(customText = null) {
+    if (!activeChatReceiverId) return;
+
+    const textInput = document.getElementById('chat-text-input');
+    const text = customText || (textInput ? textInput.value.trim() : '');
+    if (!text) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/messages`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ receiverId: activeChatReceiverId, text })
+        });
+        const newMsg = await res.json();
+        if (!res.ok) throw new Error(newMsg.error);
+
+        if (textInput) textInput.value = '';
+        appendChatMessageToThread(newMsg);
+        scrollChatToBottom();
+        loadConversationsInbox();
+    } catch (err) {
+        alert(err.message || 'Failed to send message.');
+    }
+}
+
+function handleChatFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        const base64Data = evt.target.result;
+        try {
+            const res = await fetch(`${API_BASE}/messages`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({
+                    receiverId: activeChatReceiverId,
+                    fileUrl: base64Data,
+                    fileName: file.name,
+                    fileType: file.type,
+                    text: `Sent a file: ${file.name}`
+                })
+            });
+            const newMsg = await res.json();
+            if (!res.ok) throw new Error(newMsg.error);
+
+            appendChatMessageToThread(newMsg);
+            scrollChatToBottom();
+            loadConversationsInbox();
+        } catch (err) {
+            alert('Failed to send file attachment.');
+        }
+    };
+    reader.readAsDataURL(file);
 }
 
 // Fetch all call history for Call Hub page

@@ -4453,3 +4453,35 @@ body.mode-oled {
     box-shadow: 0 6px 20px rgba(234, 0, 56, 0.4);
     transform: translateY(-2px);
 }
+
+/* ── MOBILE CHAT VIEW SWITCHER ── */
+@media (max-width: 768px) {
+    #mobile-back-to-inbox-btn {
+        display: inline-block !important;
+    }
+
+    .messages-layout {
+        position: relative;
+        height: calc(100vh - 120px) !important;
+        overflow: hidden;
+    }
+
+    .messages-inbox {
+        width: 100% !important;
+        display: flex !important;
+    }
+
+    .messages-chat-window {
+        width: 100% !important;
+        display: none !important;
+    }
+
+    .messages-layout.mobile-chat-open .messages-inbox {
+        display: none !important;
+    }
+
+    .messages-layout.mobile-chat-open .messages-chat-window {
+        display: flex !important;
+        width: 100% !important;
+    }
+}
