@@ -4284,3 +4284,161 @@ body.mode-oled {
     transform: translateY(-1px);
     box-shadow: 0 6px 24px rgba(255, 203, 5, 0.45);
 }
+
+/* ── MOBILE TOP HEADER & BOTTOM NAVIGATION ── */
+.mobile-top-header {
+    display: none;
+}
+
+.bottom-nav {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        padding-top: 60px !important;
+        padding-bottom: 75px !important;
+    }
+
+    .mobile-top-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 56px;
+        padding: 0 16px;
+        background: rgba(10, 10, 10, 0.92);
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border-color);
+        z-index: 1000;
+    }
+
+    .mobile-brand-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .mobile-brand-logo {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+    }
+
+    .mobile-top-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .mobile-action-icon-btn {
+        background: none;
+        border: none;
+        color: var(--text-primary);
+        padding: 6px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .mobile-action-icon-btn.active, .mobile-action-icon-btn:hover {
+        color: var(--accent-gold);
+        background: rgba(255, 203, 5, 0.1);
+    }
+
+    .bottom-nav {
+        display: block;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 64px;
+        background: rgba(10, 10, 10, 0.94);
+        backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border-color);
+        z-index: 1000;
+        padding: 0 12px;
+    }
+
+    .bottom-nav-menu {
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    .bottom-nav-menu .nav-item {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+    }
+
+    .bottom-nav-menu .nav-item a,
+    .bottom-nav-menu .nav-item button {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 4px 10px;
+        transition: color 0.2s, transform 0.15s;
+    }
+
+    .bottom-nav-menu .nav-item.active a,
+    .bottom-nav-menu .nav-item.active button,
+    .bottom-nav-menu .nav-item a:hover,
+    .bottom-nav-menu .nav-item button:hover {
+        color: var(--accent-gold);
+    }
+
+    .bottom-create-btn {
+        background: var(--spotlite-gradient) !important;
+        color: #000000 !important;
+        border-radius: 16px !important;
+        padding: 8px 12px !important;
+        box-shadow: 0 4px 15px rgba(255, 203, 5, 0.35);
+        transform: translateY(-4px);
+    }
+
+    .bottom-create-btn span {
+        display: none;
+    }
+}
+
+/* ── PROFILE LOGOUT BUTTON ── */
+.profile-logout-btn {
+    background: rgba(234, 0, 56, 0.1);
+    border: 1px solid var(--accent-red);
+    color: var(--accent-red);
+    border-radius: 8px;
+    padding: 7px 16px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+}
+
+.profile-logout-btn:hover {
+    background: var(--accent-red);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(234, 0, 56, 0.4);
+}

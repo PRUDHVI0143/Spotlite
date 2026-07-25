@@ -735,6 +735,30 @@ function setupNavigationLinks() {
         });
     }
 
+    // Wire mobile search button
+    document.querySelectorAll('#mobile-search-btn').forEach(btn => {
+        btn.onclick = () => {
+            const searchPanel = document.getElementById('search-slider-panel');
+            if (searchPanel) {
+                searchPanel.classList.add('active');
+                const searchInput = document.getElementById('search-panel-input');
+                if (searchInput) searchInput.focus();
+            }
+        };
+    });
+
+    // Wire mobile settings button
+    document.querySelectorAll('#mobile-settings-btn').forEach(btn => {
+        btn.onclick = () => {
+            const settingsModal = document.getElementById('settings-modal');
+            if (settingsModal) {
+                settingsModal.style.display = 'flex';
+            } else {
+                alert('⚙️ Settings & Preferences:\n- Account Security\n- Notification Preferences\n- Theme Accents');
+            }
+        };
+    });
+
     setupNotificationsSliderPanel();
 }
 
@@ -3056,15 +3080,25 @@ async function loadProfileHeader(username) {
         }
 
         const tabSavedBtn = document.getElementById('tab-saved-btn');
+        const profileLogoutBtn = document.getElementById('profile-logout-btn');
         if (currentUser && currentUser.username === username.toLowerCase()) {
-            // OWN profile – show edit button only
-            editBtn.style.display = 'block';
+            // OWN profile – show edit button & logout button
+            editBtn.style.display = 'inline-block';
+            if (profileLogoutBtn) {
+                profileLogoutBtn.style.display = 'inline-block';
+                profileLogoutBtn.onclick = () => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = 'auth.html';
+                };
+            }
             optionsBtn.style.display = 'none';
             actionsRow.style.display = 'none';
             if (tabSavedBtn) tabSavedBtn.style.display = 'flex';
         } else {
             // OTHER profile – show actions row & options
             editBtn.style.display = 'none';
+            if (profileLogoutBtn) profileLogoutBtn.style.display = 'none';
             optionsBtn.style.display = 'flex';
             actionsRow.style.display = 'flex';
             if (tabSavedBtn) tabSavedBtn.style.display = 'none';
