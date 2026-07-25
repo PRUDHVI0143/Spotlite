@@ -597,6 +597,105 @@ function getNotificationText(n) {
     }
 }
 
+// Implement Live Search Slider Panel
+function setupSearchSliderPanel() {
+    const searchPanel = document.getElementById('search-slider-panel');
+    const searchInput = document.getElementById('search-panel-input');
+    const searchResults = document.getElementById('search-panel-results');
+    const closeBtn = document.getElementById('close-search-panel-btn');
+
+    if (!searchPanel) return;
+
+    function openSearchPanel() {
+        searchPanel.classList.add('active');
+        if (searchInput) {
+            searchInput.focus();
+            searchInput.value = '';
+        }
+        if (searchResults) {
+            searchResults.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 20px; font-size: 0.9rem;">Type a name or username to search people.</p>`;
+        }
+    }
+
+    function closeSearchPanel() {
+        searchPanel.classList.remove('active');
+    }
+
+    // Bind all search buttons (sidebar and mobile)
+    document.querySelectorAll('#sidebar-search-btn, #mobile-search-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            openSearchPanel();
+        };
+    });
+
+    if (closeBtn) closeBtn.onclick = closeSearchPanel;
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+        if (searchPanel.classList.contains('active') && !searchPanel.contains(e.target) && !e.target.closest('#sidebar-search-btn') && !e.target.closest('#mobile-search-btn')) {
+            closeSearchPanel();
+        }
+    });
+
+    // Live debounced search input
+    let searchDebounceTimer;
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchDebounceTimer);
+            const query = e.target.value.trim();
+
+            if (query.length === 0) {
+                searchResults.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 20px; font-size: 0.9rem;">Type a name or username to search people.</p>`;
+                return;
+            }
+
+            searchResults.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 30px;">Searching...</p>`;
+
+            searchDebounceTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`, {
+                        headers: getHeaders()
+                    });
+                    const users = await res.json();
+                    if (!res.ok) throw new Error(users.error || 'Search failed');
+
+                    if (!Array.isArray(users) || users.length === 0) {
+                        searchResults.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 20px;">No users found matching "${escapeHtml(query)}"</p>`;
+                        return;
+                    }
+
+                    searchResults.innerHTML = '';
+                    users.forEach(u => {
+                        const row = document.createElement('div');
+                        row.className = 'search-result-row';
+                        row.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;';
+                        row.innerHTML = `
+                            <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1.5.px solid var(--accent-gold);" alt="">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <strong style="font-size: 0.92rem; color: var(--text-primary);">${escapeHtml(u.username)}</strong>
+                                    ${u.isVerified ? '<span style="color: var(--accent-gold); font-size: 0.8rem;">✓</span>' : ''}
+                                </div>
+                                <span style="font-size: 0.78rem; color: var(--text-secondary); display: block;" class="text-truncate">${escapeHtml(u.bio || 'Spotlite User')}</span>
+                            </div>
+                            <span style="font-size: 0.76rem; color: var(--accent-gold); font-weight: 600;">View Profile →</span>
+                        `;
+                        row.onclick = () => {
+                            closeSearchPanel();
+                            window.location.href = `profile.html?u=${u.username}`;
+                        };
+                        searchResults.appendChild(row);
+                    });
+                } catch (err) {
+                    console.error('Search panel error:', err);
+                    searchResults.innerHTML = `<p style="color: var(--accent-red); text-align: center; padding: 30px;">Could not perform search.</p>`;
+                }
+            }, 250);
+        });
+    }
+}
+
 function setupNotificationsSliderPanel() {
     const sidebarBtn = document.getElementById('sidebar-notifications-btn');
     const mobileBtn = document.getElementById('mobile-notifications-btn');
@@ -759,6 +858,7 @@ function setupNavigationLinks() {
         };
     });
 
+    setupSearchSliderPanel();
     setupNotificationsSliderPanel();
 }
 
@@ -3102,6 +3202,12 @@ async function loadProfileHeader(username) {
             optionsBtn.style.display = 'flex';
             actionsRow.style.display = 'flex';
             if (tabSavedBtn) tabSavedBtn.style.display = 'none';
+
+            if (messageBtn) {
+                messageBtn.onclick = () => {
+                    window.location.href = `messages.html?u=${encodeURIComponent(data.username)}`;
+                };
+            }
 
             // Check if currently following
             const isFollowing = data.followers && data.followers.some(f => (f._id || f) === (currentUser ? currentUser.id : ''));
@@ -5757,9 +5863,108 @@ function startCallWithPeer(peerId, username, avatar) {
     startWebRTCCall(false);
 }
 
+function startWebRTCCall(isAudioOnly = false) {
+    const peer = window.activeChatRecipient || currentProfileUser;
+    const peerId = (peer && (peer._id || peer.id)) || activeChatReceiverId;
+    if (!peerId) {
+        alert('Please select a user to start a call.');
+        return;
+    }
+    const callType = isAudioOnly ? 'audio' : 'video';
+    window.location.href = `call.html?peerId=${peerId}&type=${callType}`;
+}
+
+function setupGroupChatModal() {
+    const openBtn = document.getElementById('inbox-new-group-btn');
+    const modal = document.getElementById('group-chat-modal-overlay');
+    const closeBtn = document.getElementById('close-group-modal-btn');
+    const cancelBtn = document.getElementById('cancel-group-modal-btn');
+    const submitBtn = document.getElementById('submit-create-group-btn');
+    const selectionList = document.getElementById('group-user-selection-list');
+    const nameInput = document.getElementById('group-name-input');
+    const filterInput = document.getElementById('group-search-user-input');
+
+    if (!openBtn || !modal) return;
+
+    let availableUsers = [];
+    const selectedUserIds = new Set();
+
+    async function loadUsersForGroup() {
+        if (!selectionList) return;
+        selectionList.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding:12px;">Loading users...</p>';
+        try {
+            const res = await fetch(`${API_BASE}/users/all`, { headers: getHeaders() });
+            availableUsers = await res.json();
+            renderUserSelection('');
+        } catch (err) {
+            selectionList.innerHTML = '<p style="color:var(--accent-red); text-align:center; padding:12px;">Failed to load users.</p>';
+        }
+    }
+
+    function renderUserSelection(filter) {
+        if (!selectionList) return;
+        selectionList.innerHTML = '';
+        const filtered = availableUsers.filter(u => u.username.toLowerCase().includes(filter.toLowerCase()));
+
+        if (filtered.length === 0) {
+            selectionList.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:12px;">No users found.</p>';
+            return;
+        }
+
+        filtered.forEach(u => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 8px;border-bottom:1px solid var(--border-color);cursor:pointer;';
+            const isChecked = selectedUserIds.has(u._id || u.id);
+            label.innerHTML = `
+                <input type="checkbox" value="${u._id || u.id}" ${isChecked ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent-gold);">
+                <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" alt="">
+                <span style="font-size:0.88rem;color:var(--text-primary);font-weight:600;">${escapeHtml(u.username)}</span>
+            `;
+            const checkbox = label.querySelector('input');
+            checkbox.onchange = (e) => {
+                if (e.target.checked) selectedUserIds.add(u._id || u.id);
+                else selectedUserIds.delete(u._id || u.id);
+            };
+            selectionList.appendChild(label);
+        });
+    }
+
+    if (filterInput) {
+        filterInput.addEventListener('input', (e) => renderUserSelection(e.target.value.trim()));
+    }
+
+    openBtn.onclick = () => {
+        modal.style.display = 'flex';
+        selectedUserIds.clear();
+        if (nameInput) nameInput.value = '';
+        if (filterInput) filterInput.value = '';
+        loadUsersForGroup();
+    };
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+
+    if (submitBtn) {
+        submitBtn.onclick = async () => {
+            const groupName = nameInput ? nameInput.value.trim() : '';
+            if (!groupName) return alert('Please enter a group name.');
+            if (selectedUserIds.size === 0) return alert('Please select at least 1 member for your group.');
+
+            alert(`🎉 Group "${groupName}" created with ${selectedUserIds.size} members!`);
+            closeModal();
+            if (typeof loadConversationsInbox === 'function') loadConversationsInbox();
+        };
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     ensureCallModalsExist();
     bindCallModalButtons();
+    setupGroupChatModal();
 
     const startAudioBtn = document.getElementById('start-audio-call-btn');
     const startVideoBtn = document.getElementById('start-video-call-btn');

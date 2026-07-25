@@ -151,7 +151,6 @@
                             <div id="profile-badges-container" style="display: flex; gap: 6px; margin-left: 10px; align-items: center;"></div>
                             <!-- My profile: edit button -->
                             <button class="edit-profile-btn" id="open-edit-profile-btn" style="display: none;">Edit Profile</button>
-                            <button class="profile-logout-btn" id="profile-logout-btn" style="display: none;">🚪 Log Out</button>
                             <!-- Other profile: three-dot menu -->
                             <button class="profile-options-btn" id="profile-options-btn" style="display: none;">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
@@ -297,6 +296,10 @@
                     <div class="qa-list" id="profile-qa-list">
                         <!-- Loaded dynamically -->
                     </div>
+                </div>
+                <!-- Profile Bottom Left Action Bar -->
+                <div class="profile-bottom-logout-bar">
+                    <button class="profile-logout-btn" id="profile-logout-btn" style="display: none;">🚪 Log Out Account</button>
                 </div>
             </div>
         </main>
@@ -735,6 +738,20 @@
                     <button class="comment-submit-btn" id="detail-comment-submit-btn">Post</button>
                 </div>
             </div>
+        </div>
+    <!-- SEARCH SLIDER PANEL / DRAWER -->
+    <div class="search-slider-panel" id="search-slider-panel" role="dialog" aria-modal="true">
+        <div class="search-panel-header">
+            <div class="search-input-wrapper">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="search-panel-input" placeholder="Search people on Spotlite..." autocomplete="off">
+            </div>
+            <button id="close-search-panel-btn" class="search-panel-close-btn">&times;</button>
+        </div>
+        <div class="search-panel-results" id="search-panel-results">
+            <p style="color: var(--text-muted); text-align: center; padding: 40px 20px; font-size: 0.9rem;">
+                Type a name or username to search people.
+            </p>
         </div>
     </div>
 

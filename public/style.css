@@ -4423,22 +4423,33 @@ body.mode-oled {
     }
 }
 
-/* ── PROFILE LOGOUT BUTTON ── */
+/* ── PROFILE BOTTOM-LEFT LOGOUT BUTTON ── */
+.profile-bottom-logout-bar {
+    margin-top: 30px;
+    padding: 16px 0 40px 0;
+    display: flex;
+    justify-content: flex-start;
+    border-top: 1px solid var(--border-color);
+}
+
 .profile-logout-btn {
-    background: rgba(234, 0, 56, 0.1);
-    border: 1px solid var(--accent-red);
+    background: rgba(234, 0, 56, 0.12);
+    border: 1.5px solid var(--accent-red);
     color: var(--accent-red);
-    border-radius: 8px;
-    padding: 7px 16px;
-    font-size: 0.88rem;
+    border-radius: 12px;
+    padding: 10px 22px;
+    font-size: 0.92rem;
     font-weight: 700;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     transition: all 0.2s ease;
-    margin-left: 8px;
 }
 
 .profile-logout-btn:hover {
     background: var(--accent-red);
     color: #ffffff;
-    box-shadow: 0 4px 15px rgba(234, 0, 56, 0.4);
+    box-shadow: 0 6px 20px rgba(234, 0, 56, 0.4);
+    transform: translateY(-2px);
 }
