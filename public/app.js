@@ -584,6 +584,19 @@ function setupKeyboardShortcuts() {
     });
 }
 
+// Helper: Get clean readable notification text
+function getNotificationText(n) {
+    if (n.text) return n.text;
+    switch (n.type) {
+        case 'like': return 'liked your post.';
+        case 'comment': return 'commented on your post.';
+        case 'follow': return 'started following you.';
+        case 'mention': return 'mentioned you in a post.';
+        case 'message': return 'sent you a message.';
+        default: return 'sent a notification.';
+    }
+}
+
 function setupNotificationsSliderPanel() {
     const sidebarBtn = document.getElementById('sidebar-notifications-btn');
     const mobileBtn = document.getElementById('mobile-notifications-btn');
@@ -603,9 +616,9 @@ function setupNotificationsSliderPanel() {
                 headers: getHeaders()
             });
             const notifications = await res.json();
-            if (!res.ok) throw new Error(notifications.error);
+            if (!res.ok) throw new Error(notifications.error || 'Failed to fetch notifications');
 
-            if (notifications.length === 0) {
+            if (!Array.isArray(notifications) || notifications.length === 0) {
                 list.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">No notifications yet.</div>`;
                 return;
             }
@@ -616,15 +629,19 @@ function setupNotificationsSliderPanel() {
                 row.className = `notification-item ${n.isRead ? '' : 'unread'}`;
                 row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border-color);cursor:pointer;';
                 
+                const sender = n.sender || { username: 'Spotlite User', avatar: '' };
+                const senderUsername = sender.username || 'Spotlite User';
+                const senderAvatar = sender.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${senderUsername}`;
+
                 const relativeTime = formatTime(n.createdAt);
                 const text = getNotificationText(n);
                 
                 row.innerHTML = `
-                    <img src="${n.sender.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${n.sender.username}`}"
+                    <img src="${senderAvatar}"
                          style="width:42px;height:42px;border-radius:50%;object-fit:cover;" alt="">
                     <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
                         <span style="font-size:0.88rem;color:var(--text-primary);">
-                            <strong style="font-weight:600;" onclick="window.location.href='profile.html?u=${n.sender.username}'">${n.sender.username}</strong> ${text}
+                            <strong style="font-weight:600;" onclick="window.location.href='profile.html?u=${senderUsername}'">${escapeHtml(senderUsername)}</strong> ${escapeHtml(text)}
                         </span>
                         <span style="font-size:0.75rem;color:var(--text-muted);">${relativeTime}</span>
                     </div>
@@ -639,7 +656,7 @@ function setupNotificationsSliderPanel() {
                 } else if (n.type === 'follow') {
                     row.onclick = (e) => {
                         if (e.target.tagName !== 'STRONG') {
-                            window.location.href = `profile.html?u=${n.sender.username}`;
+                            window.location.href = `profile.html?u=${senderUsername}`;
                         }
                     };
                 }
@@ -3377,7 +3394,9 @@ function setupEditProfileModal() {
         modal.classList.remove('active');
     }
 
-    closeBtn.addEventListener('click', closeModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    const cancelBtn = document.getElementById('cancel-edit-profile-btn');
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
 
     // Click label to trigger file input
     fileLabel.addEventListener('click', () => fileInput.click());

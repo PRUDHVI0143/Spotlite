@@ -467,71 +467,90 @@
         </div>
     </div>
 
-    <!-- EDIT PROFILE MODAL -->
-    <div class="modal-overlay" id="edit-profile-modal-overlay">
+    <!-- EDIT PROFILE MODAL (Sleek Glassmorphism Redesign) -->
+    <div class="modal-overlay" id="edit-profile-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-profile-modal-title">
         <div class="modal-content edit-profile-modal">
-            <h3 style="font-size: 1.2rem; font-weight: 600; margin-bottom: 10px;">Edit Profile</h3>
-            <div class="edit-avatar-wrapper">
-                <img src="" alt="Avatar" class="edit-avatar-img" id="edit-avatar-preview">
-                <div class="edit-avatar-actions">
-                    <span class="avatar-upload-label" id="edit-avatar-file-label">Upload New Photo</span>
+            <!-- Modal Header -->
+            <div class="edit-profile-header">
+                <h3 id="edit-profile-modal-title">Edit Profile</h3>
+                <button class="modal-close-btn" id="close-edit-profile-btn" title="Close" aria-label="Close modal">
+                    <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="edit-profile-body">
+                <!-- Avatar Header Section -->
+                <div class="edit-avatar-compact-card">
+                    <div class="avatar-preview-wrapper" id="edit-avatar-file-label" title="Click to upload new photo">
+                        <img src="" alt="Avatar" class="edit-avatar-img" id="edit-avatar-preview">
+                        <div class="avatar-hover-overlay">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            <span>Change</span>
+                        </div>
+                    </div>
                     <input type="file" id="edit-avatar-file-input" accept="image/*" style="display: none;">
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">Or paste image URL below</p>
+                    <div style="flex: 1; min-width: 0;">
+                        <label for="edit-avatar-url" class="field-label-sm">Or Direct Image URL:</label>
+                        <input type="text" id="edit-avatar-url" class="compact-input" placeholder="https://example.com/avatar.jpg">
+                    </div>
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="edit-avatar-url">Avatar Image URL</label>
-                <input type="text" id="edit-avatar-url" placeholder="https://example.com/avatar.jpg">
-            </div>
 
-            <div class="form-group">
-                <label for="edit-bio">Bio</label>
-                <textarea id="edit-bio" placeholder="Write something about yourself..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="edit-bio-link">Custom Link</label>
-                <input type="text" id="edit-bio-link" placeholder="https://mywebsite.com">
-            </div>
-
-            <div class="form-group">
-                <label for="edit-github-url">GitHub Profile URL</label>
-                <input type="text" id="edit-github-url" placeholder="https://github.com/myusername">
-            </div>
-
-            <div class="form-group">
-                <label for="edit-tech-stack">Tech Stack (comma separated)</label>
-                <input type="text" id="edit-tech-stack" placeholder="HTML, CSS, JS, Node, React">
-            </div>
-
-            <div class="form-group">
-                <label for="edit-profile-theme">Profile Theme</label>
-                <select id="edit-profile-theme" style="background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; color: var(--text-primary); font-size: 0.95rem;">
-                    <option value="gold">Gold (Default) ✨</option>
-                    <option value="emerald">Emerald 💚</option>
-                    <option value="sapphire">Sapphire 💙</option>
-                    <option value="crimson">Crimson ❤️</option>
-                    <option value="purple">Royal Purple 💜</option>
-                </select>
-            </div>
-
-            <div class="privacy-toggle-wrapper" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
-                <div class="privacy-label">
-                    <span class="privacy-title">Spotlight Mode</span>
-                    <span class="privacy-desc">Limit yourself to sharing only one post per day.</span>
+                <!-- Form Section: Bio & Links -->
+                <div class="form-section-title">👤 Profile Details</div>
+                
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label for="edit-bio" class="field-label-sm">Bio</label>
+                    <textarea id="edit-bio" class="compact-textarea" placeholder="Write something about yourself..." rows="3"></textarea>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="edit-spotlight-mode">
-                    <span class="slider"></span>
-                </label>
+
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label for="edit-bio-link" class="field-label-sm">Website / Link</label>
+                        <input type="text" id="edit-bio-link" class="compact-input" placeholder="https://mywebsite.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-github-url" class="field-label-sm">GitHub Profile</label>
+                        <input type="text" id="edit-github-url" class="compact-input" placeholder="https://github.com/username">
+                    </div>
+                </div>
+
+                <div class="form-section-title" style="margin-top: 14px;">🎨 Customization & Developer</div>
+
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label for="edit-tech-stack" class="field-label-sm">Tech Stack</label>
+                        <input type="text" id="edit-tech-stack" class="compact-input" placeholder="HTML, CSS, JS, Node, React">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-profile-theme" class="field-label-sm">Profile Theme Accent</label>
+                        <select id="edit-profile-theme" class="compact-select">
+                            <option value="gold">Warm Gold ✨</option>
+                            <option value="emerald">Emerald Mint 💚</option>
+                            <option value="sapphire">Sapphire Blue 💙</option>
+                            <option value="crimson">Crimson Red ❤️</option>
+                            <option value="purple">Royal Purple 💜</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="privacy-toggle-wrapper" style="margin-top: 12px; padding: 10px 14px; background: rgba(255,203,5,0.05); border: 1px solid var(--border-color); border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <div class="privacy-label">
+                        <span class="privacy-title" style="font-size: 0.88rem; font-weight: 700; color: var(--accent-gold);">⚡ Spotlight Mode</span>
+                        <span class="privacy-desc" style="font-size: 0.78rem; color: var(--text-secondary); display: block;">Limit to sharing 1 post per day.</span>
+                    </div>
+                    <label class="switch" style="transform: scale(0.85); margin: 0;">
+                        <input type="checkbox" id="edit-spotlight-mode">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="error-message" id="edit-profile-error" style="display: none; margin-top: 10px; color: var(--accent-red); font-size: 0.82rem;"></div>
             </div>
 
-            <div class="error-message" id="edit-profile-error">Error placeholder</div>
-
-            <div class="edit-profile-actions">
-                <button class="btn-secondary" id="close-edit-profile-btn">Cancel</button>
-                <button class="btn-primary" id="save-profile-btn" style="margin-top: 0; padding: 10px 20px;">Save</button>
+            <!-- Footer Action Bar -->
+            <div class="edit-profile-footer">
+                <button type="button" class="btn-cancel" id="cancel-edit-profile-btn">Cancel</button>
+                <button type="button" class="btn-save-glow" id="save-profile-btn">Save Changes ✨</button>
             </div>
         </div>
     </div>
