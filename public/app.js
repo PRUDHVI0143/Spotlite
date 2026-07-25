@@ -6016,8 +6016,8 @@ async function toggleScreenShare() {
 // =============================================================
 // MESSAGES PAGE & REAL-TIME CHAT LOGIC (messages.html)
 // =============================================================
-if (typeof activeChatReceiverId === 'undefined') var activeChatReceiverId = null;
-if (typeof activeChatRecipient === 'undefined') var activeChatRecipient = null;
+window.activeChatReceiverId = window.activeChatReceiverId || null;
+window.activeChatRecipient = window.activeChatRecipient || null;
 
 async function initMessagesPage() {
     setupNavigationLinks();
@@ -6133,8 +6133,7 @@ async function loadConversationsInbox() {
 }
 
 async function openChatWithUser(user) {
-    activeChatReceiverId = user._id || user.id;
-    activeChatRecipient = user;
+    window.activeChatReceiverId = user._id || user.id;
     window.activeChatRecipient = user;
 
     const emptyState = document.getElementById('chat-empty-state');
@@ -6151,7 +6150,7 @@ async function openChatWithUser(user) {
 
     if (layout) layout.classList.add('mobile-chat-open');
 
-    await loadChatMessages(activeChatReceiverId);
+    await loadChatMessages(window.activeChatReceiverId);
 }
 
 async function loadChatMessages(userId) {
@@ -6207,7 +6206,7 @@ function scrollChatToBottom() {
 }
 
 async function sendChatMessage(customText = null) {
-    if (!activeChatReceiverId) return;
+    if (!window.activeChatReceiverId) return;
 
     const textInput = document.getElementById('chat-text-input');
     const text = customText || (textInput ? textInput.value.trim() : '');
@@ -6217,7 +6216,7 @@ async function sendChatMessage(customText = null) {
         const res = await fetch(`${API_BASE}/messages`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({ receiverId: activeChatReceiverId, text })
+            body: JSON.stringify({ receiverId: window.activeChatReceiverId, text })
         });
         const newMsg = await res.json();
         if (!res.ok) throw new Error(newMsg.error);
@@ -6243,7 +6242,7 @@ function handleChatFileSelect(e) {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify({
-                    receiverId: activeChatReceiverId,
+                    receiverId: window.activeChatReceiverId,
                     fileUrl: base64Data,
                     fileName: file.name,
                     fileType: file.type,
