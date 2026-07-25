@@ -901,6 +901,35 @@ function setupCreatePostModal() {
 }
 
 // =============================================================
+// HOME FEED & PAGE INITIALIZERS (index.html, admin.html, call.html)
+// =============================================================
+async function initFeedPage() {
+    setupNavigationLinks();
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    if (!currentUser) {
+        window.location.href = 'auth.html';
+        return;
+    }
+    if (typeof loadFeedPosts === 'function') {
+        loadFeedPosts();
+    }
+    if (typeof loadStoriesBar === 'function') {
+        loadStoriesBar();
+    }
+}
+
+async function initAdminPage() {
+    setupNavigationLinks();
+    if (typeof loadAdminDashboard === 'function') {
+        loadAdminDashboard();
+    }
+}
+
+function initCallPage() {
+    setupNavigationLinks();
+}
+
+// =============================================================
 // AUTHENTICATION LOGIC (auth.html)
 // =============================================================
 function initAuthPage() {
