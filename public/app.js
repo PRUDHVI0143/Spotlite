@@ -823,11 +823,16 @@ function setupNavigationLinks() {
     }
 
     if (currentUser && currentUser.username) {
-        const sidebarProfile = document.getElementById('sidebar-profile-link');
-        const mobileProfile = document.getElementById('mobile-profile-link');
-
-        if (sidebarProfile) sidebarProfile.href = `profile.html?u=${currentUser.username}`;
-        if (mobileProfile) mobileProfile.href = `profile.html?u=${currentUser.username}`;
+        document.querySelectorAll('#sidebar-profile-link, #mobile-profile-link, [aria-label="Profile"]').forEach(link => {
+            if (link.tagName === 'A') {
+                link.href = `profile.html?u=${currentUser.username}`;
+            } else {
+                link.onclick = (e) => {
+                    e.preventDefault();
+                    window.location.href = `profile.html?u=${currentUser.username}`;
+                };
+            }
+        });
 
         const userNav = document.getElementById('current-user-nav');
         if (userNav) {
@@ -835,26 +840,48 @@ function setupNavigationLinks() {
                 window.location.href = `profile.html?u=${currentUser.username}`;
             };
         }
+    } else {
+        document.querySelectorAll('#sidebar-profile-link, #mobile-profile-link, [aria-label="Profile"]').forEach(link => {
+            link.onclick = (e) => {
+                e.preventDefault();
+                window.location.href = 'auth.html';
+            };
+        });
     }
 
     // Wire mobile & sidebar search buttons
-    document.querySelectorAll('#mobile-search-btn, #sidebar-search-btn').forEach(btn => {
+    document.querySelectorAll('#mobile-search-btn, #sidebar-search-btn, [aria-label="Search"]').forEach(btn => {
         btn.onclick = (e) => {
+            e.preventDefault();
             e.stopPropagation();
             const searchPanel = document.getElementById('search-slider-panel');
             if (searchPanel) {
                 searchPanel.classList.add('active');
-                const searchInput = document.getElementById('search-panel-input');
+                const searchInput = document.getElementById('search-panel-input') || document.getElementById('search-users-input');
                 if (searchInput) searchInput.focus();
             }
         };
     });
 
-    // Wire mobile & sidebar settings buttons
-    document.querySelectorAll('#mobile-settings-btn, #sidebar-settings-btn').forEach(btn => {
+    // Wire mobile & sidebar notification buttons
+    document.querySelectorAll('#mobile-notifications-btn, #sidebar-notifications-btn, [aria-label="Notifications"]').forEach(btn => {
         btn.onclick = (e) => {
+            e.preventDefault();
             e.stopPropagation();
-            const settingsModal = document.getElementById('settings-modal');
+            const notifPanel = document.getElementById('notifications-slider-panel');
+            if (notifPanel) {
+                notifPanel.classList.add('active');
+                if (typeof loadUserNotifications === 'function') loadUserNotifications();
+            }
+        };
+    });
+
+    // Wire mobile & sidebar settings buttons
+    document.querySelectorAll('#mobile-settings-btn, #sidebar-settings-btn, #open-settings-btn, [aria-label="Settings"]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const settingsModal = document.getElementById('settings-modal') || document.getElementById('settings-modal-overlay');
             if (settingsModal) {
                 settingsModal.style.display = 'flex';
             }
@@ -868,8 +895,8 @@ function setupNavigationLinks() {
 }
 
 function setupSettingsModal() {
-    const modal = document.getElementById('settings-modal');
-    const closeBtn = document.getElementById('close-settings-modal-btn');
+    const modal = document.getElementById('settings-modal') || document.getElementById('settings-modal-overlay');
+    const closeBtn = document.getElementById('close-settings-modal-btn') || document.getElementById('close-settings-btn');
     const saveBtn = document.getElementById('save-settings-btn');
 
     if (!modal) return;
@@ -890,8 +917,9 @@ function setupCreatePostModal() {
 
     if (!modal) return;
 
-    document.querySelectorAll('#sidebar-create-btn, #open-create-modal, .bottom-create-btn, #empty-state-new-post-btn').forEach(btn => {
+    document.querySelectorAll('#sidebar-create-btn, #open-create-modal, #open-create-btn, .bottom-create-btn, #empty-state-new-post-btn, [aria-label="Create Post"]').forEach(btn => {
         btn.onclick = (e) => {
+            e.preventDefault();
             e.stopPropagation();
             modal.style.display = 'flex';
         };

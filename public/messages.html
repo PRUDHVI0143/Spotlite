@@ -450,6 +450,8 @@
             0%, 100% { transform: translateY(0); }
             50%       { transform: translateY(-6px); }
         }
+    </style>
+
     <!-- SEARCH SLIDER PANEL / DRAWER -->
     <div class="search-slider-panel" id="search-slider-panel" role="dialog" aria-modal="true">
         <div class="search-panel-header">
@@ -527,6 +529,39 @@
                     <a href="auth.html" style="color: var(--accent-red); font-weight: 700; font-size: 0.88rem; text-decoration: none;">🚪 Log Out Account</a>
                     <button id="save-settings-btn" class="btn-save-glow">Save Preferences ✨</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATIONS PANEL SLIDEOUT -->
+    <div class="notifications-slider-panel" id="notifications-slider-panel">
+        <h2 class="search-header">Notifications</h2>
+        <div class="notifications-list" id="notifications-list">
+            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                No notifications yet.
+            </div>
+        </div>
+    </div>
+
+    <!-- CREATE POST MODAL -->
+    <div class="modal-overlay" id="create-post-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="create-post-title" style="display: none;">
+        <div class="modal-content create-post-modal">
+            <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="modal-close-btn" id="close-create-modal" title="Close" aria-label="Close modal">
+                        <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                    <h3 class="modal-title" id="create-post-title" style="margin: 0; font-size: 1rem; font-weight: 700;">Create new post</h3>
+                </div>
+                <button class="modal-next-btn" id="submit-post-btn">Share ✨</button>
+            </div>
+            <div class="drag-drop-area" id="drop-area" style="padding: 30px; text-align: center;">
+                <p style="margin-top: 10px; font-weight: 600; font-size: 0.95rem;">Select a photo to create post</p>
+                <label for="post-file-input" style="display: inline-block; margin-top: 10px; color: var(--accent-gold); font-weight: 700; cursor: pointer; font-size: 0.9rem;">Select from computer</label>
+                <input type="file" id="post-file-input" accept="image/*" style="display: none;">
+            </div>
+            <div class="modal-caption-area" id="caption-area" style="padding: 16px;">
+                <textarea class="caption-textarea" id="post-caption-input" placeholder="Write a caption..."></textarea>
             </div>
         </div>
     </div>
