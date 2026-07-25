@@ -815,28 +815,32 @@ if (logoutBtn) {
 
 // --- SETUP SIDEBAR / MOBILE PROFILE LINKS ---
 function setupNavigationLinks() {
-    const currentUser = JSON.parse(localStorage.getItem('user'));
-    if (!currentUser || !currentUser.username) return;
-
-    const sidebarProfile = document.getElementById('sidebar-profile-link');
-    const mobileProfile = document.getElementById('mobile-profile-link');
-
-    if (sidebarProfile) sidebarProfile.href = `profile.html?u=${currentUser.username}`;
-    if (mobileProfile) mobileProfile.href = `profile.html?u=${currentUser.username}`;
-
-    // Also link user card on the feed page
-    const userNav = document.getElementById('current-user-nav');
-    if (userNav) {
-        userNav.addEventListener('click', () => {
-            if (currentUser && currentUser.username) {
-                window.location.href = `profile.html?u=${currentUser.username}`;
-            }
-        });
+    let currentUser = null;
+    try {
+        currentUser = JSON.parse(localStorage.getItem('user'));
+    } catch (e) {
+        console.warn('Failed to parse currentUser:', e);
     }
 
-    // Wire mobile search button
-    document.querySelectorAll('#mobile-search-btn').forEach(btn => {
-        btn.onclick = () => {
+    if (currentUser && currentUser.username) {
+        const sidebarProfile = document.getElementById('sidebar-profile-link');
+        const mobileProfile = document.getElementById('mobile-profile-link');
+
+        if (sidebarProfile) sidebarProfile.href = `profile.html?u=${currentUser.username}`;
+        if (mobileProfile) mobileProfile.href = `profile.html?u=${currentUser.username}`;
+
+        const userNav = document.getElementById('current-user-nav');
+        if (userNav) {
+            userNav.onclick = () => {
+                window.location.href = `profile.html?u=${currentUser.username}`;
+            };
+        }
+    }
+
+    // Wire mobile & sidebar search buttons
+    document.querySelectorAll('#mobile-search-btn, #sidebar-search-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
             const searchPanel = document.getElementById('search-slider-panel');
             if (searchPanel) {
                 searchPanel.classList.add('active');
@@ -846,9 +850,10 @@ function setupNavigationLinks() {
         };
     });
 
-    // Wire mobile settings button
+    // Wire mobile & sidebar settings buttons
     document.querySelectorAll('#mobile-settings-btn, #sidebar-settings-btn').forEach(btn => {
-        btn.onclick = () => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
             const settingsModal = document.getElementById('settings-modal');
             if (settingsModal) {
                 settingsModal.style.display = 'flex';
@@ -859,6 +864,7 @@ function setupNavigationLinks() {
     setupSearchSliderPanel();
     setupNotificationsSliderPanel();
     setupSettingsModal();
+    setupCreatePostModal();
 }
 
 function setupSettingsModal() {
@@ -876,6 +882,22 @@ function setupSettingsModal() {
             modal.style.display = 'none';
         };
     }
+}
+
+function setupCreatePostModal() {
+    const modal = document.getElementById('create-post-modal-overlay');
+    const closeBtn = document.getElementById('close-create-modal');
+
+    if (!modal) return;
+
+    document.querySelectorAll('#sidebar-create-btn, #open-create-modal, .bottom-create-btn, #empty-state-new-post-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            modal.style.display = 'flex';
+        };
+    });
+
+    if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
 }
 
 // =============================================================
