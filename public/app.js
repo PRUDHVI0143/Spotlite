@@ -5988,8 +5988,8 @@ async function toggleScreenShare() {
 // =============================================================
 // MESSAGES PAGE & REAL-TIME CHAT LOGIC (messages.html)
 // =============================================================
-let activeChatReceiverId = null;
-let activeChatRecipient = null;
+if (typeof activeChatReceiverId === 'undefined') var activeChatReceiverId = null;
+if (typeof activeChatRecipient === 'undefined') var activeChatRecipient = null;
 
 async function initMessagesPage() {
     setupNavigationLinks();
