@@ -520,7 +520,7 @@
             <!-- Right Side: Metadata, Likes, comments list -->
             <div class="detail-comment-side">
                 <!-- Header -->
-                <div class="post-header" style="border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 14px 18px;">
+                <div class="post-header" style="border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; flex-shrink: 0;">
                     <div class="post-author-info" id="detail-author-nav" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
                         <img src="" alt="Avatar" class="post-avatar" id="detail-post-avatar">
                         <div style="display: flex; flex-direction: column;">
@@ -536,17 +536,30 @@
                 </div>
 
                 <!-- Action Bar -->
-                <div class="post-actions" style="border-top: 1px solid var(--border-color); padding: 10px 16px 4px 16px;">
-                    <div class="post-actions-left">
+                <div class="post-actions" style="border-top: 1px solid var(--border-color); padding: 10px 16px 4px 16px; flex-shrink: 0;">
+                    <div class="post-actions-left" style="display: flex; gap: 12px; align-items: center;">
                         <button class="action-btn" id="detail-like-btn" aria-label="Like Post">
                             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                         </button>
+                        <button class="action-btn" id="detail-share-btn" aria-label="Share Post">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                        </button>
                     </div>
                 </div>
-                <div class="post-likes-count" id="detail-likes-count" style="padding: 0 16px 10px 16px; font-weight: 600;">0 likes</div>
+                <div class="post-likes-count" id="detail-likes-count" style="padding: 0 16px 6px 16px; font-weight: 600; font-size: 0.85rem; flex-shrink: 0;">0 likes</div>
                 
+                <!-- Quick Emoji Bar -->
+                <div class="comment-emoji-bar" id="detail-emoji-bar" style="padding: 4px 16px 8px 16px; display: flex; gap: 8px; flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <span class="emoji-reaction-pill detail-emoji-pill" data-emoji="💖">💖</span>
+                    <span class="emoji-reaction-pill detail-emoji-pill" data-emoji="🔥">🔥</span>
+                    <span class="emoji-reaction-pill detail-emoji-pill" data-emoji="🤩">🤩</span>
+                    <span class="emoji-reaction-pill detail-emoji-pill" data-emoji="👏">👏</span>
+                    <span class="emoji-reaction-pill detail-emoji-pill" data-emoji="💯">💯</span>
+                    <span class="emoji-reaction-pill detail-emoji-pill" data-emoji="✨">✨</span>
+                </div>
+
                 <!-- Comment Input -->
-                <div class="comment-input-wrapper" style="border-top: 1px solid var(--border-color); padding: 12px 16px;">
+                <div class="comment-input-wrapper" style="border-top: 1px solid var(--border-color); padding: 12px 16px; flex-shrink: 0;">
                     <input type="text" class="comment-input" id="detail-comment-input" placeholder="Add a comment..." aria-label="Add a comment">
                     <button class="comment-submit-btn" id="detail-comment-submit-btn">Post</button>
                 </div>

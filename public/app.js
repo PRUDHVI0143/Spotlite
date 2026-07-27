@@ -3852,215 +3852,193 @@ async function openPostDetailModal(postId) {
     const detailImage = document.getElementById('detail-post-img');
     const detailAvatar = document.getElementById('detail-post-avatar');
     const detailUsername = document.getElementById('detail-post-username');
+    const catBadge = document.getElementById('detail-post-category-badge');
     const commentsList = document.getElementById('detail-comments-list');
     const likesCount = document.getElementById('detail-likes-count');
     const likeBtn = document.getElementById('detail-like-btn');
     const authorNav = document.getElementById('detail-author-nav');
+    const commentInput = document.getElementById('detail-comment-input');
+    const commentSubmit = document.getElementById('detail-comment-submit-btn');
+    const shareBtn = document.getElementById('detail-share-btn');
 
-    commentsList.innerHTML = '<p style="color: var(--text-secondary)">Loading comments...</p>';
-    authorNav.onclick = null; // Clear previous listener
+    if (commentsList) {
+        commentsList.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Loading post details...</p>';
+    }
 
     try {
-        // Use the new, efficient endpoint to get a single post
         const response = await fetch(`${API_BASE}/posts/${postId}`, { headers: getHeaders() });
         const targetPost = await response.json();
-
         if (!response.ok) throw new Error(targetPost.error || 'Post not found');
 
-        // Populate elements
-        detailImage.src = targetPost.image;
-        detailAvatar.src = targetPost.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${targetPost.author.username}`;
-        detailUsername.textContent = targetPost.author.username;
-        likesCount.textContent = `${targetPost.likes.length} likes`;
-
-        authorNav.onclick = () => {
-            window.location.href = `profile.html?u=${targetPost.author.username}`;
-        };
-
-        const currentUser = JSON.parse(localStorage.getItem('user'));
-        const isLiked = targetPost.likes.includes(currentUser ? currentUser.id : '');
-        likeBtn.classList.toggle('liked', isLiked);
-
-        // Render Comments (Caption first, then replies)
-        commentsList.innerHTML = ''; // Clear previous content
-
-        if (targetPost.caption) {
-            const captionEl = document.createElement('div');
-            captionEl.className = 'comment-item';
-            captionEl.style.borderBottom = '1px solid var(--border-color)';
-            captionEl.style.paddingBottom = '12px';
-            captionEl.style.marginBottom = '8px';
-            captionEl.innerHTML = `
-                <img src="${targetPost.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${targetPost.author.username}`}" class="comment-item-avatar" alt="">
-                <div>
-                    <span class="comment-username" onclick="window.location.href='profile.html?u=${targetPost.author.username}'">${targetPost.author.username}</span>
-                    <span class="comment-text">${escapeHtml(targetPost.caption)}</span>
-                    <div style="font-size:0.75rem; color: var(--text-muted); margin-top: 4px;">${formatTime(targetPost.createdAt)}</div>
-                </div>
-            `;
-            commentsList.appendChild(captionEl);
+        // Populate header & media
+        if (detailImage) detailImage.src = targetPost.image;
+        if (detailAvatar) {
+            detailAvatar.src = targetPost.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${targetPost.author.username}`;
+            detailAvatar.style.width = '38px';
+            detailAvatar.style.height = '38px';
+            detailAvatar.style.borderRadius = '50%';
+            detailAvatar.style.objectFit = 'cover';
+            detailAvatar.style.flexShrink = '0';
+        }
+        if (detailUsername) detailUsername.textContent = targetPost.author.username;
+        if (catBadge && typeof getCategoryBadgeHTML === 'function') {
+            catBadge.innerHTML = getCategoryBadgeHTML(targetPost.category);
         }
 
-        if (targetPost.comments.length > 0) {
-            targetPost.comments.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'comment-item';
-                div.style.position = 'relative';
-                
-                const author = c.user || { username: c.username }; // Fallback for old comments
-                const avatarSrc = author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${author.username}`;
-                
-                const commentUserObjectId = author._id || author.id || c.user;
-                const isCommentOwner = currentUser && (commentUserObjectId === currentUser.id);
-                const isPostOwner = currentUser && targetPost.author && ((targetPost.author._id || targetPost.author) === currentUser.id);
-                const isAdmin = currentUser && currentUser.isAdmin;
+        if (authorNav) {
+            authorNav.onclick = () => {
+                window.location.href = `profile.html?u=${targetPost.author.username}`;
+            };
+        }
 
-                div.innerHTML = `
-                    <img src="${avatarSrc}" class="comment-item-avatar" alt="">
-                    <div style="flex: 1; padding-right: 24px;">
-                        <span class="comment-username" onclick="window.location.href='profile.html?u=${author.username}'">${author.username}</span>
-                        <span class="comment-text" id="comment-text-${c._id}">${escapeHtml(c.text)}</span>
-                        <div style="font-size:0.75rem; color: var(--text-muted); margin-top: 4px;">${formatTime(c.createdAt || new Date())}</div>
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+        const likesArr = targetPost.likes || [];
+        const isLiked = likesArr.includes(currentUser ? (currentUser.id || currentUser._id) : '');
+
+        if (likeBtn) {
+            likeBtn.classList.toggle('liked', isLiked);
+            likeBtn.onclick = async () => {
+                try {
+                    const lRes = await fetch(`${API_BASE}/posts/${targetPost._id}/like`, {
+                        method: 'POST',
+                        headers: getHeaders()
+                    });
+                    const lData = await lRes.json();
+                    if (!lRes.ok) throw new Error(lData.error);
+                    openPostDetailModal(postId); // Refresh modal view
+                } catch (e) {
+                    alert(e.message);
+                }
+            };
+        }
+
+        if (likesCount) {
+            likesCount.textContent = `${likesArr.length} like${likesArr.length !== 1 ? 's' : ''}`;
+        }
+
+        if (shareBtn) {
+            shareBtn.onclick = () => {
+                openShareModal(targetPost._id, targetPost);
+            };
+        }
+
+        // Render Comments & Caption
+        if (commentsList) {
+            commentsList.innerHTML = ''; // Clear loading text
+
+            // Caption as top item
+            if (targetPost.caption) {
+                const captionEl = document.createElement('div');
+                captionEl.className = 'comment-item';
+                captionEl.style.borderBottom = '1px solid var(--border-color)';
+                captionEl.style.paddingBottom = '12px';
+                captionEl.style.marginBottom = '8px';
+                captionEl.innerHTML = `
+                    <img src="${targetPost.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${targetPost.author.username}`}" class="comment-item-avatar" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" alt="">
+                    <div style="flex: 1;">
+                        <span class="comment-username" style="font-weight: 700; color: var(--text-primary); cursor: pointer;" onclick="window.location.href='profile.html?u=${targetPost.author.username}'">${targetPost.author.username}</span>
+                        <span class="comment-text" style="color: var(--text-primary); margin-left: 6px;">${escapeHtml(targetPost.caption)}</span>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">${formatTime(targetPost.createdAt)}</div>
                     </div>
-                    ${(isCommentOwner || isPostOwner || isAdmin) ? `
-                    <button class="comment-options-btn" style="position: absolute; right: 4px; top: 12px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.85rem; padding: 4px;" title="Comment Options">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
-                    </button>
-                    ` : ''}
                 `;
-                commentsList.appendChild(div);
+                commentsList.appendChild(captionEl);
+            }
 
-                const commOptionsBtn = div.querySelector('.comment-options-btn');
-                if (commOptionsBtn) {
-                    commOptionsBtn.onclick = () => {
-                        const commOptions = [];
-                        
-                        if (isCommentOwner) {
-                            commOptions.push({
-                                label: 'Edit Comment',
-                                onClick: () => {
-                                    showPromptModal('Edit Comment', c.text, async (newText) => {
-                                        if (newText === '') return;
-                                        try {
-                                            const res = await fetch(`${API_BASE}/posts/${postId}/comments/${c._id}`, {
-                                                method: 'PUT',
-                                                headers: getHeaders(),
-                                                body: JSON.stringify({ text: newText })
-                                            });
-                                            const data = await res.json();
-                                            if (!res.ok) throw new Error(data.error);
-                                            
-                                            const commentTextEl = div.querySelector(`#comment-text-${c._id}`);
-                                            if (commentTextEl) commentTextEl.textContent = newText;
-                                            c.text = newText;
-                                        } catch (err) {
-                                            alert(err.message);
-                                        }
-                                    });
-                                }
-                            });
-                        }
+            const commentsArr = targetPost.comments || [];
+            if (commentsArr.length === 0) {
+                const emptyMsg = document.createElement('p');
+                emptyMsg.style.color = 'var(--text-muted)';
+                emptyMsg.style.textAlign = 'center';
+                emptyMsg.style.padding = '20px 0';
+                emptyMsg.style.fontSize = '0.85rem';
+                emptyMsg.textContent = 'No comments yet. Be the first to comment!';
+                commentsList.appendChild(emptyMsg);
+            } else {
+                commentsArr.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'comment-item';
+                    div.style.position = 'relative';
 
-                        if (isCommentOwner || isPostOwner || isAdmin) {
-                            commOptions.push({
-                                label: 'Delete Comment',
-                                danger: true,
-                                onClick: () => {
-                                    if (confirm('Are you sure you want to delete this comment?')) {
-                                        (async () => {
+                    const author = c.user || { username: c.username || 'user' };
+                    const avatarSrc = author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${author.username}`;
+                    const commentUserObjectId = author._id || author.id || c.user;
+                    const isCommentOwner = currentUser && (commentUserObjectId === currentUser.id || commentUserObjectId === currentUser._id);
+                    const isPostOwner = currentUser && targetPost.author && ((targetPost.author._id || targetPost.author) === (currentUser.id || currentUser._id));
+                    const isAdmin = currentUser && currentUser.isAdmin;
+
+                    div.innerHTML = `
+                        <img src="${avatarSrc}" class="comment-item-avatar" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" alt="">
+                        <div style="flex: 1; padding-right: 24px;">
+                            <span class="comment-username" style="font-weight: 700; color: var(--text-primary); cursor: pointer;" onclick="window.location.href='profile.html?u=${author.username}'">${author.username}</span>
+                            <span class="comment-text" id="comment-text-${c._id}" style="color: var(--text-primary); margin-left: 6px;">${escapeHtml(c.text)}</span>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">${formatTime(c.createdAt || targetPost.createdAt)}</div>
+                        </div>
+                        ${(isCommentOwner || isPostOwner || isAdmin) ? `
+                        <button class="comment-options-btn" style="position: absolute; right: 4px; top: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Comment Options">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                        </button>
+                        ` : ''}
+                    `;
+                    commentsList.appendChild(div);
+
+                    const commOptionsBtn = div.querySelector('.comment-options-btn');
+                    if (commOptionsBtn) {
+                        commOptionsBtn.onclick = () => {
+                            const commOptions = [];
+                            if (isCommentOwner) {
+                                commOptions.push({
+                                    label: 'Edit Comment',
+                                    onClick: () => {
+                                        showPromptModal('Edit Comment', c.text, async (newText) => {
                                             try {
                                                 const res = await fetch(`${API_BASE}/posts/${postId}/comments/${c._id}`, {
-                                                    method: 'DELETE',
-                                                    headers: getHeaders()
+                                                    method: 'PUT',
+                                                    headers: getHeaders(),
+                                                    body: JSON.stringify({ text: newText })
                                                 });
                                                 const data = await res.json();
                                                 if (!res.ok) throw new Error(data.error);
-                                                
-                                                div.remove();
-                                                loadFeedPosts();
-                                            } catch (err) {
-                                                alert(err.message);
+                                                const commentTextEl = div.querySelector(`#comment-text-${c._id}`);
+                                                if (commentTextEl) commentTextEl.textContent = newText;
+                                                c.text = newText;
+                                            } catch (e) {
+                                                alert(e.message);
                                             }
-                                        })();
+                                        });
                                     }
-                                }
-                            });
-                        }
-
-                        showActionMenu(commOptions);
-                    };
-                }
-            });
-        } else if (!targetPost.caption) {
-            commentsList.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No comments yet.</p>';
+                                });
+                            }
+                            if (isCommentOwner || isPostOwner || isAdmin) {
+                                commOptions.push({
+                                    label: 'Delete Comment',
+                                    danger: true,
+                                    onClick: () => {
+                                        if (confirm('Are you sure you want to delete this comment?')) {
+                                            (async () => {
+                                                try {
+                                                    const res = await fetch(`${API_BASE}/posts/${postId}/comment/${c._id}`, {
+                                                        method: 'DELETE',
+                                                        headers: getHeaders()
+                                                    });
+                                                    const data = await res.json();
+                                                    if (!res.ok) throw new Error(data.error);
+                                                    div.remove();
+                                                } catch (e) {
+                                                    alert(e.message);
+                                                }
+                                            })();
+                                        }
+                                    }
+                                });
+                            }
+                            showActionMenu(commOptions);
+                        };
+                    }
+                });
+            }
         }
 
         // Setup comment posting inside detail modal
-        const commentInput = document.getElementById('detail-comment-input');
-        const commentSubmit = document.getElementById('detail-comment-submit-btn');
-
-        // Reset submit button state
-        commentSubmit.classList.remove('active');
-        commentInput.value = '';
-
-        commentInput.oninput = () => {
-            commentSubmit.classList.toggle('active', commentInput.value.trim() !== '');
-        };
-
-        async function submitModalComment() {
-            const text = commentInput.value.trim();
-            if (text === '') return;
-
-            try {
-                const response = await fetch(`${API_BASE}/posts/${postId}/comment`, {
-                    method: 'POST',
-                    headers: getHeaders(),
-                    body: JSON.stringify({ text })
-                });
-
-                const newComment = await response.json();
-                if (!response.ok) throw new Error(newComment.error);
-
-                commentInput.value = '';
-                commentSubmit.classList.remove('active');
-
-                // Append comment in modal view
-                const div = document.createElement('div');
-                div.className = 'comment-item';
-                const me = JSON.parse(localStorage.getItem('user'));
-                div.innerHTML = `
-                    <img src="${me.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${me.username}`}" class="comment-item-avatar" alt="">
-                    <div>
-                        <span class="comment-username" onclick="window.location.href='profile.html?u=${newComment.username}'">${newComment.username}</span>
-                        <span class="comment-text">${escapeHtml(newComment.text)}</span>
-                        <div style="font-size:0.75rem; color: var(--text-muted); margin-top: 4px;">Just now</div>
-                    </div>
-                `;
-                commentsList.appendChild(div);
-
-                // Refresh parent page feed/grid
-                if (window.location.pathname.includes('profile.html')) {
-                    loadProfileGrid();
-                } else {
-                    loadFeedPosts();
-                }
-            } catch (err) {
-                alert(err.message);
-            }
-        }
-
-        // Click to submit
-        commentSubmit.onclick = submitModalComment;
-
-        // Enter to submit
-        commentInput.onkeypress = (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                submitModalComment();
-            }
-        };
-
-        // Setup like inside detail modal
         // Use a named function to be able to remove the listener later if needed
         likeBtn.onclick = async () => {
             try {
@@ -4637,130 +4615,7 @@ async function sendMessage() {
     }
 }
 
-// -------------------------------------------------------------
-// POST DETAIL MODAL (SINGLE POST VIEW)
-// -------------------------------------------------------------
-async function openPostDetailModal(postId) {
-    const modal = document.getElementById('post-detail-modal-overlay');
-    if (!modal) return;
-
-    const img = document.getElementById('detail-post-img');
-    const avatar = document.getElementById('detail-post-avatar');
-    const username = document.getElementById('detail-post-username');
-    const catBadge = document.getElementById('detail-post-category-badge');
-    const commentsList = document.getElementById('detail-comments-list');
-    const likesCount = document.getElementById('detail-likes-count');
-    const likeBtn = document.getElementById('detail-like-btn');
-    const commentInput = document.getElementById('detail-comment-input');
-    const commentSubmit = document.getElementById('detail-comment-submit-btn');
-    const authorNav = document.getElementById('detail-author-nav');
-
-    if (commentsList) commentsList.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">Loading post details...</p>';
-    modal.classList.add('active');
-
-    try {
-        const response = await fetch(`${API_BASE}/posts/single/${postId}`, { headers: getHeaders() });
-        const post = await response.json();
-        if (!response.ok) throw new Error(post.error || 'Failed to load post');
-
-        if (img) img.src = post.image;
-        if (avatar) avatar.src = post.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${post.author.username}`;
-        if (username) username.textContent = post.author.username;
-        if (catBadge) catBadge.innerHTML = getCategoryBadgeHTML(post.category);
-
-        if (authorNav) {
-            authorNav.onclick = () => {
-                window.location.href = `profile.html?u=${post.author.username}`;
-            };
-        }
-
-        const currentUser = JSON.parse(localStorage.getItem('user'));
-        const isLiked = post.likes ? post.likes.includes(currentUser ? currentUser.id : '') : false;
-
-        if (likeBtn) {
-            likeBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="${isLiked ? 'var(--accent-red)' : 'none'}" stroke="${isLiked ? 'var(--accent-red)' : 'currentColor'}" stroke-width="2">
-                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                </svg>
-            `;
-            likeBtn.onclick = async () => {
-                try {
-                    const lRes = await fetch(`${API_BASE}/posts/${post._id}/like`, {
-                        method: 'POST',
-                        headers: getHeaders()
-                    });
-                    const lData = await lRes.json();
-                    if (!lRes.ok) throw new Error(lData.error);
-                    openPostDetailModal(postId); // Refresh modal
-                } catch (e) {
-                    alert(e.message);
-                }
-            };
-        }
-
-        if (likesCount) likesCount.textContent = `${post.likes ? post.likes.length : 0} like${(post.likes && post.likes.length !== 1) ? 's' : ''}`;
-
-        // Render Comments and Caption
-        if (commentsList) {
-            commentsList.innerHTML = `
-                <div style="display:flex;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border-color);">
-                    <img src="${post.author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${post.author.username}`}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="">
-                    <div>
-                        <span style="font-weight:700;color:var(--text-primary);margin-right:6px;">${post.author.username}</span>
-                        <span style="color:var(--text-primary);">${escapeHtml(post.caption || '')}</span>
-                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">${formatTime(post.createdAt)}</div>
-                    </div>
-                </div>
-            `;
-
-            if (!post.comments || post.comments.length === 0) {
-                commentsList.innerHTML += `<p style="color:var(--text-muted);text-align:center;padding:20px 0;font-size:0.85rem;">No comments yet. Be the first to comment!</p>`;
-            } else {
-                post.comments.forEach(c => {
-                    const cAuthor = c.author || { username: 'user', avatar: '' };
-                    const cDiv = document.createElement('div');
-                    cDiv.style.cssText = 'display:flex;gap:12px;align-items:flex-start;';
-                    cDiv.innerHTML = `
-                        <img src="${cAuthor.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${cAuthor.username}`}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" alt="">
-                        <div style="flex:1;">
-                            <span style="font-weight:600;color:var(--text-primary);margin-right:6px;font-size:0.85rem;">${cAuthor.username}</span>
-                            <span style="color:var(--text-primary);font-size:0.85rem;">${escapeHtml(c.text)}</span>
-                            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${formatTime(c.createdAt || post.createdAt)}</div>
-                        </div>
-                    `;
-                    commentsList.appendChild(cDiv);
-                });
-            }
-        }
-
-        // Comment submission
-        if (commentSubmit && commentInput) {
-            commentSubmit.onclick = async () => {
-                const text = commentInput.value.trim();
-                if (!text) return;
-                try {
-                    commentSubmit.disabled = true;
-                    const cRes = await fetch(`${API_BASE}/posts/${post._id}/comment`, {
-                        method: 'POST',
-                        headers: getHeaders(),
-                        body: JSON.stringify({ text })
-                    });
-                    const cData = await cRes.json();
-                    if (!cRes.ok) throw new Error(cData.error);
-                    commentInput.value = '';
-                    openPostDetailModal(postId); // Refresh modal
-                } catch (e) {
-                    alert(e.message);
-                } finally {
-                    commentSubmit.disabled = false;
-                }
-            };
-        }
-
-    } catch (err) {
-        if (commentsList) commentsList.innerHTML = `<p style="color:var(--accent-red);text-align:center;padding:20px;">${err.message}</p>`;
-    }
-}
+// Post Detail Modal End
 
 // Global listener for post detail closing & feature initializers
 document.addEventListener('DOMContentLoaded', () => {

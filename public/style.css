@@ -1452,53 +1452,71 @@ select:focus-visible {
     background-color: rgba(255, 255, 255, 0.05);
 }
 
-/* Post Detail Modal (Clicking Grid item in Profile) */
+/* Post Detail Modal (Clicking Grid item in Profile / Feed) */
+.post-avatar, #detail-post-avatar {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    flex-shrink: 0 !important;
+}
+
 .detail-modal {
-    width: 80vw;
-    max-width: 850px;
-    aspect-ratio: 1.6 / 1;
+    width: 85vw;
+    max-width: 920px;
+    height: 80vh;
+    max-height: 620px;
     display: flex;
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
 }
 
 @media (max-width: 750px) {
     .detail-modal {
         flex-direction: column;
-        aspect-ratio: auto;
-        width: 90vw;
+        width: 92vw;
+        height: 85vh;
         max-height: 85vh;
     }
 
     .detail-image-side {
         width: 100% !important;
-        aspect-ratio: 1/1;
+        height: 45% !important;
     }
 
     .detail-comment-side {
         width: 100% !important;
-        height: 300px;
+        height: 55% !important;
+        border-left: none !important;
+        border-top: 1px solid var(--border-color) !important;
     }
 }
 
 .detail-image-side {
-    width: 60%;
+    width: 58%;
     background-color: #000;
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
 }
 
 .detail-image-side img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .detail-comment-side {
-    width: 40%;
+    width: 42%;
     display: flex;
     flex-direction: column;
     background-color: var(--bg-card);
     border-left: 1px solid var(--border-color);
+    overflow: hidden;
 }
 
 .detail-comments-box {
