@@ -4270,6 +4270,21 @@ async function initMessagesPage() {
     setupSearchPanel();
     setupSettingsModal();
 
+    if (typeof initSocketConnection === 'function') {
+        initSocketConnection();
+    }
+
+    // Mobile back button
+    const mobileBackBtn = document.getElementById('mobile-back-to-inbox-btn');
+    if (mobileBackBtn) {
+        mobileBackBtn.onclick = () => {
+            const layout = document.querySelector('.messages-layout');
+            if (layout) layout.classList.remove('mobile-chat-open');
+            activeChatReceiverId = '';
+            window.activeChatReceiverId = '';
+        };
+    }
+
     // Hook search buttons inside inbox to toggle search panel
     const newChatBtn = document.getElementById('inbox-new-chat-btn');
     const emptyChatBtn = document.getElementById('empty-state-new-chat-btn');
@@ -4277,11 +4292,11 @@ async function initMessagesPage() {
 
     if (newChatBtn) newChatBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        searchPanelBtn.click();
+        if (searchPanelBtn) searchPanelBtn.click();
     });
     if (emptyChatBtn) emptyChatBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        searchPanelBtn.click();
+        if (searchPanelBtn) searchPanelBtn.click();
     });
 
     // Load active conversation cards
@@ -4292,10 +4307,10 @@ async function initMessagesPage() {
     const startChatUsername = params.get('u');
     if (startChatUsername) {
         try {
-            const response = await fetch(`${API_BASE}/users/profile/${startChatUsername}`, { headers: getHeaders() });
-            const targetUser = await response.json();
-            if (response.ok) {
-                openChatWindow(targetUser);
+            const response = await fetch(`${API_BASE}/users/profile/${startChatUsername.toLowerCase()}`, { headers: getHeaders() });
+            const targetData = await response.json();
+            if (response.ok && targetData.user) {
+                openChatWindow(targetData.user);
             }
         } catch (e) {
             console.error("Failed to start chat from query param:", e);
@@ -4306,21 +4321,25 @@ async function initMessagesPage() {
     const sendBtn = document.getElementById('chat-send-btn');
     const textInput = document.getElementById('chat-text-input');
 
-    textInput.addEventListener('input', () => {
-        if (textInput.value.trim() !== '') {
-            sendBtn.classList.add('active');
-        } else {
-            sendBtn.classList.remove('active');
-        }
-    });
+    if (textInput) {
+        textInput.addEventListener('input', () => {
+            if (textInput.value.trim() !== '') {
+                if (sendBtn) sendBtn.classList.add('active');
+            } else {
+                if (sendBtn) sendBtn.classList.remove('active');
+            }
+        });
 
-    textInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    }
 
-    sendBtn.addEventListener('click', sendMessage);
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendMessage);
+    }
 
     // Chat Attachment Handlers
     const attachBtn = document.getElementById('chat-attach-file-btn');
@@ -4358,7 +4377,7 @@ async function initMessagesPage() {
 
                 if (fileNameSpan) fileNameSpan.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
                 if (previewBanner) previewBanner.style.display = 'flex';
-                sendBtn.classList.add('active');
+                if (sendBtn) sendBtn.classList.add('active');
             };
             reader.readAsDataURL(file);
         });
@@ -4370,7 +4389,7 @@ async function initMessagesPage() {
             if (fileInput) fileInput.value = '';
             if (previewBanner) previewBanner.style.display = 'none';
             if (textInput && textInput.value.trim() === '') {
-                sendBtn.classList.remove('active');
+                if (sendBtn) sendBtn.classList.remove('active');
             }
         });
     }
@@ -4399,6 +4418,18 @@ async function initMessagesPage() {
             }
         });
     }
+
+    // Real-time socket message listener
+    if (window.socket) {
+        window.socket.off('new_message');
+        window.socket.on('new_message', (msg) => {
+            const senderId = msg.sender ? (msg.sender._id || msg.sender) : '';
+            if (activeChatReceiverId && String(senderId) === String(activeChatReceiverId)) {
+                loadMessagesHistory();
+            }
+            loadConversationsInbox();
+        });
+    }
 }
 
 // Loads active contact cards
@@ -4406,7 +4437,6 @@ async function loadConversationsInbox() {
     const list = document.getElementById('conversations-inbox-list');
     if (!list) return;
 
-    // Show skeleton placeholders while loading
     list.innerHTML = Array(5).fill(`
         <div class="skeleton-inbox-item">
             <div class="skeleton skeleton-inbox-avatar"></div>
@@ -4441,10 +4471,8 @@ async function loadConversationsInbox() {
                 </div>
             `;
             div.addEventListener('click', () => {
-                // Remove active classes
                 document.querySelectorAll('.inbox-item').forEach(item => item.classList.remove('active'));
                 div.classList.add('active');
-                
                 openChatWindow(c.user);
             });
             list.appendChild(div);
@@ -4456,36 +4484,53 @@ async function loadConversationsInbox() {
 
 // Opens the DM chat window for a user
 async function openChatWindow(user) {
-    activeChatReceiverId = user._id;
+    if (!user) return;
+    const userId = user._id || user.id;
+    activeChatReceiverId = userId;
+    window.activeChatReceiverId = userId;
     window.activeChatRecipient = user;
 
     // Toggle panels
-    document.getElementById('chat-empty-state').style.display = 'none';
-    document.getElementById('chat-window-active').style.display = 'flex';
+    const emptyState = document.getElementById('chat-empty-state');
+    const activeWindow = document.getElementById('chat-window-active');
+    const layout = document.querySelector('.messages-layout');
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (activeWindow) activeWindow.style.display = 'flex';
+    if (layout) layout.classList.add('mobile-chat-open');
 
     // Set header
     const headerAvatar = document.getElementById('active-chat-avatar');
     const headerUsername = document.getElementById('active-chat-username');
     
-    headerAvatar.src = user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`;
-    headerUsername.textContent = user.username;
+    if (headerAvatar) headerAvatar.src = user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`;
+    if (headerUsername) headerUsername.textContent = `@${user.username}`;
 
-    // Tap to view other profile
-    headerAvatar.style.cursor = 'pointer';
-    headerUsername.style.cursor = 'pointer';
-    const viewProfileFn = () => {
-        window.location.href = `profile.html?u=${user.username}`;
-    };
-    headerAvatar.onclick = viewProfileFn;
-    headerUsername.onclick = viewProfileFn;
+    if (headerAvatar) {
+        headerAvatar.style.cursor = 'pointer';
+        headerAvatar.onclick = () => window.location.href = `profile.html?u=${user.username}`;
+    }
+    if (headerUsername) {
+        headerUsername.style.cursor = 'pointer';
+        headerUsername.onclick = () => window.location.href = `profile.html?u=${user.username}`;
+    }
+
+    // Call Action Buttons
+    const audioCallBtn = document.getElementById('start-audio-call-btn');
+    const videoCallBtn = document.getElementById('start-video-call-btn');
+    if (audioCallBtn) {
+        audioCallBtn.onclick = () => {
+            window.location.href = `call.html?u=${user.username}&type=audio`;
+        };
+    }
+    if (videoCallBtn) {
+        videoCallBtn.onclick = () => {
+            window.location.href = `call.html?u=${user.username}&type=video`;
+        };
+    }
 
     // Load messages history
     await loadMessagesHistory();
-
-    // Load call history for this conversation
-    if (typeof loadCallHistory === 'function') {
-        loadCallHistory(user._id);
-    }
 
     // Start simple polling for new messages every 3 seconds
     clearInterval(messagePollingInterval);
@@ -5868,253 +5913,8 @@ async function toggleScreenShare() {
 }
 
 // =============================================================
-// MESSAGES PAGE & REAL-TIME CHAT LOGIC (messages.html)
+// CALL HISTORY CONTROLLER (call.html)
 // =============================================================
-window.activeChatReceiverId = window.activeChatReceiverId || null;
-window.activeChatRecipient = window.activeChatRecipient || null;
-
-async function initMessagesPage() {
-    setupNavigationLinks();
-    const currentUser = JSON.parse(localStorage.getItem('user'));
-    if (!currentUser) {
-        window.location.href = 'auth.html';
-        return;
-    }
-
-    if (typeof initSocketConnection === 'function') {
-        initSocketConnection();
-    }
-
-    await loadConversationsInbox();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetUsername = urlParams.get('u');
-    if (targetUsername) {
-        try {
-            const res = await fetch(`${API_BASE}/users/profile/${targetUsername.toLowerCase()}`, { headers: getHeaders() });
-            if (res.ok) {
-                const data = await res.json();
-                if (data && data.user) {
-                    openChatWithUser(data.user);
-                }
-            }
-        } catch (err) {
-            console.error('Failed to auto-open direct chat:', err);
-        }
-    }
-
-    const sendBtn = document.getElementById('chat-send-btn');
-    const textInput = document.getElementById('chat-text-input');
-    const attachBtn = document.getElementById('chat-attach-file-btn');
-    const fileInput = document.getElementById('chat-file-input');
-    const heartBtn = document.getElementById('chat-quick-heart-btn');
-    const mobileBackBtn = document.getElementById('mobile-back-to-inbox-btn');
-
-    if (mobileBackBtn) {
-        mobileBackBtn.onclick = () => {
-            const layout = document.querySelector('.messages-layout');
-            if (layout) layout.classList.remove('mobile-chat-open');
-            activeChatReceiverId = null;
-        };
-    }
-
-    if (sendBtn) {
-        sendBtn.onclick = () => sendChatMessage();
-    }
-    if (textInput) {
-        textInput.onkeypress = (e) => {
-            if (e.key === 'Enter') sendChatMessage();
-        };
-    }
-    if (attachBtn && fileInput) {
-        attachBtn.onclick = () => fileInput.click();
-        fileInput.onchange = (e) => handleChatFileSelect(e);
-    }
-    if (heartBtn) {
-        heartBtn.onclick = () => sendChatMessage('❤️');
-    }
-
-    if (window.socket) {
-        window.socket.off('direct_message');
-        window.socket.on('direct_message', (msg) => {
-            const senderId = msg.sender._id || msg.sender;
-            if (activeChatReceiverId && String(senderId) === String(activeChatReceiverId)) {
-                appendChatMessageToThread(msg);
-                scrollChatToBottom();
-            }
-            loadConversationsInbox();
-        });
-    }
-}
-
-async function loadConversationsInbox() {
-    const container = document.getElementById('conversations-inbox-list');
-    if (!container) return;
-
-    try {
-        const res = await fetch(`${API_BASE}/messages/conversations`, { headers: getHeaders() });
-        const conversations = await res.json();
-        if (!res.ok) throw new Error(conversations.error);
-
-        if (!Array.isArray(conversations) || conversations.length === 0) {
-            container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 16px; font-size: 0.88rem;">No messages yet. Start a new chat!</p>`;
-            return;
-        }
-
-        container.innerHTML = '';
-        conversations.forEach(c => {
-            const u = c.user;
-            if (!u) return;
-            const item = document.createElement('div');
-            item.className = `inbox-item ${activeChatReceiverId === u._id ? 'active' : ''}`;
-            item.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;';
-            item.innerHTML = `
-                <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--accent-gold);" alt="">
-                <div style="flex: 1; min-width: 0;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <strong style="font-size: 0.92rem; color: var(--text-primary);">${escapeHtml(u.username)}</strong>
-                        <span style="font-size: 0.72rem; color: var(--text-muted);">${c.updatedAt ? new Date(c.updatedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}</span>
-                    </div>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 2px 0 0 0;" class="text-truncate">${escapeHtml(c.lastMessage || 'Sent an attachment')}</p>
-                </div>
-            `;
-            item.onclick = () => openChatWithUser(u);
-            container.appendChild(item);
-        });
-    } catch (err) {
-        console.error('Failed to load conversations:', err);
-    }
-}
-
-async function openChatWithUser(user) {
-    window.activeChatReceiverId = user._id || user.id;
-    window.activeChatRecipient = user;
-
-    const emptyState = document.getElementById('chat-empty-state');
-    const activeWindow = document.getElementById('chat-window-active');
-    const avatarEl = document.getElementById('active-chat-avatar');
-    const usernameEl = document.getElementById('active-chat-username');
-    const layout = document.querySelector('.messages-layout');
-
-    if (emptyState) emptyState.style.display = 'none';
-    if (activeWindow) activeWindow.style.display = 'flex';
-
-    if (avatarEl) avatarEl.src = user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`;
-    if (usernameEl) usernameEl.textContent = `@${user.username}`;
-
-    if (layout) layout.classList.add('mobile-chat-open');
-
-    await loadChatMessages(window.activeChatReceiverId);
-}
-
-async function loadChatMessages(userId) {
-    const thread = document.getElementById('active-chat-thread');
-    if (!thread) return;
-
-    thread.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Loading chat...</p>`;
-    try {
-        const res = await fetch(`${API_BASE}/messages/${userId}`, { headers: getHeaders() });
-        const messages = await res.json();
-        if (!res.ok) throw new Error(messages.error);
-
-        thread.innerHTML = '';
-        messages.forEach(msg => appendChatMessageToThread(msg));
-        scrollChatToBottom();
-    } catch (err) {
-        thread.innerHTML = `<p style="color: var(--accent-red); text-align: center; padding: 20px;">Could not load messages.</p>`;
-    }
-}
-
-function appendChatMessageToThread(msg) {
-    const thread = document.getElementById('active-chat-thread');
-    if (!thread) return;
-
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const myId = String(currentUser._id || currentUser.id || '');
-    const senderId = String(msg.sender._id || msg.sender);
-    const isMine = senderId === myId;
-
-    const msgBubble = document.createElement('div');
-    msgBubble.className = `chat-bubble ${isMine ? 'mine' : 'theirs'}`;
-    msgBubble.style.cssText = `max-width: 70%; padding: 10px 14px; border-radius: 18px; margin: 6px 0; font-size: 0.9rem; align-self: ${isMine ? 'flex-end' : 'flex-start'}; background: ${isMine ? 'var(--spotlite-gradient)' : 'var(--bg-input)'}; color: ${isMine ? '#000' : 'var(--text-primary)'}; font-weight: ${isMine ? '600' : '400'}; box-shadow: var(--shadow-sm);`;
-
-    let contentHtml = '';
-    if (msg.fileUrl) {
-        if (msg.fileType && msg.fileType.startsWith('image/')) {
-            contentHtml += `<img src="${msg.fileUrl}" style="max-width: 100%; border-radius: 12px; margin-bottom: 6px; display: block;">`;
-        } else {
-            contentHtml += `<a href="${msg.fileUrl}" target="_blank" style="color: inherit; text-decoration: underline; font-weight: 700; display: flex; align-items: center; gap: 6px;">📎 ${escapeHtml(msg.fileName || 'Attachment')}</a>`;
-        }
-    }
-    if (msg.text) {
-        contentHtml += `<div>${escapeHtml(msg.text)}</div>`;
-    }
-
-    msgBubble.innerHTML = contentHtml;
-    thread.appendChild(msgBubble);
-}
-
-function scrollChatToBottom() {
-    const thread = document.getElementById('active-chat-thread');
-    if (thread) thread.scrollTop = thread.scrollHeight;
-}
-
-async function sendChatMessage(customText = null) {
-    if (!window.activeChatReceiverId) return;
-
-    const textInput = document.getElementById('chat-text-input');
-    const text = customText || (textInput ? textInput.value.trim() : '');
-    if (!text) return;
-
-    try {
-        const res = await fetch(`${API_BASE}/messages`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ receiverId: window.activeChatReceiverId, text })
-        });
-        const newMsg = await res.json();
-        if (!res.ok) throw new Error(newMsg.error);
-
-        if (textInput) textInput.value = '';
-        appendChatMessageToThread(newMsg);
-        scrollChatToBottom();
-        loadConversationsInbox();
-    } catch (err) {
-        alert(err.message || 'Failed to send message.');
-    }
-}
-
-function handleChatFileSelect(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-        const base64Data = evt.target.result;
-        try {
-            const res = await fetch(`${API_BASE}/messages`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify({
-                    receiverId: window.activeChatReceiverId,
-                    fileUrl: base64Data,
-                    fileName: file.name,
-                    fileType: file.type,
-                    text: `Sent a file: ${file.name}`
-                })
-            });
-            const newMsg = await res.json();
-            if (!res.ok) throw new Error(newMsg.error);
-
-            appendChatMessageToThread(newMsg);
-            scrollChatToBottom();
-            loadConversationsInbox();
-        } catch (err) {
-            alert('Failed to send file attachment.');
-        }
-    };
-    reader.readAsDataURL(file);
-}
 
 // Fetch all call history for Call Hub page
 async function loadAllCallHistory(containerId = 'call-history-list') {
