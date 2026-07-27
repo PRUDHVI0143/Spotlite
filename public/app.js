@@ -1787,12 +1787,31 @@ function setupAvatarViewerListeners() {
     });
 }
 
-function openAddStoryModal() {
+window.openAddStoryModal = function() {
     const modal = document.getElementById('add-story-modal-overlay');
     if (modal) {
         modal.style.cssText = 'display: flex !important; z-index: 999999;';
     }
-}
+};
+
+window.openGroupChatModal = function() {
+    const groupModal = document.getElementById('group-chat-modal-overlay');
+    if (groupModal) {
+        groupModal.style.cssText = 'display: flex !important; z-index: 999999;';
+        if (typeof loadGroupUsers === 'function') {
+            loadGroupUsers();
+        }
+    }
+};
+
+window.openNewChatPanel = function() {
+    const panel = document.getElementById('search-slider-panel');
+    const input = document.getElementById('search-users-input') || document.getElementById('search-panel-input');
+    if (panel) {
+        panel.classList.add('active');
+        if (input) setTimeout(() => input.focus(), 100);
+    }
+};
 
 function setupAddStoryModal() {
     const modal = document.getElementById('add-story-modal-overlay');
@@ -3309,9 +3328,25 @@ function setupEditProfileModal() {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to update profile');
 
-                alert('✨ Profile updated successfully!');
+                // Update local user in localStorage
+                const myUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const updatedUser = { ...myUser, avatar: avatar || myUser.avatar, coverPhoto: coverPhoto || myUser.coverPhoto, bio: bio || myUser.bio, website: website || myUser.website };
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+
                 modal.style.display = 'none';
-                window.location.reload();
+                showSpotliteToast('✨ Profile updated!');
+
+                if (window.location.pathname.includes('profile.html')) {
+                    const params = new URLSearchParams(window.location.search);
+                    const usernameParam = params.get('u') || updatedUser.username;
+                    if (usernameParam && typeof loadProfileHeader === 'function') {
+                        await loadProfileHeader(usernameParam);
+                    } else {
+                        window.location.reload();
+                    }
+                } else {
+                    window.location.reload();
+                }
             } catch (err) {
                 alert(err.message || 'Failed to update profile.');
             }
@@ -4313,13 +4348,12 @@ function setupGroupChatModal() {
     const searchInput = document.getElementById('group-search-user-input');
     const groupNameInput = document.getElementById('group-name-input');
 
-    if (!groupModal || !groupBtn) return;
-
     let availableUsers = [];
 
-    async function loadGroupUsers() {
-        if (!userListContainer) return;
-        userListContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 12px;">Loading people...</p>';
+    window.loadGroupUsers = async function() {
+        const listEl = document.getElementById('group-user-selection-list');
+        if (!listEl) return;
+        listEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 12px;">Loading people...</p>';
         try {
             const res = await fetch(`${API_BASE}/users/suggestions`, { headers: getHeaders() });
             const data = await res.json();
@@ -4327,17 +4361,18 @@ function setupGroupChatModal() {
             availableUsers = data;
             renderUserCheckboxes(availableUsers);
         } catch (err) {
-            userListContainer.innerHTML = '<p style="color: var(--accent-red); text-align: center; padding: 12px;">Could not load people.</p>';
+            listEl.innerHTML = '<p style="color: var(--accent-red); text-align: center; padding: 12px;">Could not load people.</p>';
         }
-    }
+    };
 
     function renderUserCheckboxes(users) {
-        if (!userListContainer) return;
+        const listEl = document.getElementById('group-user-selection-list');
+        if (!listEl) return;
         if (users.length === 0) {
-            userListContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 12px;">No people found.</p>';
+            listEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 12px;">No people found.</p>';
             return;
         }
-        userListContainer.innerHTML = users.map(u => `
+        listEl.innerHTML = users.map(u => `
             <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 32px; height: 32px; border-radius: 50%;">
@@ -4356,15 +4391,19 @@ function setupGroupChatModal() {
         });
     }
 
-    groupBtn.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        groupModal.style.cssText = 'display: flex !important; z-index: 999999;';
-        loadGroupUsers();
-    };
+    if (groupBtn) {
+        groupBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (groupModal) {
+                groupModal.style.cssText = 'display: flex !important; z-index: 999999;';
+            }
+            window.loadGroupUsers();
+        };
+    }
 
     const hideModal = () => {
-        groupModal.style.cssText = 'display: none !important;';
+        if (groupModal) groupModal.style.cssText = 'display: none !important;';
         if (groupNameInput) groupNameInput.value = '';
     };
 

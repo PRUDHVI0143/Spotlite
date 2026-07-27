@@ -136,8 +136,8 @@
                     <div class="inbox-header">
                         <h2>Messages</h2>
                         <div style="display: flex; gap: 8px; align-items: center;">
-                            <button id="inbox-new-chat-btn" style="color: var(--accent-gold); font-weight: 600; font-size: 0.88rem;">New Chat</button>
-                            <button id="inbox-new-group-btn" style="color: var(--text-primary); background: rgba(255,203,5,0.15); border: 1px solid var(--accent-gold); border-radius: 8px; padding: 4px 10px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">➕ Group</button>
+                            <button id="inbox-new-chat-btn" onclick="openNewChatPanel()" style="color: var(--accent-gold); font-weight: 600; font-size: 0.88rem; cursor: pointer;">New Chat</button>
+                            <button id="inbox-new-group-btn" onclick="openGroupChatModal()" style="color: var(--text-primary); background: rgba(255,203,5,0.15); border: 1px solid var(--accent-gold); border-radius: 8px; padding: 4px 10px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">➕ Group</button>
                         </div>
                     </div>
                     <div class="inbox-list" id="conversations-inbox-list">
