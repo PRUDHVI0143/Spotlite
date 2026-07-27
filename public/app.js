@@ -1798,8 +1798,8 @@ window.openGroupChatModal = function() {
     const groupModal = document.getElementById('group-chat-modal-overlay');
     if (groupModal) {
         groupModal.style.cssText = 'display: flex !important; z-index: 999999;';
-        if (typeof loadGroupUsers === 'function') {
-            loadGroupUsers();
+        if (typeof window.loadGroupUsers === 'function') {
+            window.loadGroupUsers();
         }
     }
 };

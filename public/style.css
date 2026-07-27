@@ -4570,3 +4570,19 @@ body.mode-oled {
         width: 100% !important;
     }
 }
+
+/* ── GLOBAL MODAL OVERLAY FIX ── */
+.modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    display: none;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 999999 !important;
+}
