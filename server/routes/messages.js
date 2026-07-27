@@ -69,48 +69,57 @@ router.get('/:userId', authenticateToken, async (req, res) => {
   }
 });
 
-// 3. Send Direct Message
+// 3. Send Direct / Group Message
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { receiverId, text, sharedPostId, fileUrl, fileName, fileType, messageType, audioUrl } = req.body;
+    const { receiverId, receiverIds, text, sharedPostId, fileUrl, fileName, fileType, messageType, audioUrl, groupName } = req.body;
 
-    if (!receiverId || (!text && !sharedPostId && !fileUrl && !audioUrl)) {
-      return res.status(400).json({ error: 'Recipient and message content are required.' });
+    const targetReceivers = Array.isArray(receiverIds) && receiverIds.length > 0 ? receiverIds : (receiverId ? [receiverId] : []);
+
+    if (targetReceivers.length === 0 || (!text && !sharedPostId && !fileUrl && !audioUrl && !groupName)) {
+      return res.status(400).json({ error: 'Recipient(s) and message content are required.' });
     }
 
-    const newMessage = new Message({
-      sender: req.user.id,
-      receiver: receiverId,
-      text: text || '',
-      audioUrl: audioUrl || '',
-      fileUrl: fileUrl || '',
-      fileName: fileName || '',
-      fileType: fileType || '',
-      messageType: messageType || (fileUrl ? 'file' : (audioUrl ? 'audio' : 'text')),
-      sharedPostId: sharedPostId || null
-    });
+    const createdMessages = [];
+    const messageContent = text || (groupName ? `Created group chat: ${groupName} 👥` : '');
 
-    await newMessage.save();
+    for (const targetId of targetReceivers) {
+      const newMessage = new Message({
+        sender: req.user.id,
+        receiver: targetId,
+        text: messageContent,
+        audioUrl: audioUrl || '',
+        fileUrl: fileUrl || '',
+        fileName: fileName || '',
+        fileType: fileType || '',
+        messageType: messageType || (fileUrl ? 'file' : (audioUrl ? 'audio' : 'text')),
+        sharedPostId: sharedPostId || null
+      });
 
-    const populatedMessage = await Message.findById(newMessage._id)
-      .populate('sender', 'username avatar')
-      .populate('receiver', 'username avatar')
-      .populate('sharedPostId');
+      await newMessage.save();
 
-    sendDirectMessage(receiverId, populatedMessage);
+      const populatedMessage = await Message.findById(newMessage._id)
+        .populate('sender', 'username avatar')
+        .populate('receiver', 'username avatar')
+        .populate('sharedPostId');
 
-    const notif = new Notification({
-      recipient: receiverId,
-      sender: req.user.id,
-      type: 'message',
-      text: `sent you a message: "${(text || 'shared a post').substring(0, 30)}"`
-    });
-    await notif.save();
+      sendDirectMessage(targetId, populatedMessage);
 
-    const populatedNotif = await Notification.findById(notif._id).populate('sender', 'username avatar');
-    sendNotification(receiverId, populatedNotif);
+      const notif = new Notification({
+        recipient: targetId,
+        sender: req.user.id,
+        type: 'message',
+        text: `sent you a message: "${messageContent.substring(0, 30)}"`
+      });
+      await notif.save();
 
-    res.status(201).json(populatedMessage);
+      const populatedNotif = await Notification.findById(notif._id).populate('sender', 'username avatar');
+      sendNotification(targetId, populatedNotif);
+
+      createdMessages.push(populatedMessage);
+    }
+
+    res.status(201).json(createdMessages.length === 1 ? createdMessages[0] : { message: 'Group message sent', messages: createdMessages });
   } catch (err) {
     console.error('Send message error:', err);
     res.status(500).json({ error: 'Failed to send message.' });

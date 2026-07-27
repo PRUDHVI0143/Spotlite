@@ -4100,25 +4100,36 @@ function escapeHtml(text) {
 function setupSearchPanel() {
     const searchBtn = document.getElementById('sidebar-search-btn');
     const panel = document.getElementById('search-slider-panel');
-    const input = document.getElementById('search-users-input');
-    const resultsContainer = document.getElementById('search-results-list');
+    const input = document.getElementById('search-users-input') || document.getElementById('search-panel-input');
+    const resultsContainer = document.getElementById('search-results-list') || document.getElementById('search-panel-results');
+    const closeBtn = document.getElementById('close-search-panel-btn');
 
-    if (!searchBtn || !panel) return;
+    if (!panel) return;
 
-    searchBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        panel.classList.toggle('active');
-        if (panel.classList.contains('active')) {
-            input.focus();
-        }
-    });
+    if (searchBtn) {
+        searchBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            panel.classList.toggle('active');
+            if (panel.classList.contains('active') && input) {
+                input.focus();
+            }
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            panel.classList.remove('active');
+        });
+    }
 
     // Close panel on clicking anywhere else on page
     document.addEventListener('click', (e) => {
-        if (panel.classList.contains('active') && !panel.contains(e.target) && e.target !== searchBtn && !searchBtn.contains(e.target)) {
+        if (panel.classList.contains('active') && !panel.contains(e.target) && searchBtn && !searchBtn.contains(e.target)) {
             panel.classList.remove('active');
         }
     });
+
+    if (!input || !resultsContainer) return;
 
     // Debounce search requests
     let debounceTimer;
@@ -4140,7 +4151,7 @@ function setupSearchPanel() {
                 if (!response.ok) throw new Error(users.error);
 
                 if (users.length === 0) {
-                    resultsContainer.innerHTML = `<div class="search-no-results">No accounts found.</div>`;
+                    resultsContainer.innerHTML = `<div class="search-no-results" style="padding: 20px; text-align: center; color: var(--text-muted);">No accounts found.</div>`;
                     return;
                 }
 
@@ -4148,31 +4159,142 @@ function setupSearchPanel() {
                 users.forEach(user => {
                     const row = document.createElement('div');
                     row.className = 'user-profile-card';
-                    row.style.padding = '8px 0';
+                    row.style.cssText = 'padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color);';
                     row.innerHTML = `
-                        <div class="user-card-info">
-                            <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}" alt="Avatar" class="user-card-avatar" style="width: 36px; height: 36px;">
+                        <div class="user-card-info" style="display: flex; align-items: center; gap: 10px;">
+                            <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}" alt="Avatar" class="user-card-avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                             <div class="user-card-names">
-                                <span class="user-card-username" style="font-size: 0.9rem;">${user.username}</span>
-                                <span class="user-card-fullname" style="font-size: 0.8rem; color: var(--text-muted);">${user.bio ? (user.bio.substring(0, 25) + '...') : ''}</span>
+                                <span class="user-card-username" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary); display: block;">${user.username}</span>
+                                <span class="user-card-fullname" style="font-size: 0.78rem; color: var(--text-muted);">${user.bio ? (user.bio.substring(0, 30) + '...') : 'Spotlite User'}</span>
                             </div>
                         </div>
+                        <button class="btn-primary" style="padding: 4px 12px; font-size: 0.8rem;">Chat 💬</button>
                     `;
-                    row.querySelector('.user-card-info').addEventListener('click', () => {
-                        if (window.location.pathname.includes('messages.html')) {
+                    row.addEventListener('click', () => {
+                        if (window.location.pathname.includes('messages.html') && typeof openChatWindow === 'function') {
                             openChatWindow(user);
                             panel.classList.remove('active');
                         } else {
-                            window.location.href = `profile.html?u=${user.username}`;
+                            window.location.href = `messages.html?u=${user.username}`;
                         }
                     });
                     resultsContainer.appendChild(row);
                 });
             } catch (err) {
-                resultsContainer.innerHTML = `<div style="color: var(--accent-red); font-size: 0.85rem; text-align: center;">Error searching.</div>`;
+                resultsContainer.innerHTML = `<div style="color: var(--accent-red); font-size: 0.85rem; text-align: center;">Error searching users.</div>`;
             }
         }, 300);
     });
+}
+
+// Setup Group Chat Modal
+function setupGroupChatModal() {
+    const groupModal = document.getElementById('group-chat-modal-overlay');
+    const groupBtn = document.getElementById('inbox-new-group-btn');
+    const closeBtn = document.getElementById('close-group-modal-btn');
+    const cancelBtn = document.getElementById('cancel-group-modal-btn');
+    const submitBtn = document.getElementById('submit-create-group-btn');
+    const userListContainer = document.getElementById('group-user-selection-list');
+    const searchInput = document.getElementById('group-search-user-input');
+    const groupNameInput = document.getElementById('group-name-input');
+
+    if (!groupModal || !groupBtn) return;
+
+    let availableUsers = [];
+
+    async function loadGroupUsers() {
+        if (!userListContainer) return;
+        userListContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 12px;">Loading people...</p>';
+        try {
+            const res = await fetch(`${API_BASE}/users/suggestions`, { headers: getHeaders() });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            availableUsers = data;
+            renderUserCheckboxes(availableUsers);
+        } catch (err) {
+            userListContainer.innerHTML = '<p style="color: var(--accent-red); text-align: center; padding: 12px;">Could not load people.</p>';
+        }
+    }
+
+    function renderUserCheckboxes(users) {
+        if (!userListContainer) return;
+        if (users.length === 0) {
+            userListContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 12px;">No people found.</p>';
+            return;
+        }
+        userListContainer.innerHTML = users.map(u => `
+            <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 32px; height: 32px; border-radius: 50%;">
+                    <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${u.username}</span>
+                </div>
+                <input type="checkbox" class="group-user-checkbox" value="${u._id}" style="width: 18px; height: 18px; accent-color: var(--accent-gold);">
+            </label>
+        `).join('');
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            const q = searchInput.value.toLowerCase().trim();
+            const filtered = availableUsers.filter(u => u.username.toLowerCase().includes(q));
+            renderUserCheckboxes(filtered);
+        });
+    }
+
+    groupBtn.addEventListener('click', () => {
+        groupModal.style.display = 'flex';
+        loadGroupUsers();
+    });
+
+    const hideModal = () => {
+        groupModal.style.display = 'none';
+        if (groupNameInput) groupNameInput.value = '';
+    };
+
+    if (closeBtn) closeBtn.onclick = hideModal;
+    if (cancelBtn) cancelBtn.onclick = hideModal;
+
+    if (submitBtn) {
+        submitBtn.onclick = async () => {
+            const groupName = groupNameInput ? groupNameInput.value.trim() : '';
+            const checkedBoxes = Array.from(document.querySelectorAll('.group-user-checkbox:checked'));
+            const selectedIds = checkedBoxes.map(cb => cb.value);
+
+            if (!groupName) {
+                alert('Please enter a group name.');
+                return;
+            }
+            if (selectedIds.length === 0) {
+                alert('Please select at least 1 person for the group.');
+                return;
+            }
+
+            try {
+                submitBtn.disabled = true;
+                const res = await fetch(`${API_BASE}/messages`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        receiverIds: selectedIds,
+                        groupName,
+                        text: `Created group chat: ${groupName} 👥`
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                hideModal();
+                showSpotliteToast(`Group "${groupName}" created! 👥✨`);
+                if (typeof loadConversationsInbox === 'function') {
+                    loadConversationsInbox();
+                }
+            } catch (err) {
+                alert(err.message || 'Failed to create group');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        };
+    }
 }
 
 // =============================================================
@@ -4269,6 +4391,7 @@ async function initMessagesPage() {
     setupCreatePostModal();
     setupSearchPanel();
     setupSettingsModal();
+    setupGroupChatModal();
 
     if (typeof initSocketConnection === 'function') {
         initSocketConnection();
