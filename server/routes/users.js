@@ -192,7 +192,7 @@ router.get('/profile/:username', async (req, res) => {
 // 6. Update Current User Profile
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { bio, avatar, coverPhoto, website, github, linkedin, accentColor, themeMode } = req.body;
+    const { bio, avatar, coverPhoto, website, github, linkedin, portfolioUrl, resumeUrl, accentColor, themeMode } = req.body;
     const user = await User.findById(req.user.id);
 
     if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -203,6 +203,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (website !== undefined) user.website = website;
     if (github !== undefined) user.github = github;
     if (linkedin !== undefined) user.linkedin = linkedin;
+    if (portfolioUrl !== undefined) user.portfolioUrl = portfolioUrl;
+    if (resumeUrl !== undefined) user.resumeUrl = resumeUrl;
     if (accentColor !== undefined) user.accentColor = accentColor;
     if (themeMode !== undefined) user.themeMode = themeMode;
 
@@ -212,6 +214,29 @@ router.put('/profile', authenticateToken, async (req, res) => {
     res.json(updatedUser);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update profile.' });
+  }
+});
+
+// 6b. Add Featured Project to Developer Portfolio
+router.post('/projects', authenticateToken, async (req, res) => {
+  try {
+    const { title, description, link, techStack } = req.body;
+    if (!title) return res.status(400).json({ error: 'Project title is required.' });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    user.featuredProjects.push({
+      title,
+      description: description || '',
+      link: link || '',
+      techStack: Array.isArray(techStack) ? techStack : (techStack ? techStack.split(',').map(s => s.trim()) : [])
+    });
+
+    await user.save();
+    res.status(201).json(user.featuredProjects);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add project.' });
   }
 });
 

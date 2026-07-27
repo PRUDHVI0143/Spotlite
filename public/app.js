@@ -2130,14 +2130,14 @@ function createPostCard(post) {
         <button class="comments-preview-btn" onclick="openPostDetailModal('${post._id}')">View all ${post.comments.length} comment${post.comments.length !== 1 ? 's' : ''}</button>
         ` : ''}
 
-        <!-- Quick Emoji Reaction Pills -->
+        <!-- Quick Emoji & AI Comment Suggestion Pills -->
         <div class="comment-emoji-bar">
             <span class="emoji-reaction-pill" data-emoji="❤️">❤️</span>
             <span class="emoji-reaction-pill" data-emoji="🔥">🔥</span>
-            <span class="emoji-reaction-pill" data-emoji="😍">😍</span>
             <span class="emoji-reaction-pill" data-emoji="👏">👏</span>
-            <span class="emoji-reaction-pill" data-emoji="💯">💯</span>
-            <span class="emoji-reaction-pill" data-emoji="✨">✨</span>
+            <span class="emoji-reaction-pill ai-suggest-pill" data-text="Love this ❤️">Love this ❤️</span>
+            <span class="emoji-reaction-pill ai-suggest-pill" data-text="Awesome work 👏">Awesome work 👏</span>
+            <span class="emoji-reaction-pill ai-suggest-pill" data-text="Great shot 📷">Great shot 📷</span>
         </div>
 
         <div class="comment-input-wrapper">
@@ -2276,15 +2276,20 @@ function createPostCard(post) {
         });
     }
 
-    // Quick Emoji Pills Click Handler
+    // Quick Emoji & AI Pills Click Handler
     const emojiPills = card.querySelectorAll('.emoji-reaction-pill');
     emojiPills.forEach(pill => {
         pill.addEventListener('click', (e) => {
             e.stopPropagation();
             const emoji = pill.getAttribute('data-emoji');
+            const aiText = pill.getAttribute('data-text');
             if (commentInput) {
-                const currentVal = commentInput.value.trim();
-                commentInput.value = currentVal ? `${currentVal} ${emoji}` : emoji;
+                if (aiText) {
+                    commentInput.value = aiText;
+                } else {
+                    const currentVal = commentInput.value.trim();
+                    commentInput.value = currentVal ? `${currentVal} ${emoji}` : emoji;
+                }
                 commentInput.focus();
                 if (commentSubmit) commentSubmit.classList.add('active');
             }

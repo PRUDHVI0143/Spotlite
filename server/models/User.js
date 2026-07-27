@@ -10,6 +10,21 @@ const UserSchema = new mongoose.Schema({
   website: { type: String, default: '' },
   github: { type: String, default: '' },
   linkedin: { type: String, default: '' },
+  portfolioUrl: { type: String, default: '' },
+  resumeUrl: { type: String, default: '' },
+  featuredProjects: [{
+    title: { type: String, required: true },
+    description: { type: String, default: '' },
+    link: { type: String, default: '' },
+    techStack: [{ type: String }]
+  }],
+  achievements: [{
+    title: { type: String, required: true },
+    icon: { type: String, default: '🏆' },
+    description: { type: String, default: '' },
+    date: { type: Date, default: Date.now }
+  }],
+  streakDays: { type: Number, default: 1 },
   accentColor: { type: String, default: 'purple' },
   themeMode: { type: String, default: 'dark' },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
