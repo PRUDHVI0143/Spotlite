@@ -4241,13 +4241,15 @@ function setupGroupChatModal() {
         });
     }
 
-    groupBtn.addEventListener('click', () => {
-        groupModal.style.display = 'flex';
+    groupBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        groupModal.style.cssText = 'display: flex !important; z-index: 999999;';
         loadGroupUsers();
-    });
+    };
 
     const hideModal = () => {
-        groupModal.style.display = 'none';
+        groupModal.style.cssText = 'display: none !important;';
         if (groupNameInput) groupNameInput.value = '';
     };
 
@@ -4411,16 +4413,31 @@ async function initMessagesPage() {
     // Hook search buttons inside inbox to toggle search panel
     const newChatBtn = document.getElementById('inbox-new-chat-btn');
     const emptyChatBtn = document.getElementById('empty-state-new-chat-btn');
-    const searchPanelBtn = document.getElementById('sidebar-search-btn');
 
-    if (newChatBtn) newChatBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (searchPanelBtn) searchPanelBtn.click();
-    });
-    if (emptyChatBtn) emptyChatBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (searchPanelBtn) searchPanelBtn.click();
-    });
+    if (newChatBtn) {
+        newChatBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const panel = document.getElementById('search-slider-panel');
+            const input = document.getElementById('search-users-input') || document.getElementById('search-panel-input');
+            if (panel) {
+                panel.classList.add('active');
+                if (input) setTimeout(() => input.focus(), 100);
+            }
+        };
+    }
+    if (emptyChatBtn) {
+        emptyChatBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const panel = document.getElementById('search-slider-panel');
+            const input = document.getElementById('search-users-input') || document.getElementById('search-panel-input');
+            if (panel) {
+                panel.classList.add('active');
+                if (input) setTimeout(() => input.focus(), 100);
+            }
+        };
+    }
 
     // Load active conversation cards
     await loadConversationsInbox();
