@@ -1863,7 +1863,7 @@ function setupAddStoryModal() {
 
             try {
                 submitBtn.disabled = true;
-                const res = await fetch(`${API_BASE}/users/stories`, {
+                const res = await fetch(`${API_BASE}/stories`, {
                     method: 'POST',
                     headers: getHeaders(),
                     body: JSON.stringify({
@@ -1911,7 +1911,7 @@ async function loadStoriesBar() {
     `;
 
     try {
-        const response = await fetch(`${API_BASE}/users/stories`, { headers: getHeaders() });
+        const response = await fetch(`${API_BASE}/stories`, { headers: getHeaders() });
         const stories = await response.json();
         if (Array.isArray(stories) && stories.length > 0) {
             stories.forEach(s => {
@@ -4355,10 +4355,11 @@ function setupGroupChatModal() {
         if (!listEl) return;
         listEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 12px;">Loading people...</p>';
         try {
-            const res = await fetch(`${API_BASE}/users/suggestions`, { headers: getHeaders() });
+            // /api/users/search returns a list of users matching query
+            const res = await fetch(`${API_BASE}/users/search?q=a`, { headers: getHeaders() });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
-            availableUsers = data;
+            availableUsers = Array.isArray(data) ? data : [];
             renderUserCheckboxes(availableUsers);
         } catch (err) {
             listEl.innerHTML = '<p style="color: var(--accent-red); text-align: center; padding: 12px;">Could not load people.</p>';
