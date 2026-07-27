@@ -19,14 +19,13 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Fixed: verifyAdmin no longer double-calls authenticateToken.
+// admin.js uses router.use(authenticateToken, verifyAdmin) so req.user is already set.
 function verifyAdmin(req, res, next) {
-  authenticateToken(req, res, () => {
-    if (req.user && req.user.isAdmin) {
-      next();
-    } else {
-      res.status(403).json({ error: 'Forbidden. Admin privileges required.' });
-    }
-  });
+  if (req.user && req.user.isAdmin) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Forbidden. Admin privileges required.' });
 }
 
 module.exports = {

@@ -139,10 +139,30 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
     const now = new Date();
     const stories = await Story.find({ expiresAt: { $gt: now } })
       .populate('author', 'username avatar isVerified')
-      .sort({ createdAt: -1 });
+      .populate('viewers', 'username avatar')
+      .sort({ createdAt: -1 })
+      .limit(50); // Prevent unbounded query growth
     res.json(stories);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch stories.' });
+  }
+});
+
+// Story View Tracking — POST /api/stories/:id/view
+app.post('/api/stories/:id/view', authenticateToken, async (req, res) => {
+  try {
+    const story = await Story.findById(req.params.id);
+    if (!story) return res.status(404).json({ error: 'Story not found or expired.' });
+
+    const userId = req.user.id;
+    if (!story.viewers.includes(userId)) {
+      story.viewers.push(userId);
+      await story.save();
+    }
+
+    res.json({ viewersCount: story.viewers.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to record story view.' });
   }
 });
 

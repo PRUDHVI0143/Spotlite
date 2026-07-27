@@ -39,4 +39,14 @@ const markReadHandler = async (req, res) => {
 router.put('/read', authenticateToken, markReadHandler);
 router.put('/mark-read', authenticateToken, markReadHandler);
 
+// 3. Clear / Delete All Notifications
+router.delete('/', authenticateToken, async (req, res) => {
+  try {
+    await Notification.deleteMany({ recipient: req.user.id });
+    res.json({ message: 'All notifications cleared.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to clear notifications.' });
+  }
+});
+
 module.exports = router;

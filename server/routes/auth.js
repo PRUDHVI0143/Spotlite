@@ -105,19 +105,17 @@ async function sendVerificationEmail(username, email, code) {
         tls: { rejectUnauthorized: false }
       });
 
-      transporter.sendMail({
+      // FIXED: properly await sendMail so errors are not silently swallowed
+      const info = await transporter.sendMail({
         from: process.env.SMTP_FROM || `"Spotlite Support" <${smtpUser}>`,
         to: email,
-        subject: `✨ ${code} is your Spotlite verification code`,
+        subject: `🔐 ${code} is your Spotlite verification code`,
         text: textContent,
         html: htmlContent
-      }).then((info) => {
-        console.log(`[SMTP SUCCESS] Verification email sent successfully to ${email} (MessageID: ${info.messageId})`);
-      }).catch(err => {
-        console.error(`[SMTP ERROR] Failed to send email to ${email}:`, err.message);
       });
 
-      return { success: true };
+      console.log(`[SMTP SUCCESS] Verification email sent to ${email} (MessageID: ${info.messageId})`);
+      return { success: true, messageId: info.messageId };
     } catch (err) {
       console.error(`[SMTP ERROR] Failed to initialize mailer:`, err.message);
     }
@@ -370,6 +368,41 @@ router.get('/me', authenticateToken, async (req, res) => {
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch current user.' });
+  }
+});
+
+// 8. Dev/Test Helper — GET /api/auth/dev-code?email=
+// Returns the pending verification code directly from the DB.
+// BLOCKED in production. Use only for local development & automated tests.
+router.get('/dev-code', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Not available in production.' });
+  }
+
+  try {
+    const identifier = (req.query.email || '').trim().toLowerCase();
+    if (!identifier) return res.status(400).json({ error: 'email query param is required.' });
+
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { username: identifier }]
+    }).select('username email verificationCode verificationCodeExpires isVerified');
+
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    if (user.isVerified) return res.status(400).json({ error: 'Account is already verified.' });
+    if (!user.verificationCode) return res.status(400).json({ error: 'No pending verification code.' });
+
+    const expiresIn = user.verificationCodeExpires
+      ? Math.max(0, Math.round((new Date(user.verificationCodeExpires) - Date.now()) / 1000))
+      : null;
+
+    res.json({
+      email: user.email,
+      username: user.username,
+      code: user.verificationCode,
+      expiresInSeconds: expiresIn
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch dev code.' });
   }
 });
 

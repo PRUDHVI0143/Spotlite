@@ -423,22 +423,22 @@ async function checkNotifications() {
         const response = await fetch(`${API_BASE}/notifications`, {
             headers: getHeaders()
         });
-        const notifications = await response.json();
+        const data = await response.json();
         if (!response.ok) return;
 
-        const unread = notifications.filter(n => !n.isRead);
-        const count = unread.length;
+        const notifications = Array.isArray(data) ? data : (data.notifications || []);
+        const unreadCount = typeof data.unreadCount === 'number' ? data.unreadCount : notifications.filter(n => !n.isRead).length;
 
         const badge = document.getElementById('notif-count-badge');
         const mobBadge = document.getElementById('mobile-notif-count-badge');
 
         if (badge) {
-            badge.style.display = count > 0 ? 'inline-block' : 'none';
-            badge.textContent = count;
+            badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+            badge.textContent = unreadCount;
         }
         if (mobBadge) {
-            mobBadge.style.display = count > 0 ? 'inline-block' : 'none';
-            mobBadge.textContent = count;
+            mobBadge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+            mobBadge.textContent = unreadCount;
         }
 
         if (notifications.length > 0) {
@@ -2172,10 +2172,30 @@ function createPostCard(post) {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to post comment');
+            
             commentInput.value = '';
+            if (commentSubmit) commentSubmit.classList.remove('active');
             showSpotliteToast('Comment posted! 💬');
+            
+            const commentsArr = Array.isArray(data) ? data : (data.comments || []);
+            const newCount = commentsArr.length;
             const countSpan = card.querySelector(`#comment-btn-${post._id} .action-count`);
-            if (countSpan && data.comments) countSpan.textContent = data.comments.length;
+            if (countSpan) countSpan.textContent = newCount;
+            
+            let previewBtn = card.querySelector('.comments-preview-btn');
+            if (previewBtn) {
+                previewBtn.textContent = `View all ${newCount} comment${newCount !== 1 ? 's' : ''}`;
+            } else if (newCount > 0) {
+                const wrapper = card.querySelector('.comment-input-wrapper');
+                if (wrapper) {
+                    previewBtn = document.createElement('button');
+                    previewBtn.className = 'comments-preview-btn';
+                    previewBtn.onclick = () => openPostDetailModal(post._id);
+                    previewBtn.textContent = `View all ${newCount} comment${newCount !== 1 ? 's' : ''}`;
+                    wrapper.parentNode.insertBefore(previewBtn, wrapper);
+                }
+            }
+
             if (typeof playActionSound === 'function') playActionSound('comment');
         } catch (err) {
             alert(err.message || 'Failed to post comment');
@@ -2185,12 +2205,17 @@ function createPostCard(post) {
     }
 
     if (commentSubmit) commentSubmit.addEventListener('click', submitInlineComment);
-    if (commentInput) commentInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            submitInlineComment();
-        }
-    });
+    if (commentInput) {
+        commentInput.addEventListener('input', () => {
+            if (commentSubmit) commentSubmit.classList.toggle('active', commentInput.value.trim() !== '');
+        });
+        commentInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitInlineComment();
+            }
+        });
+    }
 
     // Caption "more" toggle
     const moreBtn = card.querySelector('.caption-more-btn');
@@ -2258,8 +2283,10 @@ function createPostCard(post) {
             e.stopPropagation();
             const emoji = pill.getAttribute('data-emoji');
             if (commentInput) {
-                commentInput.value += ' ' + emoji;
+                const currentVal = commentInput.value.trim();
+                commentInput.value = currentVal ? `${currentVal} ${emoji}` : emoji;
                 commentInput.focus();
+                if (commentSubmit) commentSubmit.classList.add('active');
             }
         });
     });
@@ -2394,53 +2421,6 @@ function createPostCard(post) {
             showActionMenu(menuOptions);
         });
     }
-
-    // Comment submit
-    commentInput.addEventListener('input', () => {
-        commentSubmit.classList.toggle('active', commentInput.value.trim() !== '');
-    });
-
-    commentSubmit.addEventListener('click', async () => {
-        const text = commentInput.value.trim();
-        if (!text) return;
-        try {
-            const response = await fetch(`${API_BASE}/posts/${post._id}/comment`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify({ text })
-            });
-            const newComment = await response.json();
-            if (!response.ok) throw new Error(newComment.error);
-
-            commentInput.value = '';
-            commentSubmit.classList.remove('active');
-
-            // Update comment count
-            const countEl = card.querySelector(`#comment-btn-${post._id} .action-count`);
-            let newCount = 1;
-            if (countEl) {
-                newCount = parseInt(countEl.textContent || 0) + 1;
-                countEl.textContent = newCount;
-            }
-
-            // Update or create "View all comments" button dynamically
-            let previewBtn = card.querySelector('.comments-preview-btn');
-            if (previewBtn) {
-                previewBtn.textContent = `View all ${newCount} comment${newCount !== 1 ? 's' : ''}`;
-            } else {
-                const wrapper = card.querySelector('.comment-input-wrapper');
-                if (wrapper) {
-                    previewBtn = document.createElement('button');
-                    previewBtn.className = 'comments-preview-btn';
-                    previewBtn.onclick = () => openPostDetailModal(post._id);
-                    previewBtn.textContent = `View all ${newCount} comment${newCount !== 1 ? 's' : ''}`;
-                    wrapper.parentNode.insertBefore(previewBtn, wrapper);
-                }
-            }
-        } catch (err) {
-            alert(err.message);
-        }
-    });
 
     return card;
 }
@@ -2612,7 +2592,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Load recommended suggestions
 async function loadSuggestions() {
-    const container = document.getElementById('suggestions-container');
+    const container = document.getElementById('suggestions-container') || document.getElementById('suggestions-list');
     if (!container) return;
 
     try {
@@ -2623,53 +2603,67 @@ async function loadSuggestions() {
         const users = await response.json();
         if (!response.ok) throw new Error(users.error);
 
-        if (users.length === 0) {
-            container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem;">No suggestions available</p>`;
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+        const currentUserId = currentUser ? (currentUser.id || currentUser._id) : null;
+
+        // Exclude self from suggestions list
+        const filteredUsers = Array.isArray(users) ? users.filter(u => u._id !== currentUserId && u.id !== currentUserId) : [];
+
+        if (filteredUsers.length === 0) {
+            container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; padding: 6px 0;">No suggestions available</p>`;
             return;
         }
 
         container.innerHTML = '';
 
-        users.forEach(user => {
+        filteredUsers.slice(0, 5).forEach(user => {
+            const isFollowing = currentUser && currentUser.following && currentUser.following.includes(user._id);
             const row = document.createElement('div');
             row.className = 'suggestion-item';
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.justifyContent = 'space-between';
+            row.style.marginBottom = '10px';
+
             row.innerHTML = `
-                <div class="user-profile-card">
-                    <div class="user-card-info" onclick="window.location.href='profile.html?u=${user.username}'">
-                        <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}" alt="Avatar" class="user-card-avatar" style="width: 36px; height: 36px;">
-                        <div class="user-card-names">
-                            <span class="user-card-username" style="font-size: 0.88rem;">${user.username}</span>
-                            <span class="user-card-fullname" style="font-size: 0.78rem;">Suggested for you</span>
+                <div class="user-profile-card" style="margin: 0; padding: 0; background: none; box-shadow: none;">
+                    <div class="user-card-info" style="cursor: pointer;" onclick="window.location.href='profile.html?u=${user.username}'">
+                        <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}" alt="Avatar" class="user-card-avatar" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;">
+                        <div class="user-card-names" style="margin-left: 10px;">
+                            <span class="user-card-username" style="font-size: 0.88rem; font-weight: 600; display: block;">${user.username}</span>
+                            <span class="user-card-fullname" style="font-size: 0.76rem; color: var(--text-muted);">Suggested for you</span>
                         </div>
                     </div>
                 </div>
-                <button class="follow-btn" id="suggest-follow-${user._id}">Follow</button>
+                <button class="follow-btn" id="suggest-follow-${user._id}" style="background: none; border: none; color: ${isFollowing ? 'var(--text-secondary)' : 'var(--accent-blue)'}; font-weight: 600; font-size: 0.82rem; cursor: pointer;">${isFollowing ? 'Following' : 'Follow'}</button>
             `;
 
             container.appendChild(row);
 
             // Hook follow toggle
             const followBtn = row.querySelector(`#suggest-follow-${user._id}`);
-            followBtn.addEventListener('click', async () => {
-                try {
-                    const res = await fetch(`${API_BASE}/users/${user._id}/follow`, {
-                        method: 'POST',
-                        headers: getHeaders()
-                    });
-                    const d = await res.json();
-                    if (!res.ok) throw new Error(d.error);
+            if (followBtn) {
+                followBtn.addEventListener('click', async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/users/${user._id}/follow`, {
+                            method: 'POST',
+                            headers: getHeaders()
+                        });
+                        const d = await res.json();
+                        if (!res.ok) throw new Error(d.error);
 
-                    if (d.following) {
-                        followBtn.textContent = 'Following';
-                        followBtn.style.color = 'var(--text-secondary)';
-                    } else {
-                        followBtn.textContent = 'Follow';
-                        followBtn.style.color = 'var(--accent-blue)';
+                        if (d.following) {
+                            followBtn.textContent = 'Following';
+                            followBtn.style.color = 'var(--text-secondary)';
+                        } else {
+                            followBtn.textContent = 'Follow';
+                            followBtn.style.color = 'var(--accent-blue)';
+                        }
+                    } catch (err) {
+                        console.error('Follow error:', err);
                     }
-                } catch (err) {
-                    console.error('Follow error:', err);
-                }
-            });
+                });
+            }
         });
     } catch (err) {
         console.error('Failed to load suggestions:', err);

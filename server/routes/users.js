@@ -39,18 +39,23 @@ function getActiveNote(note) {
 // 1. Get All Users
 router.get('/all', authenticateToken, async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 30, 100); // max 100 per page
+    const skip = (page - 1) * limit;
+
     const users = await User.find()
       .select('username avatar bio isVerified followers note')
-      .limit(30);
-    
-    // Attach clean 24h note
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
     const processed = users.map(u => {
-      const uObj = u.toObject();
-      uObj.note = getActiveNote(uObj.note);
-      return uObj;
+      u.note = getActiveNote(u.note);
+      return u;
     });
 
-    res.json(processed);
+    const total = await User.countDocuments();
+    res.json({ users: processed, page, totalPages: Math.ceil(total / limit), total });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users.' });
   }

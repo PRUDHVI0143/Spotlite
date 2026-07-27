@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const PostSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  image: { type: String, required: true },
+  image: { type: String, default: '' }, // Not required at schema level — validated at route level (image OR poll)
   caption: { type: String, default: '', maxLength: 2200 },
   mood: { type: String, default: '' },
   category: { type: String, default: 'General', index: true },

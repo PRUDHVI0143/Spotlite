@@ -123,6 +123,204 @@ describe('Spotlite Modular API Tests', () => {
     const res = await request(app).post('/api/users/note').send({ text: 'Hello Spotlite' });
     expect(res.statusCode).toBe(401);
   });
+
+  it('PUT /api/posts/:id — edit post caption, mood, hashtags', async () => {
+    // Login
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    // Create a post
+    const postRes = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        caption: 'Original caption',
+        category: 'General'
+      });
+    expect(postRes.statusCode).toBe(201);
+    const postId = postRes.body._id;
+
+    // Edit the post
+    const editRes = await request(app)
+      .put(`/api/posts/${postId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ caption: 'Updated caption!', mood: 'Happy', hashtags: ['#updated', '#spotlite'] });
+    expect(editRes.statusCode).toBe(200);
+    expect(editRes.body.caption).toBe('Updated caption!');
+    expect(editRes.body.mood).toBe('Happy');
+    expect(editRes.body.hashtags).toContain('#updated');
+  });
+
+  it('GET /api/posts/search?q= — search posts by caption', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    const searchRes = await request(app)
+      .get('/api/posts/search?q=spotlite')
+      .set('Authorization', `Bearer ${token}`);
+    expect(searchRes.statusCode).toBe(200);
+    expect(Array.isArray(searchRes.body)).toBe(true);
+  });
+
+  it('DELETE /api/notifications — clear all notifications', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    const deleteRes = await request(app)
+      .delete('/api/notifications')
+      .set('Authorization', `Bearer ${token}`);
+    expect(deleteRes.statusCode).toBe(200);
+    expect(deleteRes.body.message).toMatch(/cleared/i);
+  });
+
+  it('POST /api/posts/:id/repost — repost a post with a comment', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    // Create original post
+    const postRes = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        caption: 'This is the original post',
+        category: 'Tech'
+      });
+    expect(postRes.statusCode).toBe(201);
+    const originalId = postRes.body._id;
+
+    // Repost it
+    const repostRes = await request(app)
+      .post(`/api/posts/${originalId}/repost`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ repostComment: 'Great post worth sharing!' });
+    expect(repostRes.statusCode).toBe(201);
+    expect(repostRes.body.repostOf).toBeDefined();
+    expect(repostRes.body.repostComment).toBe('Great post worth sharing!');
+  });
+
+  it('POST /api/posts/:id/vote — vote on a poll (exclusive)', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    // Create a poll post
+    const pollRes = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        caption: '',
+        category: 'General',
+        poll: {
+          question: 'Best MERN stack tool?',
+          options: [{ text: 'MongoDB', votes: [] }, { text: 'Express', votes: [] }]
+        }
+      });
+    expect(pollRes.statusCode).toBe(201);
+    const pollPostId = pollRes.body._id;
+
+    // Vote on option 0
+    const voteRes = await request(app)
+      .post(`/api/posts/${pollPostId}/vote`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ optionIndex: 0 });
+    expect(voteRes.statusCode).toBe(200);
+    expect(voteRes.body.poll.options[0].votes).toBe(1);
+    expect(voteRes.body.poll.options[0].votedByMe).toBe(true);
+
+    // Change vote to option 1 (exclusive — old vote should be removed)
+    const voteRes2 = await request(app)
+      .post(`/api/posts/${pollPostId}/vote`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ optionIndex: 1 });
+    expect(voteRes2.statusCode).toBe(200);
+    expect(voteRes2.body.poll.options[0].votes).toBe(0);
+    expect(voteRes2.body.poll.options[1].votes).toBe(1);
+    expect(voteRes2.body.poll.options[1].votedByMe).toBe(true);
+  });
+
+  it('GET /api/auth/dev-code — returns pending verification code from DB', async () => {
+    const testEmail = `devcode_${Date.now()}@example.com`;
+    const testUsername = `devuser_${Date.now()}`;
+
+    // Register (email send is bypassed in test env via NODE_ENV=test)
+    const regRes = await request(app)
+      .post('/api/auth/register')
+      .send({ username: testUsername, email: testEmail, password: 'password123' });
+    expect(regRes.statusCode).toBe(201);
+
+    // Use dev-code to fetch the code without checking inbox
+    const devRes = await request(app)
+      .get(`/api/auth/dev-code?email=${testEmail}`);
+    expect(devRes.statusCode).toBe(200);
+    expect(devRes.body).toHaveProperty('code');
+    expect(devRes.body.code).toHaveLength(6);
+    expect(devRes.body.email).toBe(testEmail);
+    expect(devRes.body.expiresInSeconds).toBeGreaterThan(0);
+  });
+
+  it('Full email verification flow: register → dev-code → verify → login', async () => {
+    const testEmail = `flow_${Date.now()}@example.com`;
+    const testUsername = `flowuser_${Date.now()}`;
+
+    // 1. Register
+    const regRes = await request(app)
+      .post('/api/auth/register')
+      .send({ username: testUsername, email: testEmail, password: 'mypassword' });
+    expect(regRes.statusCode).toBe(201);
+    expect(regRes.body.requiresVerification).toBe(true);
+
+    // 2. Get code via dev-code (simulates getting from email)
+    const devRes = await request(app)
+      .get(`/api/auth/dev-code?email=${testEmail}`);
+    expect(devRes.statusCode).toBe(200);
+    const { code } = devRes.body;
+
+    // 3. Verify with the code
+    const verifyRes = await request(app)
+      .post('/api/auth/verify')
+      .send({ email: testEmail, code });
+    expect(verifyRes.statusCode).toBe(200);
+    expect(verifyRes.body).toHaveProperty('token');
+    expect(verifyRes.body.user.isVerified).toBe(true);
+
+    // 4. Login
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: testUsername, password: 'mypassword' });
+    expect(loginRes.statusCode).toBe(200);
+    expect(loginRes.body).toHaveProperty('token');
+
+    // 5. dev-code should now return 400 (already verified)
+    const devRes2 = await request(app)
+      .get(`/api/auth/dev-code?email=${testEmail}`);
+    expect(devRes2.statusCode).toBe(400);
+    expect(devRes2.body.error).toMatch(/already verified/i);
+  });
+
+  it('GET /api/posts/user/:username — fetches user posts for profile grid', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    const res = await request(app)
+      .get('/api/posts/user/admin')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
 });
 
 
