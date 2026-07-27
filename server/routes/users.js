@@ -27,6 +27,50 @@ router.post('/note', authenticateToken, async (req, res) => {
   }
 });
 
+// Create a 24-Hour Instagram-Style Story
+router.post('/stories', authenticateToken, async (req, res) => {
+  try {
+    const { image, caption } = req.body;
+    const userId = req.user.id || req.user._id;
+
+    if (!image && !caption) {
+      return res.status(400).json({ error: 'Image or caption text is required for stories.' });
+    }
+
+    const Story = require('../models/Story');
+    const story = new Story({
+      author: userId,
+      image: image || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+      caption: (caption || '').trim().substring(0, 100)
+    });
+    await story.save();
+
+    const user = await User.findById(userId);
+    if (user && caption) {
+      user.note = { text: caption.substring(0, 60), updatedAt: new Date() };
+      await user.save();
+    }
+
+    const populatedStory = await Story.findById(story._id).populate('author', 'username avatar');
+    res.status(201).json(populatedStory);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create story.' });
+  }
+});
+
+// Fetch active stories
+router.get('/stories', authenticateToken, async (req, res) => {
+  try {
+    const Story = require('../models/Story');
+    const stories = await Story.find({ expiresAt: { $gt: new Date() } })
+      .sort({ createdAt: -1 })
+      .populate('author', 'username avatar note');
+    res.json(stories);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch stories.' });
+  }
+});
+
 // Helper: Filter note if older than 24 hours
 function getActiveNote(note) {
   if (!note || !note.text || !note.updatedAt) return null;

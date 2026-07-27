@@ -1787,10 +1787,92 @@ function setupAvatarViewerListeners() {
     });
 }
 
+function openAddStoryModal() {
+    const modal = document.getElementById('add-story-modal-overlay');
+    if (modal) {
+        modal.style.cssText = 'display: flex !important; z-index: 999999;';
+    }
+}
+
+function setupAddStoryModal() {
+    const modal = document.getElementById('add-story-modal-overlay');
+    const closeBtn = document.getElementById('close-add-story-modal-btn');
+    const cancelBtn = document.getElementById('cancel-add-story-btn');
+    const submitBtn = document.getElementById('submit-share-story-btn');
+    const fileInput = document.getElementById('story-file-input');
+    const previewImg = document.getElementById('story-media-preview');
+    const captionInput = document.getElementById('story-caption-input');
+
+    if (!modal) return;
+
+    let pendingStoryImage = '';
+
+    if (fileInput) {
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                pendingStoryImage = evt.target.result;
+                if (previewImg) {
+                    previewImg.src = pendingStoryImage;
+                    previewImg.style.display = 'block';
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+    }
+
+    const hide = () => {
+        modal.style.cssText = 'display: none !important;';
+        pendingStoryImage = '';
+        if (previewImg) previewImg.style.display = 'none';
+        if (captionInput) captionInput.value = '';
+        if (fileInput) fileInput.value = '';
+    };
+
+    if (closeBtn) closeBtn.onclick = hide;
+    if (cancelBtn) cancelBtn.onclick = hide;
+
+    if (submitBtn) {
+        submitBtn.onclick = async () => {
+            const caption = captionInput ? captionInput.value.trim() : '';
+            if (!pendingStoryImage && !caption) {
+                alert('Please choose a photo or write a caption for your story.');
+                return;
+            }
+
+            try {
+                submitBtn.disabled = true;
+                const res = await fetch(`${API_BASE}/users/stories`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        image: pendingStoryImage,
+                        caption
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                hide();
+                showSpotliteToast('Added to your story! 📸✨');
+                if (typeof loadStoriesBar === 'function') loadStoriesBar();
+            } catch (err) {
+                alert(err.message || 'Failed to add story');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        };
+    }
+}
+
 // Load real dynamic user stories bar
 async function loadStoriesBar() {
     const storiesContainer = document.getElementById('stories-container');
     if (!storiesContainer) return;
+
+    setupAddStoryModal();
 
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     const userAvatar = currentUser && currentUser.avatar 
@@ -1799,39 +1881,54 @@ async function loadStoriesBar() {
     const userNoteText = currentUser.note ? currentUser.note.text : '';
 
     let html = `
-        <div class="story-item" id="user-note-trigger" style="position: relative;" title="Click to update your 24h Note">
+        <div class="story-item" id="user-note-trigger" style="position: relative; cursor: pointer;" onclick="openAddStoryModal()" title="Click to Add Instagram Story">
             ${userNoteText ? `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">${escapeHtml(userNoteText)}</div>` : `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">+ Note...</div>`}
-            <div class="story-avatar-wrapper user-story-add" onclick="openModal()">
+            <div class="story-avatar-wrapper user-story-add">
                 <img src="${userAvatar}" class="story-avatar-img" alt="Your story">
                 <div class="add-story-badge">+</div>
             </div>
-            <span class="story-username" style="color: var(--accent-gold); font-weight: 700;">+ Story</span>
+            <span class="story-username" style="color: var(--accent-gold); font-weight: 700;">Your story</span>
         </div>
     `;
 
     try {
-        const response = await fetch(`${API_BASE}/users/search?q=a`, { headers: getHeaders() });
-        const users = await response.json();
-        if (Array.isArray(users) && users.length > 0) {
-            users.slice(0, 12).forEach(u => {
-                const noteText = u.note ? u.note.text : '';
+        const response = await fetch(`${API_BASE}/users/stories`, { headers: getHeaders() });
+        const stories = await response.json();
+        if (Array.isArray(stories) && stories.length > 0) {
+            stories.forEach(s => {
+                const u = s.author || {};
+                const noteText = s.caption || (u.note ? u.note.text : '');
                 html += `
-                    <div class="story-item" style="position: relative;" onclick="openStoryViewerModal('${u.username}', '${u.avatar || ''}')">
+                    <div class="story-item" style="position: relative; cursor: pointer;" onclick="openStoryViewerModal('${u.username || 'user'}', '${s.image || u.avatar || ''}')">
                         ${noteText ? `<div class="story-note-bubble">${escapeHtml(noteText)}</div>` : ''}
                         <div class="story-avatar-wrapper">
                             <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" class="story-avatar-img" alt="${u.username}">
                         </div>
-                        <span class="story-username">${escapeHtml(u.username)}</span>
+                        <span class="story-username">${escapeHtml(u.username || 'user')}</span>
                     </div>
                 `;
             });
+        } else {
+            const fallbackRes = await fetch(`${API_BASE}/users/search?q=a`, { headers: getHeaders() });
+            const users = await fallbackRes.json();
+            if (Array.isArray(users)) {
+                users.slice(0, 10).forEach(u => {
+                    html += `
+                        <div class="story-item" style="position: relative; cursor: pointer;" onclick="openStoryViewerModal('${u.username}', '${u.avatar || ''}')">
+                            <div class="story-avatar-wrapper">
+                                <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" class="story-avatar-img" alt="${u.username}">
+                            </div>
+                            <span class="story-username">${escapeHtml(u.username)}</span>
+                        </div>
+                    `;
+                });
+            }
         }
     } catch (e) {
         console.error('Stories load error:', e);
     }
 
     storiesContainer.innerHTML = html;
-
     setTimeout(setupAvatarViewerListeners, 300);
 }
 
@@ -3232,15 +3329,26 @@ async function loadProfileHeader(username) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Profile not found.');
 
-        profileUserObjectId = data.id;
-        currentProfileUser = data;
-        applyThemeClass(data.profileTheme);
+        const u = data.user || data;
+        profileUserObjectId = u._id || u.id;
+        currentProfileUser = u;
+        applyThemeClass(u.profileTheme);
+
+        // Update local user storage if updating own profile
+        const myUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (myUser && (myUser.username === u.username || myUser.id === (u._id || u.id))) {
+            myUser.avatar = u.avatar;
+            myUser.coverPhoto = u.coverPhoto;
+            myUser.bio = u.bio;
+            myUser.website = u.website;
+            localStorage.setItem('user', JSON.stringify(myUser));
+        }
 
         // Render Cover Banner (Image or Video)
         const bannerContainer = document.getElementById('profile-cover-media-container');
         if (bannerContainer) {
-            if (data.coverPhoto) {
-                const url = data.coverPhoto.trim();
+            if (u.coverPhoto) {
+                const url = u.coverPhoto.trim();
                 const isVideo = url.endsWith('.mp4') || url.endsWith('.webm') || url.startsWith('data:video/');
                 if (isVideo) {
                     bannerContainer.innerHTML = `<video src="${url}" autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>`;
@@ -3253,17 +3361,24 @@ async function loadProfileHeader(username) {
         }
 
         // Populate elements
-        document.getElementById('profile-user-avatar').src = data.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${data.username}`;
-        document.getElementById('profile-username-heading').textContent = data.username;
-        document.getElementById('profile-fullname').textContent = data.username;
-        document.getElementById('profile-bio-text').textContent = data.bio || 'No bio description.';
+        const avatarEl = document.getElementById('profile-user-avatar');
+        if (avatarEl) avatarEl.src = u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`;
+
+        const usernameHeading = document.getElementById('profile-username-heading');
+        if (usernameHeading) usernameHeading.textContent = u.username;
+
+        const fullnameEl = document.getElementById('profile-fullname');
+        if (fullnameEl) fullnameEl.textContent = u.username;
+
+        const bioTextEl = document.getElementById('profile-bio-text');
+        if (bioTextEl) bioTextEl.textContent = u.bio || 'No bio description.';
 
         // Animate stats
-        animateNumber('profile-followers-count', data.followersCount);
-        animateNumber('profile-following-count', data.followingCount);
+        animateNumber('profile-followers-count', data.followersCount || (u.followers ? u.followers.length : 0));
+        animateNumber('profile-following-count', data.followingCount || (u.following ? u.following.length : 0));
 
         // Render badges
-        renderProfileBadges(data);
+        renderProfileBadges(u);
 
         // Bio link
         const bioLinkWrapper = document.getElementById('profile-bio-link-wrapper');
