@@ -43,8 +43,55 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
-// Database Connection & Admin Seeding
+// Database Connection & Seeding
 let isConnected = false;
+
+async function seedInitialPosts(adminId) {
+  try {
+    const Post = require('./server/models/Post');
+    const count = await Post.countDocuments();
+    if (count === 0 && adminId) {
+      const samplePosts = [
+        {
+          author: adminId,
+          caption: "Welcome to Spotlite! 🌟 Built with Node.js, Express, MongoDB & WebSockets. Share your moments with live photo filters & real-time messaging!",
+          image: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1080&q=80",
+          category: "Tech & Code",
+          mood: "Coding",
+          hashtags: ["#spotlite", "#mern", "#coding", "#tech"],
+          likes: [adminId],
+          comments: [
+            { user: adminId, username: "admin", text: "Welcome everyone! Feel free to create your own posts. ✨", createdAt: new Date() }
+          ]
+        },
+        {
+          author: adminId,
+          caption: "Exploring majestic mountain trails at sunrise. Nothing beats morning crisp air! 🏔️✨",
+          image: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1080&q=80",
+          category: "Travel",
+          mood: "Travel",
+          hashtags: ["#travel", "#explore", "#nature", "#vibes"],
+          likes: [adminId],
+          comments: []
+        },
+        {
+          author: adminId,
+          caption: "Fresh artisanal sourdough & avocado toast breakfast spread. Good food, good mood! 🥑🍞☕",
+          image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=1080&q=80",
+          category: "Food",
+          mood: "Food",
+          hashtags: ["#foodie", "#breakfast", "#delicious"],
+          likes: [adminId],
+          comments: []
+        }
+      ];
+      await Post.insertMany(samplePosts);
+      console.log('Initial sample posts seeded successfully.');
+    }
+  } catch (err) {
+    console.error('Failed to seed sample posts:', err.message);
+  }
+}
 
 async function seedAdmin() {
   try {
@@ -53,10 +100,10 @@ async function seedAdmin() {
     const adminPassword = 'prudhvi';
 
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    const existingAdmin = await User.findOne({ username: adminUsername });
+    let adminUser = await User.findOne({ username: adminUsername });
 
-    if (!existingAdmin) {
-      const adminUser = new User({
+    if (!adminUser) {
+      adminUser = new User({
         username: adminUsername,
         email: adminEmail,
         password: hashedPassword,
@@ -67,11 +114,13 @@ async function seedAdmin() {
       await adminUser.save();
       console.log('Default administrator account created successfully.');
     } else {
-      existingAdmin.password = hashedPassword;
-      existingAdmin.isAdmin = true;
-      existingAdmin.isVerified = true;
-      await existingAdmin.save();
+      adminUser.password = hashedPassword;
+      adminUser.isAdmin = true;
+      adminUser.isVerified = true;
+      await adminUser.save();
     }
+
+    await seedInitialPosts(adminUser._id);
   } catch (err) {
     console.error('Failed to seed admin account:', err.message);
   }
