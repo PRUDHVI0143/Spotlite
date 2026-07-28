@@ -6374,7 +6374,227 @@ function setupGroupChatModal() {
     }
 }
 
+// ── GLOBAL NAVIGATION LISTENERS ──
+window.setupGlobalNavigationListeners = function() {
+    const searchBtns = document.querySelectorAll('#sidebar-search-btn, #mobile-search-btn');
+    const searchPanel = document.getElementById('search-slider-panel');
+    const closeSearchBtn = document.getElementById('close-search-panel-btn');
+
+    searchBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            if (searchPanel) searchPanel.classList.toggle('active');
+        };
+    });
+    if (closeSearchBtn && searchPanel) {
+        closeSearchBtn.onclick = () => searchPanel.classList.remove('active');
+    }
+
+    const settingsBtns = document.querySelectorAll('#open-settings-btn, #mobile-settings-btn');
+    const settingsModal = document.getElementById('settings-modal') || document.getElementById('settings-modal-overlay');
+    const closeSettingsBtns = document.querySelectorAll('#close-settings-modal-btn, #close-settings-btn');
+
+    settingsBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            if (settingsModal) settingsModal.style.cssText = 'display: flex !important; z-index: 999999;';
+        };
+    });
+    closeSettingsBtns.forEach(btn => {
+        btn.onclick = () => {
+            if (settingsModal) settingsModal.style.cssText = 'display: none !important;';
+        };
+    });
+
+    const createBtns = document.querySelectorAll('#open-create-btn, #mobile-open-create-btn, #sidebar-create-btn, .bottom-create-btn, [aria-label="Create Post"]');
+    const createModal = document.getElementById('create-post-modal-overlay');
+    const closeCreateBtn = document.getElementById('close-create-modal');
+
+    createBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            if (createModal) createModal.style.cssText = 'display: flex !important; z-index: 999999;';
+        };
+    });
+    if (closeCreateBtn && createModal) {
+        closeCreateBtn.onclick = () => createModal.style.cssText = 'display: none !important;';
+    }
+
+    const groupBtn = document.getElementById('inbox-new-group-btn');
+    if (groupBtn) {
+        groupBtn.onclick = (e) => {
+            e.preventDefault();
+            if (typeof window.openGroupChatModal === 'function') window.openGroupChatModal();
+        };
+    }
+};
+
+window.initMessagesPage = function() {
+    window.setupGlobalNavigationListeners();
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = 'auth.html';
+        return;
+    }
+    if (typeof loadConversationsInbox === 'function') {
+        loadConversationsInbox();
+    }
+    if (typeof setupAddStoryModal === 'function') {
+        setupAddStoryModal();
+    }
+};
+
+window.currentProfileUserId = null;
+window.currentProfileStories = [];
+
+window.initProfilePage = async function() {
+    window.setupGlobalNavigationListeners();
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = 'auth.html';
+        return;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUsername = urlParams.get('user') || urlParams.get('username');
+    const loggedUser = JSON.parse(localStorage.getItem('user')) || {};
+
+    try {
+        let profileUser = loggedUser;
+        if (targetUsername && targetUsername.toLowerCase() !== (loggedUser.username || '').toLowerCase()) {
+            const res = await fetch(`${API_BASE}/users/profile/${targetUsername}`, { headers: getHeaders() });
+            if (res.ok) profileUser = await res.json();
+        }
+
+        window.currentProfileUserId = profileUser._id || profileUser.id;
+
+        const heading = document.getElementById('profile-username-heading');
+        const avatarImg = document.getElementById('profile-user-avatar');
+        const fullname = document.getElementById('profile-fullname');
+        const bioText = document.getElementById('profile-bio-text');
+        const editBtn = document.getElementById('open-edit-profile-btn');
+        const addStoryBtn = document.getElementById('open-add-story-btn');
+
+        if (heading) heading.textContent = profileUser.username || 'user';
+        if (avatarImg) avatarImg.src = profileUser.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${profileUser.username}`;
+        if (fullname) fullname.textContent = profileUser.fullName || profileUser.username || 'Spotlite Member';
+        if (bioText) bioText.textContent = profileUser.bio || 'No bio yet.';
+
+        const isOwnProfile = (!targetUsername || profileUser._id === loggedUser.id || profileUser._id === loggedUser._id || profileUser.username === loggedUser.username);
+        if (isOwnProfile) {
+            if (editBtn) editBtn.style.display = 'inline-block';
+            if (addStoryBtn) addStoryBtn.style.display = 'inline-block';
+        }
+
+        await window.checkUserProfileStories(window.currentProfileUserId);
+
+        if (typeof setupAddStoryModal === 'function') {
+            setupAddStoryModal();
+        }
+    } catch (e) {
+        console.error('Failed to init profile page:', e);
+    }
+};
+
+window.checkUserProfileStories = async function(userId) {
+    const ring = document.getElementById('profile-avatar-story-ring');
+    if (!ring || !userId) return;
+    try {
+        const res = await fetch(`${API_BASE}/users/${userId}/stories`, { headers: getHeaders() });
+        if (res.ok) {
+            window.currentProfileStories = await res.json();
+            if (window.currentProfileStories && window.currentProfileStories.length > 0) {
+                ring.classList.add('has-active-story');
+            } else {
+                ring.classList.remove('has-active-story');
+            }
+        }
+    } catch (e) {
+        console.error('Failed to check user stories:', e);
+    }
+};
+
+window.handleProfileAvatarClick = async function() {
+    const loggedUser = JSON.parse(localStorage.getItem('user')) || {};
+    const isOwnProfile = !window.currentProfileUserId || window.currentProfileUserId === loggedUser.id || window.currentProfileUserId === loggedUser._id;
+
+    if (window.currentProfileStories && window.currentProfileStories.length > 0) {
+        window.openStoryViewerModal(window.currentProfileStories);
+    } else if (isOwnProfile) {
+        if (typeof window.openAddStoryModal === 'function') {
+            window.openAddStoryModal();
+        }
+    } else {
+        alert('This user has no active stories.');
+    }
+};
+
+window.openStoryViewerModal = function(stories) {
+    if (!stories || stories.length === 0) return;
+
+    let existingModal = document.getElementById('story-viewer-modal');
+    if (existingModal) existingModal.remove();
+
+    let currentIndex = 0;
+    const currentStory = stories[currentIndex];
+
+    const modal = document.createElement('div');
+    modal.id = 'story-viewer-modal';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'display: flex !important; z-index: 999999; background: rgba(0,0,0,0.92);';
+
+    modal.innerHTML = `
+        <div style="position: relative; max-width: 420px; width: 90%; background: #12161c; border: 1.5px solid var(--accent-gold); border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.9); flex-direction: column;">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(0,0,0,0.6); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img id="sv-author-avatar" src="${currentStory.author?.avatar || 'spotlite.png'}" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--accent-gold); object-fit: cover;">
+                    <span id="sv-author-name" style="color: #fff; font-weight: 700; font-size: 0.95rem;">@${currentStory.author?.username || 'user'}</span>
+                </div>
+                <button id="sv-close-btn" style="background: none; border: none; color: #fff; font-size: 1.8rem; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div style="width: 100%; height: 500px; background: #000; display: flex; align-items: center; justify-content: center; position: relative;">
+                <img id="sv-story-img" src="${currentStory.image}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                <button id="sv-prev-btn" style="position: absolute; left: 10px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;">❮</button>
+                <button id="sv-next-btn" style="position: absolute; right: 10px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;">❯</button>
+            </div>
+
+            <div style="padding: 14px 18px; background: #12161c; text-align: center;">
+                <p id="sv-caption-text" style="color: var(--text-primary); font-size: 0.95rem; margin: 0; font-weight: 600;">${currentStory.caption || ''}</p>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const updateView = (index) => {
+        const s = stories[index];
+        if (!s) return;
+        document.getElementById('sv-author-avatar').src = s.author?.avatar || 'spotlite.png';
+        document.getElementById('sv-author-name').textContent = `@${s.author?.username || 'user'}`;
+        document.getElementById('sv-story-img').src = s.image;
+        document.getElementById('sv-caption-text').textContent = s.caption || '';
+    };
+
+    document.getElementById('sv-close-btn').onclick = () => modal.remove();
+    document.getElementById('sv-prev-btn').onclick = () => {
+        if (currentIndex > 0) {
+            currentIndex--;
+            updateView(currentIndex);
+        }
+    };
+    document.getElementById('sv-next-btn').onclick = () => {
+        if (currentIndex < stories.length - 1) {
+            currentIndex++;
+            updateView(currentIndex);
+        } else {
+            modal.remove();
+        }
+    };
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+    window.setupGlobalNavigationListeners();
     ensureCallModalsExist();
     bindCallModalButtons();
     setupGroupChatModal();

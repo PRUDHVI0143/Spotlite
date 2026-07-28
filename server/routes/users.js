@@ -71,6 +71,22 @@ router.get('/stories', authenticateToken, async (req, res) => {
   }
 });
 
+// Fetch active stories for a specific user
+router.get('/:userId/stories', authenticateToken, async (req, res) => {
+  try {
+    const Story = require('../models/Story');
+    const stories = await Story.find({
+      author: req.params.userId,
+      expiresAt: { $gt: new Date() }
+    })
+      .sort({ createdAt: 1 })
+      .populate('author', 'username avatar note');
+    res.json(stories);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch user stories.' });
+  }
+});
+
 // Helper: Filter note if older than 24 hours
 function getActiveNote(note) {
   if (!note || !note.text || !note.updatedAt) return null;

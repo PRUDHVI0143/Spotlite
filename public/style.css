@@ -4586,3 +4586,23 @@ body.mode-oled {
     justify-content: center !important;
     z-index: 999999 !important;
 }
+
+/* ── INSTAGRAM-STYLE STORY RING & AVATAR GLOW ── */
+.profile-avatar-story-ring.has-active-story {
+    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888, #ffcb05) !important;
+    background-size: 300% 300% !important;
+    animation: instaStoryGradient 4s ease infinite !important;
+    box-shadow: 0 0 16px rgba(220, 39, 67, 0.6) !important;
+    padding: 3.5px !important;
+    border-radius: 50% !important;
+}
+
+.profile-avatar-story-ring.has-active-story img {
+    border: 3px solid #0d1117 !important;
+}
+
+@keyframes instaStoryGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}

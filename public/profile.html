@@ -143,15 +143,18 @@
                         <div class="story-note-bubble profile-note-bubble" id="profile-status-note-bubble" onclick="openNoteModal()" style="position: absolute; top: -14px; left: 50%; transform: translateX(-50%); cursor: pointer; z-index: 10;" title="Click to update status note">
                             + Note...
                         </div>
-                        <img src="https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=default" alt="Avatar" class="profile-avatar-img" id="profile-user-avatar">
+                        <div class="profile-avatar-story-ring" id="profile-avatar-story-ring" onclick="handleProfileAvatarClick()" style="cursor: pointer; position: relative; display: inline-block; padding: 4px; border-radius: 50%; border: 3px solid transparent;" title="Tap DP to view story">
+                            <img src="https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=default" alt="Avatar" class="profile-avatar-img" id="profile-user-avatar" style="display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                        </div>
                     </div>
                     <div class="profile-info-container">
                         <!-- Username row with action buttons -->
                         <div class="profile-username-row">
                             <h2 class="profile-username" id="profile-username-heading">username</h2>
                             <div id="profile-badges-container" style="display: flex; gap: 6px; margin-left: 10px; align-items: center;"></div>
-                            <!-- My profile: edit button -->
+                            <!-- My profile: edit button & add story button -->
                             <button class="edit-profile-btn" id="open-edit-profile-btn" style="display: none;">Edit Profile</button>
+                            <button class="edit-profile-btn" id="open-add-story-btn" onclick="openAddStoryModal()" style="display: none; background: var(--spotlite-gradient); color: black; border: none; font-weight: 700;">➕ Add Story</button>
                             <!-- Other profile: three-dot menu -->
                             <button class="profile-options-btn" id="profile-options-btn" style="display: none;">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
