@@ -6807,6 +6807,293 @@ function startWebRTCCall(isAudioOnly = false) {
     window.location.href = `call.html?peerId=${peerId}&type=${callType}`;
 }
 
+window.activeChatRecipient = null;
+window.activeChatReceiverId = null;
+window.pendingChatAttachment = null;
+
+window.openChatWithUser = async function(user) {
+    if (!user) return;
+    window.activeChatRecipient = user;
+    window.activeChatReceiverId = user._id || user.id;
+
+    const emptyState = document.getElementById('chat-empty-state');
+    const activeWindow = document.getElementById('chat-window-active');
+    const avatarImg = document.getElementById('active-chat-avatar');
+    const usernameSpan = document.getElementById('active-chat-username');
+    const backBtn = document.getElementById('mobile-back-to-inbox-btn');
+
+    if (emptyState) emptyState.style.cssText = 'display: none !important;';
+    if (activeWindow) activeWindow.style.cssText = 'display: flex !important; flex-direction: column; height: 100%;';
+
+    if (avatarImg) avatarImg.src = user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`;
+    if (usernameSpan) usernameSpan.textContent = `@${user.username}`;
+    if (backBtn) backBtn.style.display = 'inline-block';
+
+    if (window.innerWidth <= 768) {
+        const inboxPanel = document.querySelector('.messages-inbox');
+        if (inboxPanel) inboxPanel.style.display = 'none';
+    }
+
+    loadChatThread(window.activeChatReceiverId);
+};
+
+window.loadChatThread = async function(receiverId) {
+    if (!receiverId) return;
+    const thread = document.getElementById('active-chat-thread');
+    if (!thread) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/messages/${receiverId}`, { headers: getHeaders() });
+        if (!res.ok) return;
+        const messages = await res.json();
+
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const myId = String(currentUser._id || currentUser.id || '');
+
+        thread.innerHTML = '';
+
+        if (!Array.isArray(messages) || messages.length === 0) {
+            thread.innerHTML = `
+                <div style="text-align:center; padding: 40px 20px; color: var(--text-muted); font-size: 0.88rem;">
+                    👋 Say hi to <strong>@${escapeHtml(window.activeChatRecipient?.username || 'user')}</strong>!
+                </div>
+            `;
+            return;
+        }
+
+        messages.forEach(msg => {
+            const senderId = String(msg.sender?._id || msg.sender?.id || msg.sender || '');
+            const isMe = senderId === myId;
+
+            const bubbleWrap = document.createElement('div');
+            bubbleWrap.style.cssText = `display: flex; flex-direction: column; margin-bottom: 12px; align-items: ${isMe ? 'flex-end' : 'flex-start'};`;
+
+            let mediaContent = '';
+            if (msg.fileUrl) {
+                if (msg.fileType && msg.fileType.startsWith('image/')) {
+                    mediaContent = `<img src="${msg.fileUrl}" style="max-width: 240px; max-height: 200px; border-radius: 12px; margin-bottom: 6px; display: block; cursor: pointer;" onclick="window.open('${msg.fileUrl}', '_blank')">`;
+                } else {
+                    mediaContent = `<a href="${msg.fileUrl}" target="_blank" style="color: var(--accent-gold); font-weight: 600; text-decoration: underline; font-size: 0.85rem; display: block; margin-bottom: 6px;">📎 ${escapeHtml(msg.fileName || 'Attachment')}</a>`;
+                }
+            }
+
+            const timeStr = new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            bubbleWrap.innerHTML = `
+                <div style="max-width: 75%; padding: 10px 14px; border-radius: ${isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px'}; background: ${isMe ? 'var(--spotlite-gradient)' : 'var(--bg-card)'}; color: ${isMe ? '#000' : 'var(--text-primary)'}; border: ${isMe ? 'none' : '1px solid var(--border-color)'}; font-size: 0.92rem; font-weight: 500; word-break: break-word; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    ${mediaContent}
+                    ${escapeHtml(msg.text || '')}
+                    <div style="font-size: 0.7rem; color: ${isMe ? 'rgba(0,0,0,0.6)' : 'var(--text-muted)'}; margin-top: 4px; text-align: right;">${timeStr}</div>
+                </div>
+            `;
+            thread.appendChild(bubbleWrap);
+        });
+
+        thread.scrollTop = thread.scrollHeight;
+    } catch (err) {
+        console.error('Error loading chat thread:', err);
+    }
+};
+
+window.sendChatMessage = async function(customText) {
+    if (!window.activeChatReceiverId) {
+        if (typeof openNewChatPanel === 'function') {
+            openNewChatPanel();
+        } else {
+            alert('Please select or search for a user to message.');
+        }
+        return;
+    }
+
+    const input = document.getElementById('chat-text-input');
+    const text = customText !== undefined ? customText : (input ? input.value.trim() : '');
+    const attachment = window.pendingChatAttachment;
+
+    if (!text && !attachment) return;
+
+    const thread = document.getElementById('active-chat-thread');
+    if (thread) {
+        const tempWrap = document.createElement('div');
+        tempWrap.style.cssText = 'display: flex; flex-direction: column; margin-bottom: 12px; align-items: flex-end;';
+        
+        let mediaHtml = '';
+        if (attachment && attachment.fileUrl) {
+            mediaHtml = `<img src="${attachment.fileUrl}" style="max-width: 240px; max-height: 200px; border-radius: 12px; margin-bottom: 6px;">`;
+        }
+
+        tempWrap.innerHTML = `
+            <div style="max-width: 75%; padding: 10px 14px; border-radius: 18px 18px 4px 18px; background: var(--spotlite-gradient); color: #000; font-size: 0.92rem; font-weight: 500; word-break: break-word;">
+                ${mediaHtml}
+                ${escapeHtml(text || '')}
+                <div style="font-size: 0.7rem; color: rgba(0,0,0,0.6); margin-top: 4px; text-align: right;">Just now</div>
+            </div>
+        `;
+        thread.appendChild(tempWrap);
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    if (input) input.value = '';
+    const attachPreview = document.getElementById('chat-attachment-preview');
+    if (attachPreview) attachPreview.style.display = 'none';
+    window.pendingChatAttachment = null;
+
+    if (typeof playActionSound === 'function') playActionSound('comment');
+
+    try {
+        const payload = {
+            receiverId: window.activeChatReceiverId,
+            text: text || ''
+        };
+        if (attachment) {
+            payload.fileUrl = attachment.fileUrl;
+            payload.fileName = attachment.fileName;
+            payload.fileType = attachment.fileType;
+        }
+
+        const res = await fetch(`${API_BASE}/messages`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error('Failed to send message');
+
+        loadChatThread(window.activeChatReceiverId);
+        loadConversationsInbox();
+    } catch (err) {
+        console.error('Send message error:', err);
+    }
+};
+
+window.loadConversationsInbox = async function() {
+    const list = document.getElementById('conversations-inbox-list');
+    if (!list) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/messages/conversations`, { headers: getHeaders() });
+        if (!res.ok) return;
+        const convs = await res.json();
+
+        if (!Array.isArray(convs) || convs.length === 0) {
+            list.innerHTML = `
+                <div style="text-align:center; padding: 30px 16px; color: var(--text-muted); font-size: 0.85rem;">
+                    No active conversations.<br>Click <strong>New Chat</strong> to message someone!
+                </div>
+            `;
+            return;
+        }
+
+        list.innerHTML = '';
+        convs.forEach(c => {
+            const u = c.user;
+            if (!u) return;
+
+            const row = document.createElement('div');
+            row.style.cssText = `display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; background: ${window.activeChatReceiverId === u._id ? 'rgba(255,203,5,0.1)' : 'transparent'}; transition: background 0.2s;`;
+            
+            const timeStr = c.updatedAt ? new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+            row.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px; overflow: hidden;">
+                    <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-gold);">
+                    <div style="min-width: 0;">
+                        <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary); display: block;">@${escapeHtml(u.username)}</span>
+                        <span style="font-size: 0.78rem; color: var(--text-muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${escapeHtml(c.lastMessage || 'Sent attachment')}</span>
+                    </div>
+                </div>
+                <span style="font-size: 0.72rem; color: var(--text-muted); flex-shrink: 0;">${timeStr}</span>
+            `;
+
+            row.onclick = () => openChatWithUser(u);
+            list.appendChild(row);
+        });
+    } catch (err) {
+        console.error('Error loading conversations inbox:', err);
+    }
+};
+
+window.initMessagesPage = function() {
+    loadConversationsInbox();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUsername = urlParams.get('u');
+    if (targetUsername) {
+        fetch(`${API_BASE}/users/profile/${targetUsername}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.user) openChatWithUser(data.user);
+            })
+            .catch(e => console.error('Failed to load user profile for chat:', e));
+    }
+
+    const sendBtn = document.getElementById('chat-send-btn');
+    const textInput = document.getElementById('chat-text-input');
+    const heartBtn = document.getElementById('chat-quick-heart-btn');
+    const attachBtn = document.getElementById('chat-attach-file-btn');
+    const fileInput = document.getElementById('chat-file-input');
+    const removeAttachBtn = document.getElementById('chat-attachment-remove-btn');
+    const backBtn = document.getElementById('mobile-back-to-inbox-btn');
+
+    if (sendBtn) sendBtn.onclick = () => sendChatMessage();
+    if (textInput) {
+        textInput.onkeypress = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        };
+    }
+    if (heartBtn) heartBtn.onclick = () => sendChatMessage('❤️');
+
+    if (attachBtn && fileInput) {
+        attachBtn.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            fileToBase64(file).then(base64 => {
+                window.pendingChatAttachment = {
+                    fileUrl: base64,
+                    fileName: file.name,
+                    fileType: file.type
+                };
+                const preview = document.getElementById('chat-attachment-preview');
+                const nameSpan = document.getElementById('chat-attachment-name');
+                if (preview) preview.style.display = 'flex';
+                if (nameSpan) nameSpan.textContent = file.name;
+            });
+        };
+    }
+
+    if (removeAttachBtn) {
+        removeAttachBtn.onclick = () => {
+            window.pendingChatAttachment = null;
+            const preview = document.getElementById('chat-attachment-preview');
+            if (preview) preview.style.display = 'none';
+        };
+    }
+
+    if (backBtn) {
+        backBtn.onclick = () => {
+            const inboxPanel = document.querySelector('.messages-inbox');
+            if (inboxPanel) inboxPanel.style.display = 'block';
+            const activeWindow = document.getElementById('chat-window-active');
+            if (activeWindow) activeWindow.style.cssText = 'display: none !important;';
+            const emptyState = document.getElementById('chat-empty-state');
+            if (emptyState) emptyState.style.cssText = 'display: flex !important;';
+        };
+    }
+
+    // Auto refresh active chat thread every 3 seconds
+    if (!window._messagesAutoRefreshInterval) {
+        window._messagesAutoRefreshInterval = setInterval(() => {
+            if (window.activeChatReceiverId && window.location.pathname.includes('messages')) {
+                loadChatThread(window.activeChatReceiverId);
+                loadConversationsInbox();
+            }
+        }, 3000);
+    }
+};
+
 function setupGroupChatModal() {
     const openBtn = document.getElementById('inbox-new-group-btn');
     const modal = document.getElementById('group-chat-modal-overlay');
