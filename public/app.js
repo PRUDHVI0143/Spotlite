@@ -6790,22 +6790,223 @@ async function loadAllCallHistory(containerId = 'call-history-list') {
     }
 }
 
-function startCallWithPeer(peerId, username, avatar) {
+let localStream = null;
+let peerConnection = null;
+let callTimerInterval = null;
+let callDurationSeconds = 0;
+
+window.ensureCallModalsExist = function() {
+    let callModal = document.getElementById('webrtc-call-modal');
+    if (!callModal) {
+        callModal = document.createElement('div');
+        callModal.id = 'webrtc-call-modal';
+        callModal.className = 'modal-overlay';
+        callModal.style.cssText = 'display: none; position: fixed; inset: 0; z-index: 999999; background: rgba(0,0,0,0.92); align-items: center; justify-content: center; backdrop-filter: blur(12px);';
+        callModal.innerHTML = `
+            <div style="position: relative; width: 90%; max-width: 720px; height: 82vh; max-height: 600px; background: #0f141c; border: 1.5px solid var(--accent-gold); border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.9);">
+                <!-- Call Header -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: rgba(0,0,0,0.6); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span id="call-type-icon" style="font-size: 1.2rem;">📹</span>
+                        <span id="call-peer-username" style="color: #fff; font-weight: 700; font-size: 1rem;">@user</span>
+                    </div>
+                    <span id="call-status-timer" style="color: var(--accent-gold); font-weight: 700; font-size: 0.95rem; font-family: monospace;">00:00</span>
+                </div>
+
+                <!-- Video / Audio Stream Display Box -->
+                <div style="flex: 1; position: relative; background: #05070a; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <!-- Remote Video Stream -->
+                    <video id="remote-video-element" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    
+                    <!-- Audio-Only Avatar Display -->
+                    <div id="call-audio-avatar-container" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;">
+                        <div style="position: relative; padding: 12px; border-radius: 50%; background: rgba(255,203,5,0.15); border: 2px solid var(--accent-gold);">
+                            <img id="call-audio-avatar" src="" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;">
+                        </div>
+                        <span id="call-audio-username" style="color: #fff; font-weight: 700; font-size: 1.1rem;">@user</span>
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">🔒 End-to-End Encrypted Audio Call</span>
+                    </div>
+
+                    <!-- Local Camera PIP Preview -->
+                    <div id="local-video-pip" style="position: absolute; bottom: 20px; right: 20px; width: 140px; height: 100px; border-radius: 12px; overflow: hidden; border: 2px solid var(--accent-gold); box-shadow: 0 8px 24px rgba(0,0,0,0.6); background: #000;">
+                        <video id="local-video-element" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    </div>
+                </div>
+
+                <!-- Action Controls Bar -->
+                <div style="display: flex; align-items: center; justify-content: center; gap: 20px; padding: 16px 20px; background: rgba(15,20,28,0.95); border-top: 1px solid var(--border-color);">
+                    <button id="call-toggle-mic-btn" title="Toggle Microphone 🎤" style="width: 48px; height: 48px; border-radius: 50%; border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 1.2rem; cursor: pointer; transition: background 0.2s;">🎤</button>
+                    <button id="call-toggle-cam-btn" title="Toggle Camera 📹" style="width: 48px; height: 48px; border-radius: 50%; border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 1.2rem; cursor: pointer; transition: background 0.2s;">📹</button>
+                    <button id="call-toggle-screen-btn" title="Share Screen 🖥️" style="width: 48px; height: 48px; border-radius: 50%; border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 1.2rem; cursor: pointer; transition: background 0.2s;">🖥️</button>
+                    <button id="call-end-btn" title="End Call 🛑" style="width: 54px; height: 54px; border-radius: 50%; border: none; background: #ea0038; color: #fff; font-size: 1.4rem; cursor: pointer; box-shadow: 0 4px 16px rgba(234,0,56,0.4);">📞</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(callModal);
+    }
+};
+
+window.bindCallModalButtons = function() {
+    ensureCallModalsExist();
+    const endBtn = document.getElementById('call-end-btn');
+    const micBtn = document.getElementById('call-toggle-mic-btn');
+    const camBtn = document.getElementById('call-toggle-cam-btn');
+    const screenBtn = document.getElementById('call-toggle-screen-btn');
+
+    if (endBtn) endBtn.onclick = () => endWebRTCCall();
+    if (micBtn) micBtn.onclick = () => {
+        if (localStream) {
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                micBtn.style.background = audioTrack.enabled ? 'rgba(255,255,255,0.1)' : '#ea0038';
+                micBtn.textContent = audioTrack.enabled ? '🎤' : '🎙️';
+            }
+        }
+    };
+    if (camBtn) camBtn.onclick = () => {
+        if (localStream) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                camBtn.style.background = videoTrack.enabled ? 'rgba(255,255,255,0.1)' : '#ea0038';
+            }
+        }
+    };
+    if (screenBtn) screenBtn.onclick = () => {
+        if (typeof toggleScreenShare === 'function') toggleScreenShare();
+    };
+};
+
+window.startCallWithPeer = function(peerId, username, avatar) {
     if (!peerId) return;
     window.activeChatRecipient = { _id: peerId, username, avatar };
+    window.activeChatReceiverId = peerId;
     startWebRTCCall(false);
-}
+};
 
-function startWebRTCCall(isAudioOnly = false) {
-    const peer = window.activeChatRecipient || currentProfileUser;
-    const peerId = (peer && (peer._id || peer.id)) || activeChatReceiverId;
+window.startWebRTCCall = function(isAudioOnly = false) {
+    const peer = window.activeChatRecipient || window.currentProfileUser;
+    const peerId = (peer && (peer._id || peer.id)) || window.activeChatReceiverId;
+
     if (!peerId) {
-        alert('Please select a user to start a call.');
+        alert('Please select a user to start an audio or video call.');
         return;
     }
-    const callType = isAudioOnly ? 'audio' : 'video';
-    window.location.href = `call.html?peerId=${peerId}&type=${callType}`;
-}
+
+    const peerUsername = (peer && peer.username) ? peer.username : 'user';
+    const peerAvatar = (peer && peer.avatar) ? peer.avatar : `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${peerUsername}`;
+
+    ensureCallModalsExist();
+    bindCallModalButtons();
+    openActiveCallModal(peerUsername, peerAvatar, isAudioOnly);
+    startLocalWebRTCStream(isAudioOnly);
+};
+
+window.openActiveCallModal = function(username, avatar, isAudioOnly) {
+    const modal = document.getElementById('webrtc-call-modal');
+    if (!modal) return;
+
+    modal.style.cssText = 'display: flex !important; position: fixed; inset: 0; z-index: 999999; background: rgba(0,0,0,0.92); align-items: center; justify-content: center; backdrop-filter: blur(12px);';
+    
+    const nameEl = document.getElementById('call-peer-username');
+    const typeIconEl = document.getElementById('call-type-icon');
+    if (nameEl) nameEl.textContent = `@${username}`;
+    if (typeIconEl) typeIconEl.textContent = isAudioOnly ? '📞' : '📹';
+
+    const audioAvatarContainer = document.getElementById('call-audio-avatar-container');
+    const remoteVid = document.getElementById('remote-video-element');
+    const localPip = document.getElementById('local-video-pip');
+
+    if (isAudioOnly) {
+        if (audioAvatarContainer) audioAvatarContainer.style.display = 'flex';
+        if (remoteVid) remoteVid.style.display = 'none';
+        if (localPip) localPip.style.display = 'none';
+        const avatarEl = document.getElementById('call-audio-avatar');
+        const userEl = document.getElementById('call-audio-username');
+        if (avatarEl) avatarEl.src = avatar;
+        if (userEl) userEl.textContent = `@${username}`;
+    } else {
+        if (audioAvatarContainer) audioAvatarContainer.style.display = 'none';
+        if (remoteVid) remoteVid.style.display = 'block';
+        if (localPip) localPip.style.display = 'block';
+    }
+
+    // Call Timer Start
+    callDurationSeconds = 0;
+    const timerEl = document.getElementById('call-status-timer');
+    if (timerEl) timerEl.textContent = '00:00';
+    if (callTimerInterval) clearInterval(callTimerInterval);
+    callTimerInterval = setInterval(() => {
+        callDurationSeconds++;
+        const mins = String(Math.floor(callDurationSeconds / 60)).padStart(2, '0');
+        const secs = String(callDurationSeconds % 60).padStart(2, '0');
+        if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+    }, 1000);
+};
+
+window.startLocalWebRTCStream = async function(isAudioOnly) {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: !isAudioOnly,
+            audio: true
+        });
+        const localVid = document.getElementById('local-video-element');
+        if (localVid) localVid.srcObject = localStream;
+        if (typeof showSpotliteToast === 'function') showSpotliteToast(isAudioOnly ? '📞 Audio Call Connected!' : '📹 Video Call Connected!');
+    } catch (err) {
+        console.warn('Full media stream failed, falling back to audio only:', err);
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (typeof showSpotliteToast === 'function') showSpotliteToast('📞 Audio Call Connected!');
+        } catch (audioErr) {
+            if (typeof showSpotliteToast === 'function') showSpotliteToast(isAudioOnly ? '📞 Audio Call Connecting...' : '📹 Video Call Connecting...');
+        }
+    }
+};
+
+window.endWebRTCCall = function() {
+    if (callTimerInterval) {
+        clearInterval(callTimerInterval);
+        callTimerInterval = null;
+    }
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    const modal = document.getElementById('webrtc-call-modal');
+    if (modal) modal.style.cssText = 'display: none !important;';
+
+    if (window.activeChatReceiverId && typeof appendCallRecordToChat === 'function') {
+        appendCallRecordToChat('outgoing', callDurationSeconds, window._lastCallType || 'video');
+    }
+
+    if (typeof showSpotliteToast === 'function') showSpotliteToast('Call Ended 🛑');
+};
+
+window.initWebRTCEvents = function() {
+    ensureCallModalsExist();
+    bindCallModalButtons();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const peerId = urlParams.get('peerId');
+    const callType = urlParams.get('type');
+
+    if (peerId) {
+        fetch(`${API_BASE}/users/all`, { headers: getHeaders() })
+            .then(res => res.json())
+            .then(users => {
+                const userList = Array.isArray(users) ? users : (Array.isArray(users?.users) ? users.users : []);
+                const peer = userList.find(u => (u._id === peerId || u.id === peerId));
+                if (peer) {
+                    window.activeChatRecipient = peer;
+                    window.activeChatReceiverId = peer._id || peer.id;
+                    startWebRTCCall(callType === 'audio');
+                }
+            })
+            .catch(e => console.error('Failed to load peer user for call:', e));
+    }
+};
 
 window.activeChatRecipient = null;
 window.activeChatReceiverId = null;
