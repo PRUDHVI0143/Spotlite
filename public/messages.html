@@ -140,6 +140,9 @@
                             <button id="inbox-new-group-btn" onclick="openGroupChatModal()" style="color: var(--text-primary); background: rgba(255,203,5,0.15); border: 1px solid var(--accent-gold); border-radius: 8px; padding: 4px 10px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">➕ Group</button>
                         </div>
                     </div>
+                    <div class="inbox-search-box" style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">
+                        <input type="text" id="inbox-search-input" placeholder="🔍 Search conversations or users..." style="width: 100%; padding: 8px 12px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-size: 0.85rem; outline: none;">
+                    </div>
                     <div class="inbox-list" id="conversations-inbox-list">
                         <!-- Dynamic active conversations loaded by app.js -->
                     </div>
@@ -255,17 +258,6 @@
                     </button>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- SEARCH PANEL SLIDEOUT -->
-    <div class="search-slider-panel" id="search-slider-panel">
-        <h2 class="search-header">Search</h2>
-        <div class="search-input-wrapper">
-            <input type="text" id="search-users-input" placeholder="Search accounts...">
-        </div>
-        <div class="search-results-list" id="search-results-list">
-            <!-- Dynamic search results loaded here -->
         </div>
     </div>
 

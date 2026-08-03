@@ -321,6 +321,105 @@ describe('Spotlite Modular API Tests', () => {
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
+
+  it('PUT /api/users/profile — updates user profile bio, website, github, and profileTheme', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    const profileRes = await request(app)
+      .put('/api/users/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        bio: 'Updated Spotlite Bio for Deep Testing ✨',
+        bioLink: 'https://spotlite.dev',
+        githubUrl: 'https://github.com/spotlite',
+        profileTheme: 'purple',
+        spotlightMode: 'neon'
+      });
+
+    expect(profileRes.statusCode).toBe(200);
+    expect(profileRes.body.bio).toBe('Updated Spotlite Bio for Deep Testing ✨');
+    expect(profileRes.body.accentColor).toBe('purple');
+  });
+
+  it('POST /api/users/change-password — changes user password and verifies re-authentication', async () => {
+    const testEmail = `pwd_change_${Date.now()}@example.com`;
+    const testUsername = `pwd_user_${Date.now()}`;
+
+    // Register & Verify
+    await request(app)
+      .post('/api/auth/register')
+      .send({ username: testUsername, email: testEmail, password: 'oldPassword123' });
+    const devRes = await request(app).get(`/api/auth/dev-code?email=${testEmail}`);
+    await request(app).post('/api/auth/verify').send({ email: testEmail, code: devRes.body.code });
+
+    // Login with old password
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: testUsername, password: 'oldPassword123' });
+    const token = loginRes.body.token;
+
+    // Change Password
+    const changeRes = await request(app)
+      .post('/api/users/change-password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: 'oldPassword123', newPassword: 'newPassword456' });
+
+    expect(changeRes.statusCode).toBe(200);
+    expect(changeRes.body.message).toMatch(/success/i);
+
+    // Login with new password
+    const newLoginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: testUsername, password: 'newPassword456' });
+    expect(newLoginRes.statusCode).toBe(200);
+    expect(newLoginRes.body.token).toBeDefined();
+  });
+
+  it('POST /api/messages & GET /api/messages/conversations — sends message and returns conversation inbox', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+    const adminUser = loginRes.body.user;
+
+    const msgRes = await request(app)
+      .post('/api/messages')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ receiverId: adminUser._id || adminUser.id, text: 'Self message test 💬' });
+
+    expect(msgRes.statusCode).toBe(201);
+    expect(msgRes.body.text).toBe('Self message test 💬');
+
+    const convRes = await request(app)
+      .get('/api/messages/conversations')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(convRes.statusCode).toBe(200);
+    expect(Array.isArray(convRes.body)).toBe(true);
+  });
+
+  it('GET /api/admin/users & Admin verification toggle — returns user directory for admin', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    const usersRes = await request(app)
+      .get('/api/admin/users')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(usersRes.statusCode).toBe(200);
+    expect(usersRes.body.users.length).toBeGreaterThan(0);
+  });
+
+  it('GET /api/users/search?q= — search users with special regex characters safely', async () => {
+    const res = await request(app).get('/api/users/search?q=admin(test)');
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
 });
 
 

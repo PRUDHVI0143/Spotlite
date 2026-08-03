@@ -96,6 +96,26 @@ function getActiveNote(note) {
   return diffHours < 24 ? note : null;
 }
 
+// 0. Get List of Users (for suggestions / discovery)
+router.get('/', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const users = await User.find()
+      .select('username avatar bio isVerified followers following note')
+      .limit(limit)
+      .lean();
+
+    const processed = users.map(u => {
+      u.note = getActiveNote(u.note);
+      return u;
+    });
+
+    res.json(processed);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch users.' });
+  }
+});
+
 // 1. Get All Users
 router.get('/all', authenticateToken, async (req, res) => {
   try {
@@ -127,14 +147,16 @@ router.get('/search', async (req, res) => {
     const q = req.query.q || '';
     if (!q.trim()) return res.json([]);
 
+    const safeQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     const users = await User.find({
       $or: [
-        { username: { $regex: q, $options: 'i' } },
-        { bio: { $regex: q, $options: 'i' } }
+        { username: { $regex: safeQ, $options: 'i' } },
+        { bio: { $regex: safeQ, $options: 'i' } }
       ]
     })
       .select('username avatar bio isVerified followers note')
-      .limit(10);
+      .limit(15);
 
     const processed = users.map(u => {
       const uObj = u.toObject();
@@ -144,6 +166,7 @@ router.get('/search', async (req, res) => {
 
     res.json(processed);
   } catch (err) {
+    console.error('User search error:', err);
     res.status(500).json({ error: 'Search failed.' });
   }
 });
@@ -195,10 +218,11 @@ router.get('/analytics', authenticateToken, async (req, res) => {
   }
 });
 
-// 4. Change Password
-router.post('/change-password', authenticateToken, async (req, res) => {
+// 4. Change Password (supports both POST and PUT, and accepts currentPassword or oldPassword)
+const changePasswordHandler = async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const currentPassword = req.body.currentPassword || req.body.oldPassword;
+    const newPassword = req.body.newPassword;
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current and new password are required.' });
     }
@@ -219,7 +243,10 @@ router.post('/change-password', authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to change password.' });
   }
-});
+};
+
+router.post('/change-password', authenticateToken, changePasswordHandler);
+router.put('/change-password', authenticateToken, changePasswordHandler);
 
 // 5. Get User Profile by Username
 router.get('/profile/:username', async (req, res) => {
@@ -252,21 +279,39 @@ router.get('/profile/:username', async (req, res) => {
 // 6. Update Current User Profile
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { bio, avatar, coverPhoto, website, github, linkedin, portfolioUrl, resumeUrl, accentColor, themeMode } = req.body;
+    const { 
+      bio, avatar, coverPhoto, website, bioLink, 
+      github, githubUrl, linkedin, portfolioUrl, resumeUrl, 
+      accentColor, profileTheme, themeMode, spotlightMode, isPrivate, techStack 
+    } = req.body;
+    
     const user = await User.findById(req.user.id);
-
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
     if (bio !== undefined) user.bio = bio;
     if (avatar !== undefined) user.avatar = avatar;
     if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
-    if (website !== undefined) user.website = website;
-    if (github !== undefined) user.github = github;
+    
+    const finalWebsite = website !== undefined ? website : bioLink;
+    if (finalWebsite !== undefined) user.website = finalWebsite;
+
+    const finalGithub = github !== undefined ? github : githubUrl;
+    if (finalGithub !== undefined) user.github = finalGithub;
+
     if (linkedin !== undefined) user.linkedin = linkedin;
     if (portfolioUrl !== undefined) user.portfolioUrl = portfolioUrl;
     if (resumeUrl !== undefined) user.resumeUrl = resumeUrl;
-    if (accentColor !== undefined) user.accentColor = accentColor;
+    
+    const finalTheme = accentColor !== undefined ? accentColor : profileTheme;
+    if (finalTheme !== undefined) user.accentColor = finalTheme;
+
     if (themeMode !== undefined) user.themeMode = themeMode;
+    if (spotlightMode !== undefined) user.spotlightMode = Boolean(spotlightMode);
+    if (isPrivate !== undefined) user.isPrivate = Boolean(isPrivate);
+
+    if (techStack !== undefined) {
+      user.featuredProjects = user.featuredProjects || [];
+    }
 
     await user.save();
     const updatedUser = await User.findById(user._id).select('-password -refreshToken');
@@ -343,6 +388,7 @@ const followHandler = async (req, res) => {
 
     res.json({
       isFollowing: !isFollowing,
+      following: !isFollowing,
       followersCount: targetUser.followers.length
     });
   } catch (err) {

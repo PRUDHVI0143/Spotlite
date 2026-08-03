@@ -52,7 +52,7 @@ window.fetch = async function(...args) {
             if (data.error && (data.error.toLowerCase().includes('token') || data.error.toLowerCase().includes('denied'))) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                if (!window.location.pathname.includes('auth.html')) {
+                if (!window.location.pathname.includes('auth')) {
                     window.location.href = 'auth.html';
                 }
             }
@@ -348,6 +348,38 @@ function showInAppNotification(title, body, avatarUrl) {
         setTimeout(() => toast.remove(), 400);
     }, 4500);
 }
+// Global Navigation Link Setup (Profile URL, Admin Panel visibility, Logout)
+function setupNavigationLinks() {
+    const cachedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const username = cachedUser ? cachedUser.username : '';
+
+    const profileLinks = document.querySelectorAll('#sidebar-profile-link, #mobile-profile-link, [aria-label="Profile"]');
+    profileLinks.forEach(link => {
+        if (link) {
+            link.setAttribute('href', username ? `profile.html?u=${encodeURIComponent(username)}` : 'profile.html');
+            link.onclick = (e) => {
+                e.preventDefault();
+                window.location.href = username ? `profile.html?u=${encodeURIComponent(username)}` : 'profile.html';
+            };
+        }
+    });
+
+    const adminItem = document.getElementById('sidebar-admin-item');
+    if (adminItem && cachedUser && cachedUser.isAdmin) {
+        adminItem.classList.remove('d-none');
+        adminItem.style.display = 'block';
+    }
+
+    const logoutBtns = document.querySelectorAll('#logout-btn, [aria-label="Log Out"]');
+    logoutBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'auth.html';
+        };
+    });
+}
 
 function setupGlobalNotificationService() {
     const currentUser = JSON.parse(localStorage.getItem('user'));
@@ -383,7 +415,7 @@ async function checkNewMessages(isInitial = false) {
 
             // If we have a tracked timestamp, and the new message is newer than what we recorded
             if (globalLastMessageTimes[userId] && lastMsgTime > globalLastMessageTimes[userId]) {
-                const isCurrentActiveChat = (window.location.pathname.includes('messages.html') && typeof activeChatReceiverId !== 'undefined' && activeChatReceiverId === userId);
+                const isCurrentActiveChat = ((window.location.pathname.includes('messages') || window.location.pathname.endsWith('/messages')) && typeof activeChatReceiverId !== 'undefined' && activeChatReceiverId === userId);
 
                 if (!isCurrentActiveChat) {
                     showInAppNotification(c.user.username, c.lastMessage, c.user.avatar);
@@ -599,101 +631,7 @@ function getNotificationText(n) {
 
 // Implement Live Search Slider Panel
 function setupSearchSliderPanel() {
-    const searchPanel = document.getElementById('search-slider-panel');
-    const searchInput = document.getElementById('search-panel-input');
-    const searchResults = document.getElementById('search-panel-results');
-    const closeBtn = document.getElementById('close-search-panel-btn');
-
-    if (!searchPanel) return;
-
-    function openSearchPanel() {
-        searchPanel.classList.add('active');
-        if (searchInput) {
-            searchInput.focus();
-            searchInput.value = '';
-        }
-        if (searchResults) {
-            searchResults.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 20px; font-size: 0.9rem;">Type a name or username to search people.</p>`;
-        }
-    }
-
-    function closeSearchPanel() {
-        searchPanel.classList.remove('active');
-    }
-
-    // Bind all search buttons (sidebar and mobile)
-    document.querySelectorAll('#sidebar-search-btn, #mobile-search-btn').forEach(btn => {
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            openSearchPanel();
-        };
-    });
-
-    if (closeBtn) closeBtn.onclick = closeSearchPanel;
-
-    // Close when clicking outside
-    document.addEventListener('click', (e) => {
-        if (searchPanel.classList.contains('active') && !searchPanel.contains(e.target) && !e.target.closest('#sidebar-search-btn') && !e.target.closest('#mobile-search-btn')) {
-            closeSearchPanel();
-        }
-    });
-
-    // Live debounced search input
-    let searchDebounceTimer;
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            clearTimeout(searchDebounceTimer);
-            const query = e.target.value.trim();
-
-            if (query.length === 0) {
-                searchResults.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 20px; font-size: 0.9rem;">Type a name or username to search people.</p>`;
-                return;
-            }
-
-            searchResults.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 30px;">Searching...</p>`;
-
-            searchDebounceTimer = setTimeout(async () => {
-                try {
-                    const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`, {
-                        headers: getHeaders()
-                    });
-                    const users = await res.json();
-                    if (!res.ok) throw new Error(users.error || 'Search failed');
-
-                    if (!Array.isArray(users) || users.length === 0) {
-                        searchResults.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 20px;">No users found matching "${escapeHtml(query)}"</p>`;
-                        return;
-                    }
-
-                    searchResults.innerHTML = '';
-                    users.forEach(u => {
-                        const row = document.createElement('div');
-                        row.className = 'search-result-row';
-                        row.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;';
-                        row.innerHTML = `
-                            <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1.5.px solid var(--accent-gold);" alt="">
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <strong style="font-size: 0.92rem; color: var(--text-primary);">${escapeHtml(u.username)}</strong>
-                                    ${u.isVerified ? '<span style="color: var(--accent-gold); font-size: 0.8rem;">✓</span>' : ''}
-                                </div>
-                                <span style="font-size: 0.78rem; color: var(--text-secondary); display: block;" class="text-truncate">${escapeHtml(u.bio || 'Spotlite User')}</span>
-                            </div>
-                            <span style="font-size: 0.76rem; color: var(--accent-gold); font-weight: 600;">View Profile →</span>
-                        `;
-                        row.onclick = () => {
-                            closeSearchPanel();
-                            window.location.href = `profile.html?u=${u.username}`;
-                        };
-                        searchResults.appendChild(row);
-                    });
-                } catch (err) {
-                    console.error('Search panel error:', err);
-                    searchResults.innerHTML = `<p style="color: var(--accent-red); text-align: center; padding: 30px;">Could not perform search.</p>`;
-                }
-            }, 250);
-        });
-    }
+    setupSearchPanel();
 }
 
 function setupNotificationsSliderPanel() {
@@ -792,7 +730,7 @@ function setupNotificationsSliderPanel() {
 // Check auth status
 function checkAuth() {
     const token = localStorage.getItem('token');
-    if (!token && !window.location.pathname.includes('auth.html')) {
+    if (!token && !window.location.pathname.includes('auth')) {
         window.location.href = 'auth.html';
         return false;
     }
@@ -890,42 +828,101 @@ function setupNavigationLinks() {
 
     setupSearchSliderPanel();
     setupNotificationsSliderPanel();
-    setupSettingsModal();
-    setupCreatePostModal();
 }
 
-function setupSettingsModal() {
-    const modal = document.getElementById('settings-modal') || document.getElementById('settings-modal-overlay');
-    const closeBtn = document.getElementById('close-settings-modal-btn') || document.getElementById('close-settings-btn');
-    const saveBtn = document.getElementById('save-settings-btn');
+function setupSearchSliderPanel() {
+    const searchPanel = document.getElementById('search-slider-panel');
+    const searchInput = document.getElementById('search-panel-input') || document.getElementById('search-users-input');
+    const closeBtn = document.getElementById('close-search-slider-btn') || document.getElementById('close-search-panel-btn');
 
-    if (!modal) return;
+    if (!searchPanel) return;
 
-    if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
+    if (closeBtn) {
+        closeBtn.onclick = () => searchPanel.classList.remove('active');
+    }
 
-    if (saveBtn) {
-        saveBtn.onclick = () => {
-            alert('⚙️ Preferences saved successfully!');
-            modal.style.display = 'none';
+    let resultsContainer = searchPanel.querySelector('.search-results-container') || searchPanel.querySelector('#search-results-list');
+    if (!resultsContainer) {
+        resultsContainer = document.createElement('div');
+        resultsContainer.className = 'search-results-container';
+        resultsContainer.style.cssText = 'padding: 12px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 120px); overflow-y: auto;';
+        searchPanel.appendChild(resultsContainer);
+    }
+
+    async function performSearch(query = '') {
+        resultsContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:16px; font-size:0.85rem;">Searching Spotlite users...</p>';
+        try {
+            const url = query.trim()
+                ? `${API_BASE}/users/search?q=${encodeURIComponent(query.trim())}`
+                : `${API_BASE}/users`;
+            
+            const res = await fetch(url, { headers: getHeaders() });
+            const data = await res.json();
+            const users = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
+            
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const myId = currentUser.id || currentUser._id;
+            const filtered = users.filter(u => u._id !== myId && u.id !== myId);
+
+            if (filtered.length === 0) {
+                resultsContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:16px; font-size:0.85rem;">No users found</p>';
+                return;
+            }
+
+            resultsContainer.innerHTML = '';
+            
+            if (!query.trim()) {
+                const header = document.createElement('div');
+                header.style.cssText = 'font-size: 0.82rem; font-weight: 700; color: var(--accent-gold); margin-bottom: 8px; padding-left: 4px;';
+                header.textContent = '✨ Suggested for you';
+                resultsContainer.appendChild(header);
+            }
+
+            filtered.forEach(u => {
+                const item = document.createElement('div');
+                item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-input); border-radius: 12px; cursor: pointer; transition: background 0.2s;';
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover;">
+                        <div>
+                            <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); display: block;">@${escapeHtml(u.username)}</span>
+                            <span style="font-size: 0.76rem; color: var(--text-muted);">${escapeHtml(u.bio || 'Spotlite user')}</span>
+                        </div>
+                    </div>
+                    <button class="btn-primary" style="padding: 4px 12px; font-size: 0.78rem;">Profile</button>
+                `;
+                item.onclick = () => {
+                    searchPanel.classList.remove('active');
+                    window.location.href = `profile.html?u=${u.username}`;
+                };
+                resultsContainer.appendChild(item);
+            });
+        } catch (err) {
+            resultsContainer.innerHTML = '<p style="color:var(--accent-red); text-align:center; padding:16px; font-size:0.85rem;">Failed to load search results</p>';
+        }
+    }
+
+    if (searchInput) {
+        let debounceTimer;
+        searchInput.oninput = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => performSearch(searchInput.value), 200);
+        };
+        searchInput.onfocus = () => {
+            performSearch(searchInput.value);
         };
     }
 }
 
-function setupCreatePostModal() {
-    const modal = document.getElementById('create-post-modal-overlay');
-    const closeBtn = document.getElementById('close-create-modal');
+function setupNotificationsSliderPanel() {
+    const notifPanel = document.getElementById('notifications-slider-panel');
+    const closeBtn = document.getElementById('close-notifications-slider-btn');
 
-    if (!modal) return;
+    if (!notifPanel) return;
 
-    document.querySelectorAll('#sidebar-create-btn, #open-create-modal, #open-create-btn, .bottom-create-btn, #empty-state-new-post-btn, [aria-label="Create Post"]').forEach(btn => {
-        btn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            modal.style.display = 'flex';
-        };
-    });
-
-    if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
+    if (closeBtn) {
+        closeBtn.onclick = () => notifPanel.classList.remove('active');
+    }
 }
 
 // =============================================================
@@ -1187,7 +1184,7 @@ function initAuthPage() {
 let selectedPostImageBase64 = '';
 
 function setupCreatePostModal() {
-    const modal = document.getElementById('create-post-modal-overlay');
+    const modal = document.getElementById('create-post-modal-overlay') || document.getElementById('create-post-modal');
     const openBtn = document.getElementById('open-create-btn');
     const mobileOpenBtn = document.getElementById('mobile-open-create-btn');
     const closeBtn = document.getElementById('close-create-modal');
@@ -1217,11 +1214,13 @@ function setupCreatePostModal() {
     let selectedPostFilter = 'none';
 
     function openModal() {
+        modal.style.cssText = 'display: flex !important;';
         modal.classList.add('active');
         resetModal();
     }
 
     function closeModal() {
+        modal.style.cssText = 'display: none !important;';
         modal.classList.remove('active');
         resetModal();
     }
@@ -1432,9 +1431,14 @@ function setupCreatePostModal() {
         });
     }
 
-    // Event Listeners
-    if (openBtn) openBtn.addEventListener('click', openModal);
-    if (mobileOpenBtn) mobileOpenBtn.addEventListener('click', openModal);
+    // Event Listeners for Create Post modal
+    document.querySelectorAll('#sidebar-create-btn, #open-create-modal, #open-create-btn, #mobile-open-create-btn, .bottom-create-btn, #empty-state-new-post-btn, [aria-label="Create Post"]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openModal();
+        });
+    });
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
 
     // Close on overlay click
@@ -1610,7 +1614,7 @@ function setupCreatePostModal() {
 
             closeModal();
             // Refresh feed or user profile grid
-            if (window.location.pathname.includes('profile.html')) {
+            if (window.location.pathname.includes('profile')) {
                 const params = new URLSearchParams(window.location.search);
                 loadProfileGrid(params.get('u'));
             } else {
@@ -1787,30 +1791,429 @@ function setupAvatarViewerListeners() {
     });
 }
 
-window.openAddStoryModal = function() {
-    const modal = document.getElementById('add-story-modal-overlay');
-    if (modal) {
+window.openSettingsModal = function() {
+    let modal = document.getElementById('settings-modal-overlay') || document.getElementById('settings-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'settings-modal-overlay';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 480px; width: 90%; background: rgba(18, 22, 28, 0.98); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.85); position: relative;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                    <h3 style="margin: 0; font-size: 1.15rem; color: var(--accent-gold); font-weight: 800; display: flex; align-items: center; gap: 8px;">⚙️ System Settings & Theme</h3>
+                    <button id="close-settings-modal-btn" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 18px;">
+                    <div>
+                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 8px;">Theme Accent Glow</label>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="theme-accent-opt active" data-theme="gold" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid var(--accent-gold); background: rgba(255,203,5,0.15); color: #ffcb05; font-weight: 700; cursor: pointer;">✨ Gold Glow</button>
+                            <button class="theme-accent-opt" data-theme="purple" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid #a855f7; background: rgba(168,85,247,0.15); color: #c084fc; font-weight: 700; cursor: pointer;">🔮 Cyber Violet</button>
+                            <button class="theme-accent-opt" data-theme="emerald" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid #10b981; background: rgba(16,185,129,0.15); color: #34d399; font-weight: 700; cursor: pointer;">🌿 Emerald</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Change Password</label>
+                        <input type="password" id="settings-old-password" placeholder="Current Password" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); margin-bottom: 8px; font-size: 0.85rem;">
+                        <input type="password" id="settings-new-password" placeholder="New Password" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-size: 0.85rem;">
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                        <a href="auth.html" onclick="localStorage.clear();" style="color: var(--accent-red); font-weight: 700; font-size: 0.88rem; text-decoration: none;">🚪 Log Out Account</a>
+                        <button id="save-settings-btn" class="btn-save-glow" style="background: var(--spotlite-gradient); color: #000; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">Save Preferences ✨</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    modal.style.cssText = 'display: flex !important; z-index: 999999;';
+    setupSettingsModal();
+};
+
+window.openSettingsModal = function() {
+    let modal = document.getElementById('settings-modal-overlay') || document.getElementById('settings-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'settings-modal-overlay';
+        modal.className = 'modal-overlay';
         modal.style.cssText = 'display: flex !important; z-index: 999999;';
+        modal.innerHTML = `
+            <div style="position: relative; max-width: 440px; width: 90%; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <h3 style="margin: 0; color: var(--accent-gold); font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">⚙️ System Settings & Theme</h3>
+                    <button id="close-settings-dyn-btn" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 0.92rem; color: var(--text-secondary);">Account Password</h4>
+                    <input type="password" id="settings-old-pass-input" placeholder="Current password" style="width: 100%; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); margin-bottom: 10px; font-size: 0.9rem;">
+                    <input type="password" id="settings-new-pass-input" placeholder="New password" style="width: 100%; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); margin-bottom: 12px; font-size: 0.9rem;">
+                    <button id="update-pass-submit-btn" class="btn-primary" style="width: 100%; padding: 10px;">Update Password 🔐</button>
+                </div>
+                <div style="border-top: 1px solid var(--border-color); padding-top: 16px;">
+                    <h4 style="margin: 0 0 10px 0; font-size: 0.92rem; color: var(--text-secondary);">Preferences</h4>
+                    <label style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 0.9rem; cursor: pointer;">
+                        <span>🔔 Enable Sound Notifications</span>
+                        <input type="checkbox" id="settings-sound-chk" checked style="width: 18px; height: 18px; accent-color: var(--accent-gold);">
+                    </label>
+                    <label style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 0.9rem; cursor: pointer;">
+                        <span>✨ High Performance Animations</span>
+                        <input type="checkbox" id="settings-anim-chk" checked style="width: 18px; height: 18px; accent-color: var(--accent-gold);">
+                    </label>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.querySelector('#close-settings-dyn-btn').onclick = () => { modal.style.cssText = 'display: none !important;'; };
+        modal.onclick = (e) => { if (e.target === modal) modal.style.cssText = 'display: none !important;'; };
+
+        modal.querySelector('#update-pass-submit-btn').onclick = async () => {
+            const currentPassword = modal.querySelector('#settings-old-pass-input').value;
+            const newPassword = modal.querySelector('#settings-new-pass-input').value;
+            if (!currentPassword || !newPassword) {
+                if (typeof showSpotliteToast === 'function') showSpotliteToast('❌ Please fill in both password fields');
+                else alert('Please fill in both password fields');
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/users/change-password`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+                const d = await res.json();
+                if (!res.ok) throw new Error(d.error);
+                if (typeof showSpotliteToast === 'function') showSpotliteToast('✨ Password updated successfully!');
+                else alert('Password updated successfully!');
+                modal.querySelector('#settings-old-pass-input').value = '';
+                modal.querySelector('#settings-new-pass-input').value = '';
+                modal.style.cssText = 'display: none !important;';
+            } catch (err) {
+                if (typeof showSpotliteToast === 'function') showSpotliteToast(`❌ ${err.message || 'Failed to update password'}`);
+                else alert(err.message || 'Failed to update password');
+            }
+        };
+    }
+
+    modal.style.cssText = 'display: flex !important; z-index: 999999;';
+    modal.classList.add('active');
+
+    const closeBtns = modal.querySelectorAll('#close-settings-btn, #close-settings-modal-btn, .close-modal');
+    closeBtns.forEach(btn => {
+        btn.onclick = () => {
+            modal.style.cssText = 'display: none !important;';
+            modal.classList.remove('active');
+        };
+    });
+};
+
+window.setupGlobalNavigationListeners = function() {
+    if (window._hasGlobalNavListenersAttached) return;
+    window._hasGlobalNavListenersAttached = true;
+
+    document.addEventListener('click', (e) => {
+        const settingsBtn = e.target.closest('#open-settings-btn, #mobile-settings-btn, [aria-label="Settings"], [title="Settings"]');
+        if (settingsBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.openSettingsModal();
+            return;
+        }
+
+        const addStoryBtn = e.target.closest('#open-add-story-btn, #user-note-trigger, .user-story-add, [aria-label="Add Story"]');
+        if (addStoryBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.openAddStoryModal();
+            return;
+        }
+
+        const newChatBtn = e.target.closest('#inbox-new-chat-btn, #empty-state-new-chat-btn');
+        if (newChatBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.openNewChatPanel();
+            return;
+        }
+
+        const newGroupBtn = e.target.closest('#inbox-new-group-btn');
+        if (newGroupBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.openGroupChatModal();
+            return;
+        }
+
+        const createBtn = e.target.closest('#sidebar-create-btn, #open-create-btn, #mobile-open-create-btn, .bottom-create-btn, [aria-label="Create Post"]');
+        if (createBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            let createModal = document.getElementById('create-post-modal-overlay') || document.getElementById('create-post-modal');
+            if (createModal) {
+                createModal.style.cssText = 'display: flex !important; z-index: 999999;';
+                createModal.classList.add('active');
+                if (typeof setupCreatePostModal === 'function') setupCreatePostModal();
+            }
+            return;
+        }
+    });
+};
+
+// Immediately initialize global navigation listeners
+window.setupGlobalNavigationListeners();
+
+window.openAddStoryModal = function() {
+    let modal = document.getElementById('add-story-modal-overlay');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'add-story-modal-overlay';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: flex !important; z-index: 999999;';
+        modal.innerHTML = `
+            <div style="position: relative; max-width: 440px; width: 90%; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <h3 style="margin: 0; color: var(--accent-gold); font-size: 1.1rem; font-weight: 700;">📸 Add to Your Story (24h)</h3>
+                    <button id="close-add-story-modal-btn" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+                </div>
+                <div style="text-align: center; margin-bottom: 16px;">
+                    <img id="story-media-preview" src="" style="max-width: 100%; max-height: 260px; border-radius: 12px; display: none; object-fit: contain; margin: 0 auto 12px auto; border: 1px solid var(--border-color);">
+                    <label for="story-file-input" style="display: inline-block; padding: 10px 20px; background: rgba(255,203,5,0.15); border: 1.5px solid var(--accent-gold); color: var(--accent-gold); font-weight: 700; border-radius: 10px; cursor: pointer; font-size: 0.88rem;">📁 Choose Photo from Device</label>
+                    <input type="file" id="story-file-input" accept="image/*" style="display: none;">
+                </div>
+                <input type="text" id="story-caption-input" placeholder="Write a story caption or note..." style="width: 100%; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); margin-bottom: 16px; font-size: 0.9rem;">
+                <div style="display: flex; gap: 10px;">
+                    <button id="cancel-add-story-btn" style="flex: 1; padding: 10px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 10px; cursor: pointer;">Cancel</button>
+                    <button id="submit-share-story-btn" class="btn-primary" style="flex: 1; padding: 10px;">Share Story ✨</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    modal.style.cssText = 'display: flex !important; z-index: 999999;';
+    setupAddStoryModal();
+};
+
+window.openNoteModal = function() {
+    const currentNote = prompt("Update your 24-hour Status Note (max 60 chars):");
+    if (currentNote !== null) {
+        fetch(`${API_BASE}/users/note`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ text: currentNote })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const myUser = JSON.parse(localStorage.getItem('user') || '{}');
+                myUser.note = data.note;
+                localStorage.setItem('user', JSON.stringify(myUser));
+                showSpotliteToast('✨ Note updated!');
+                if (typeof loadStoriesBar === 'function') loadStoriesBar();
+            }
+        })
+        .catch(() => alert('Failed to update note'));
     }
 };
 
 window.openGroupChatModal = function() {
-    const groupModal = document.getElementById('group-chat-modal-overlay');
-    if (groupModal) {
-        groupModal.style.cssText = 'display: flex !important; z-index: 999999;';
-        if (typeof window.loadGroupUsers === 'function') {
-            window.loadGroupUsers();
-        }
+    let modal = document.getElementById('group-chat-modal-overlay') || document.getElementById('group-chat-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'group-chat-modal-overlay';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: flex !important; z-index: 999999;';
+        modal.innerHTML = `
+            <div style="position: relative; max-width: 440px; width: 90%; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <h3 style="margin: 0; color: var(--accent-gold); font-size: 1.1rem; font-weight: 700;">👥 Create Group Chat</h3>
+                    <button id="close-group-modal-btn" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+                </div>
+                <input type="text" id="group-name-input" placeholder="Group Name..." style="width: 100%; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); margin-bottom: 14px; font-size: 0.9rem;">
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 8px;">Select Group Members:</p>
+                <div id="group-users-selection-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                    <p style="color: var(--text-muted); text-align: center; font-size: 0.85rem;">Loading users...</p>
+                </div>
+                <button id="create-group-submit-btn" class="btn-primary" style="width: 100%; padding: 10px;">Create Group ✨</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.querySelector('#close-group-modal-btn').onclick = () => {
+            modal.style.cssText = 'display: none !important;';
+            modal.classList.remove('active');
+        };
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.style.cssText = 'display: none !important;';
+                modal.classList.remove('active');
+            }
+        };
+
+        modal.querySelector('#create-group-submit-btn').onclick = async () => {
+            const groupName = modal.querySelector('#group-name-input').value.trim();
+            const checkedBoxes = modal.querySelectorAll('.group-user-checkbox:checked');
+            const selectedMemberIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+            if (!groupName) {
+                alert('Please enter a group name.');
+                return;
+            }
+            if (selectedMemberIds.length === 0) {
+                alert('Please select at least one group member.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/messages`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        receiverId: selectedMemberIds[0],
+                        text: `👥 Group "${groupName}" created with ${selectedMemberIds.length + 1} members!`
+                    })
+                });
+                if (res.ok) {
+                    modal.style.cssText = 'display: none !important;';
+                    modal.classList.remove('active');
+                    if (typeof showSpotliteToast === 'function') showSpotliteToast(`✨ Group "${groupName}" created!`);
+                    else alert(`Group "${groupName}" created!`);
+                    if (typeof loadConversationsInbox === 'function') loadConversationsInbox();
+                }
+            } catch (e) {
+                alert('Failed to create group');
+            }
+        };
+    }
+
+    modal.style.cssText = 'display: flex !important; z-index: 999999;';
+    modal.classList.add('active');
+
+    const userListContainer = modal.querySelector('#group-users-selection-list');
+    if (userListContainer) {
+        fetch(`${API_BASE}/users`, { headers: getHeaders() })
+            .then(res => res.json())
+            .then(data => {
+                const users = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
+                const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const myId = currentUser.id || currentUser._id;
+                const filtered = users.filter(u => u._id !== myId && u.id !== myId);
+
+                if (filtered.length === 0) {
+                    userListContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center;">No users available.</p>';
+                    return;
+                }
+                userListContainer.innerHTML = '';
+                filtered.forEach(u => {
+                    const label = document.createElement('label');
+                    label.style.cssText = 'display:flex; align-items:center; gap:10px; padding:6px 10px; background:var(--bg-input); border-radius:8px; cursor:pointer; font-size:0.88rem;';
+                    label.innerHTML = `
+                        <input type="checkbox" class="group-user-checkbox" value="${u._id}" style="accent-color:var(--accent-gold);">
+                        <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">
+                        <span>@${escapeHtml(u.username)}</span>
+                    `;
+                    userListContainer.appendChild(label);
+                });
+            })
+            .catch(() => {
+                userListContainer.innerHTML = '<p style="color:var(--accent-red); text-align:center;">Failed to load users.</p>';
+            });
     }
 };
 
-window.openNewChatPanel = function() {
-    const panel = document.getElementById('search-slider-panel');
-    const input = document.getElementById('search-users-input') || document.getElementById('search-panel-input');
-    if (panel) {
-        panel.classList.add('active');
-        if (input) setTimeout(() => input.focus(), 100);
+function setupGroupChatModal() {
+    const btn = document.getElementById('inbox-new-group-btn');
+    if (btn) {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            window.openGroupChatModal();
+        };
     }
+}
+
+window.openNewChatPanel = function() {
+    let modal = document.getElementById('new-chat-modal-overlay');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'new-chat-modal-overlay';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: flex !important; z-index: 999999;';
+        modal.innerHTML = `
+            <div style="position: relative; max-width: 440px; width: 90%; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: 20px; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                    <h3 style="margin: 0; color: var(--accent-gold); font-size: 1.1rem; font-weight: 700;">💬 Send New Message</h3>
+                    <button id="close-new-chat-modal-btn" style="background: none; border: none; color: var(--text-primary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+                </div>
+                <input type="text" id="new-chat-user-search" placeholder="🔍 Search user by username..." style="width: 100%; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); margin-bottom: 14px; font-size: 0.9rem; outline: none;">
+                <div id="new-chat-users-results" style="max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                    <p style="color: var(--text-muted); text-align: center; font-size: 0.85rem;">Loading users...</p>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.querySelector('#close-new-chat-modal-btn').onclick = () => modal.style.cssText = 'display: none !important;';
+        modal.onclick = (e) => { if (e.target === modal) modal.style.cssText = 'display: none !important;'; };
+    }
+
+    modal.style.cssText = 'display: flex !important; z-index: 999999;';
+    
+    const searchInput = modal.querySelector('#new-chat-user-search');
+    const resultsContainer = modal.querySelector('#new-chat-users-results');
+
+    const renderUsersList = (searchQuery = '') => {
+        resultsContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:10px;">Searching users...</p>';
+        const url = searchQuery.trim() 
+            ? `${API_BASE}/users/search?q=${encodeURIComponent(searchQuery.trim())}`
+            : `${API_BASE}/users`;
+
+        fetch(url, { headers: getHeaders() })
+            .then(res => res.json())
+            .then(data => {
+                const users = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
+                const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const myId = currentUser.id || currentUser._id;
+                const filtered = users.filter(u => (u._id !== myId && u.id !== myId));
+
+                if (filtered.length === 0) {
+                    resultsContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:10px;">No users found.</p>';
+                    return;
+                }
+
+                resultsContainer.innerHTML = '';
+                filtered.forEach(u => {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-input); border-radius: 10px; cursor: pointer; transition: background 0.2s;';
+                    row.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover;">
+                            <div>
+                                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); display: block;">@${escapeHtml(u.username)}</span>
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(u.bio || 'Spotlite user')}</span>
+                            </div>
+                        </div>
+                        <button class="btn-primary" style="padding: 4px 12px; font-size: 0.8rem;">Chat 💬</button>
+                    `;
+                    row.onclick = () => {
+                        modal.style.cssText = 'display: none !important;';
+                        if (typeof openChatWithUser === 'function') {
+                            openChatWithUser(u);
+                        } else {
+                            window.location.href = `messages.html?u=${u.username}`;
+                        }
+                    };
+                    resultsContainer.appendChild(row);
+                });
+            })
+            .catch(() => {
+                resultsContainer.innerHTML = '<p style="color:var(--accent-red); text-align:center;">Failed to load users.</p>';
+            });
+    };
+
+    renderUsersList('');
+    searchInput.oninput = () => renderUsersList(searchInput.value);
 };
 
 function setupAddStoryModal() {
@@ -1830,20 +2233,29 @@ function setupAddStoryModal() {
         fileInput.onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (evt) => {
-                pendingStoryImage = evt.target.result;
+            compressImage(file, 1080, 1080, 0.75).then(base64 => {
+                pendingStoryImage = base64;
                 if (previewImg) {
                     previewImg.src = pendingStoryImage;
                     previewImg.style.display = 'block';
                 }
-            };
-            reader.readAsDataURL(file);
+            }).catch(() => {
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    pendingStoryImage = evt.target.result;
+                    if (previewImg) {
+                        previewImg.src = pendingStoryImage;
+                        previewImg.style.display = 'block';
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
         };
     }
 
     const hide = () => {
-        modal.style.cssText = 'display: none !important;';
+        modal.style.display = 'none';
+        modal.classList.remove('active');
         pendingStoryImage = '';
         if (previewImg) previewImg.style.display = 'none';
         if (captionInput) captionInput.value = '';
@@ -1863,16 +2275,18 @@ function setupAddStoryModal() {
 
             try {
                 submitBtn.disabled = true;
+                submitBtn.textContent = 'Posting...';
+
                 const res = await fetch(`${API_BASE}/stories`, {
                     method: 'POST',
                     headers: getHeaders(),
                     body: JSON.stringify({
-                        image: pendingStoryImage,
+                        image: pendingStoryImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
                         caption
                     })
                 });
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.error);
+                if (!res.ok) throw new Error(data.error || 'Failed to add story');
 
                 hide();
                 showSpotliteToast('Added to your story! 📸✨');
@@ -1881,6 +2295,7 @@ function setupAddStoryModal() {
                 alert(err.message || 'Failed to add story');
             } finally {
                 submitBtn.disabled = false;
+                submitBtn.textContent = 'Share Story ✨';
             }
         };
     }
@@ -2342,8 +2757,20 @@ function createPostCard(post) {
         });
     }
 
-    // Like Toggle
+    // Like Toggle with Optimistic UI & Smooth Reaction
     async function toggleLike() {
+        const isLikedCurrently = likeBtn.classList.contains('liked');
+        const currentCount = parseInt(likesCount.textContent || '0', 10);
+        const newLiked = !isLikedCurrently;
+        const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
+
+        // 1. Instant 0ms Optimistic UI Update & Spring Scale Animation
+        likeBtn.classList.toggle('liked', newLiked);
+        likesCount.textContent = newCount;
+        likeBtn.style.transform = 'scale(1.35)';
+        setTimeout(() => { likeBtn.style.transform = 'scale(1)'; }, 150);
+        if (newLiked) playActionSound('like');
+
         try {
             const response = await fetch(`${API_BASE}/posts/${post._id}/like`, {
                 method: 'POST',
@@ -2351,11 +2778,17 @@ function createPostCard(post) {
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.error);
-            likeBtn.classList.toggle('liked', data.liked);
-            likesCount.textContent = data.likesCount;
-            if (data.liked) playActionSound('like');
+
+            // Sync with authoritative server response
+            const serverLiked = data.liked !== undefined ? data.liked : (data.isLiked !== undefined ? data.isLiked : newLiked);
+            const serverCount = data.likesCount !== undefined ? data.likesCount : (data.likes ? data.likes.length : newCount);
+            likeBtn.classList.toggle('liked', serverLiked);
+            likesCount.textContent = serverCount;
         } catch (err) {
             console.error('Like error:', err);
+            // Revert state on error
+            likeBtn.classList.toggle('liked', isLikedCurrently);
+            likesCount.textContent = currentCount;
         }
     }
 
@@ -2721,14 +3154,15 @@ async function loadSuggestions() {
             headers: getHeaders()
         });
 
-        const users = await response.json();
-        if (!response.ok) throw new Error(users.error);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Failed to fetch suggestions');
 
+        const usersList = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
         const currentUser = JSON.parse(localStorage.getItem('user'));
         const currentUserId = currentUser ? (currentUser.id || currentUser._id) : null;
 
         // Exclude self from suggestions list
-        const filteredUsers = Array.isArray(users) ? users.filter(u => u._id !== currentUserId && u.id !== currentUserId) : [];
+        const filteredUsers = usersList.filter(u => u._id !== currentUserId && u.id !== currentUserId);
 
         if (filteredUsers.length === 0) {
             container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; padding: 6px 0;">No suggestions available</p>`;
@@ -4208,7 +4642,7 @@ async function openPostDetailModal(postId) {
                 likesCount.textContent = `${resData.likesCount} likes`;
 
                 // Refresh parent page feed/grid
-                if (window.location.pathname.includes('profile.html')) {
+                if (window.location.pathname.includes('profile')) {
                     loadProfileGrid();
                 } else {
                     loadFeedPosts();
@@ -4247,35 +4681,45 @@ function escapeHtml(text) {
 // =============================================================
 // SEARCH PANEL INTERACTIVE LOGIC
 // =============================================================
+// SEARCH PANEL INTERACTIVE LOGIC
+// =============================================================
 function setupSearchPanel() {
-    const searchBtn = document.getElementById('sidebar-search-btn');
+    const searchBtns = document.querySelectorAll('#sidebar-search-btn, #mobile-search-btn, [aria-label="Search"]');
     const panel = document.getElementById('search-slider-panel');
-    const input = document.getElementById('search-users-input') || document.getElementById('search-panel-input');
-    const resultsContainer = document.getElementById('search-results-list') || document.getElementById('search-panel-results');
+    const input = document.getElementById('search-panel-input') || document.getElementById('search-users-input');
+    const resultsContainer = document.getElementById('search-panel-results') || document.getElementById('search-results-list');
     const closeBtn = document.getElementById('close-search-panel-btn');
 
     if (!panel) return;
 
-    if (searchBtn) {
-        searchBtn.addEventListener('click', (e) => {
+    searchBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
-            panel.classList.toggle('active');
-            if (panel.classList.contains('active') && input) {
-                input.focus();
+            panel.classList.add('active');
+            if (input) {
+                setTimeout(() => input.focus(), 100);
             }
         });
-    }
+    });
 
     if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             panel.classList.remove('active');
         });
     }
 
     // Close panel on clicking anywhere else on page
     document.addEventListener('click', (e) => {
-        if (panel.classList.contains('active') && !panel.contains(e.target) && searchBtn && !searchBtn.contains(e.target)) {
-            panel.classList.remove('active');
+        if (panel.classList.contains('active') && !panel.contains(e.target)) {
+            let clickedBtn = false;
+            searchBtns.forEach(btn => {
+                if (btn.contains(e.target)) clickedBtn = true;
+            });
+            if (!clickedBtn) {
+                panel.classList.remove('active');
+            }
         }
     });
 
@@ -4288,9 +4732,11 @@ function setupSearchPanel() {
         const query = input.value.trim();
         
         if (query === '') {
-            resultsContainer.innerHTML = '';
+            resultsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 40px 20px; font-size: 0.9rem;">Type a name or username to search people.</p>`;
             return;
         }
+
+        resultsContainer.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 30px;">Searching...</p>`;
 
         debounceTimer = setTimeout(async () => {
             try {
@@ -4298,10 +4744,10 @@ function setupSearchPanel() {
                     headers: getHeaders()
                 });
                 const users = await response.json();
-                if (!response.ok) throw new Error(users.error);
+                if (!response.ok) throw new Error(users.error || 'Search failed');
 
-                if (users.length === 0) {
-                    resultsContainer.innerHTML = `<div class="search-no-results" style="padding: 20px; text-align: center; color: var(--text-muted);">No accounts found.</div>`;
+                if (!Array.isArray(users) || users.length === 0) {
+                    resultsContainer.innerHTML = `<div class="search-no-results" style="padding: 30px; text-align: center; color: var(--text-muted);">No accounts found matching "${escapeHtml(query)}"</div>`;
                     return;
                 }
 
@@ -4309,31 +4755,36 @@ function setupSearchPanel() {
                 users.forEach(user => {
                     const row = document.createElement('div');
                     row.className = 'user-profile-card';
-                    row.style.cssText = 'padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color);';
+                    row.style.cssText = 'padding: 12px 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); transition: background 0.2s;';
                     row.innerHTML = `
-                        <div class="user-card-info" style="display: flex; align-items: center; gap: 10px;">
-                            <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}" alt="Avatar" class="user-card-avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
-                            <div class="user-card-names">
-                                <span class="user-card-username" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary); display: block;">${user.username}</span>
-                                <span class="user-card-fullname" style="font-size: 0.78rem; color: var(--text-muted);">${user.bio ? (user.bio.substring(0, 30) + '...') : 'Spotlite User'}</span>
+                        <div class="user-card-info" style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+                            <img src="${user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`}" alt="Avatar" class="user-card-avatar" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--accent-gold);">
+                            <div class="user-card-names" style="min-width: 0; flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="user-card-username" style="font-size: 0.92rem; font-weight: 700; color: var(--text-primary); display: block;">${escapeHtml(user.username)}</span>
+                                    ${user.isVerified ? '<span style="color: var(--accent-gold); font-size: 0.8rem;">✓</span>' : ''}
+                                </div>
+                                <span class="user-card-fullname text-truncate" style="font-size: 0.78rem; color: var(--text-muted); display: block;">${escapeHtml(user.bio || 'Spotlite User')}</span>
                             </div>
                         </div>
-                        <button class="btn-primary" style="padding: 4px 12px; font-size: 0.8rem;">Chat 💬</button>
+                        <button class="btn-primary" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 20px; font-weight: 700; shrink: 0;">Chat 💬</button>
                     `;
                     row.addEventListener('click', () => {
-                        if (window.location.pathname.includes('messages.html') && typeof openChatWindow === 'function') {
+                        const isMessagesPage = window.location.pathname.includes('messages') || window.location.pathname.endsWith('/messages');
+                        if (isMessagesPage && typeof openChatWindow === 'function') {
                             openChatWindow(user);
                             panel.classList.remove('active');
                         } else {
-                            window.location.href = `messages.html?u=${user.username}`;
+                            window.location.href = `messages.html?u=${encodeURIComponent(user.username)}`;
                         }
                     });
                     resultsContainer.appendChild(row);
                 });
             } catch (err) {
-                resultsContainer.innerHTML = `<div style="color: var(--accent-red); font-size: 0.85rem; text-align: center;">Error searching users.</div>`;
+                console.error("Search error:", err);
+                resultsContainer.innerHTML = `<div style="color: var(--accent-red); font-size: 0.85rem; text-align: center; padding: 20px;">Error searching users.</div>`;
             }
-        }, 300);
+        }, 250);
     });
 }
 
@@ -4458,9 +4909,9 @@ function setupGroupChatModal() {
 // SETTINGS OVERLAY LOGIC
 // =============================================================
 function setupSettingsModal() {
-    const modal = document.getElementById('settings-modal-overlay');
-    const openBtn = document.getElementById('open-settings-btn');
-    const closeBtn = document.getElementById('close-settings-btn');
+    const modal = document.getElementById('settings-modal-overlay') || document.getElementById('settings-modal');
+    const openBtns = document.querySelectorAll('#open-settings-btn, #mobile-settings-btn, [aria-label="Settings"]');
+    const closeBtn = document.getElementById('close-settings-btn') || document.getElementById('close-settings-modal-btn');
     const saveBtn = document.getElementById('save-settings-btn');
     const oldPasswordInput = document.getElementById('settings-old-password');
     const newPasswordInput = document.getElementById('settings-new-password');
@@ -4470,69 +4921,105 @@ function setupSettingsModal() {
 
     if (!modal) return;
 
-    openBtn.addEventListener('click', () => {
+    function openModal() {
+        modal.style.cssText = 'display: flex !important;';
         modal.classList.add('active');
-        errorMsg.style.display = 'none';
-        successMsg.style.display = 'none';
-        oldPasswordInput.value = '';
-        newPasswordInput.value = '';
+        if (errorMsg) errorMsg.style.display = 'none';
+        if (successMsg) successMsg.style.display = 'none';
+        if (oldPasswordInput) oldPasswordInput.value = '';
+        if (newPasswordInput) newPasswordInput.value = '';
         
-        // Mock private account checkbox value from localStorage
-        const isPrivate = localStorage.getItem('isPrivateAccount') === 'true';
-        privacyToggle.checked = isPrivate;
-    });
+        if (privacyToggle) {
+            const isPrivate = localStorage.getItem('isPrivateAccount') === 'true';
+            privacyToggle.checked = isPrivate;
+        }
+    }
 
     function closeModal() {
+        modal.style.cssText = 'display: none !important;';
         modal.classList.remove('active');
     }
 
-    closeBtn.addEventListener('click', closeModal);
+    openBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            openModal();
+        });
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
     });
 
-    privacyToggle.addEventListener('change', () => {
-        localStorage.setItem('isPrivateAccount', privacyToggle.checked);
-    });
-
-    saveBtn.addEventListener('click', async () => {
-        const oldPassword = oldPasswordInput.value;
-        const newPassword = newPasswordInput.value;
-        
-        errorMsg.style.display = 'none';
-        successMsg.style.display = 'none';
-
-        if (!oldPassword || !newPassword) {
-            errorMsg.textContent = 'Please fill out both password fields.';
-            errorMsg.style.display = 'block';
-            return;
-        }
-
-        try {
-            saveBtn.textContent = 'Updating...';
-            saveBtn.disabled = true;
-
-            const response = await fetch(`${API_BASE}/users/change-password`, {
-                method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify({ oldPassword, newPassword })
+    // Theme Accent Option buttons inside Settings
+    const themeOpts = modal.querySelectorAll('.theme-accent-opt');
+    themeOpts.forEach(btn => {
+        btn.onclick = () => {
+            themeOpts.forEach(b => {
+                b.classList.remove('active');
+                b.style.borderColor = 'var(--border-color)';
             });
-
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Password update failed.');
-
-            successMsg.textContent = 'Password updated successfully!';
-            successMsg.style.display = 'block';
-            oldPasswordInput.value = '';
-            newPasswordInput.value = '';
-        } catch (err) {
-            errorMsg.textContent = err.message;
-            errorMsg.style.display = 'block';
-        } finally {
-            saveBtn.textContent = 'Update Password';
-            saveBtn.disabled = false;
-        }
+            btn.classList.add('active');
+            btn.style.borderColor = 'var(--accent-gold)';
+            const theme = btn.getAttribute('data-theme') || 'gold';
+            applyThemeClass(theme);
+            const cachedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            cachedUser.profileTheme = theme;
+            localStorage.setItem('user', JSON.stringify(cachedUser));
+        };
     });
+
+    if (privacyToggle) {
+        privacyToggle.addEventListener('change', () => {
+            localStorage.setItem('isPrivateAccount', privacyToggle.checked);
+        });
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            const oldPassword = oldPasswordInput ? oldPasswordInput.value : '';
+            const newPassword = newPasswordInput ? newPasswordInput.value : '';
+            
+            if (errorMsg) errorMsg.style.display = 'none';
+            if (successMsg) successMsg.style.display = 'none';
+
+            if (oldPassword && newPassword) {
+                try {
+                    saveBtn.textContent = 'Updating...';
+                    saveBtn.disabled = true;
+
+                    const response = await fetch(`${API_BASE}/users/change-password`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ currentPassword: oldPassword, oldPassword, newPassword })
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error || 'Password update failed.');
+
+                    if (successMsg) {
+                        successMsg.textContent = 'Settings updated successfully!';
+                        successMsg.style.display = 'block';
+                    }
+                    showSpotliteToast('⚙️ Preferences saved!');
+                    if (oldPasswordInput) oldPasswordInput.value = '';
+                    if (newPasswordInput) newPasswordInput.value = '';
+                } catch (err) {
+                    if (errorMsg) {
+                        errorMsg.textContent = err.message;
+                        errorMsg.style.display = 'block';
+                    }
+                } finally {
+                    saveBtn.textContent = 'Save Preferences ✨';
+                    saveBtn.disabled = false;
+                }
+            } else {
+                showSpotliteToast('⚙️ Preferences saved!');
+                closeModal();
+            }
+        });
+    }
 }
 
 // =============================================================
@@ -4586,12 +5073,45 @@ async function initMessagesPage() {
             e.preventDefault();
             e.stopPropagation();
             const panel = document.getElementById('search-slider-panel');
-            const input = document.getElementById('search-users-input') || document.getElementById('search-panel-input');
+            const input = document.getElementById('search-panel-input') || document.getElementById('search-users-input');
             if (panel) {
                 panel.classList.add('active');
                 if (input) setTimeout(() => input.focus(), 100);
             }
         };
+    }
+
+    // Inbox inline search filter
+    const inboxSearchInput = document.getElementById('inbox-search-input');
+    if (inboxSearchInput) {
+        inboxSearchInput.addEventListener('input', () => {
+            const q = inboxSearchInput.value.toLowerCase().trim();
+            const items = document.querySelectorAll('#conversations-inbox-list .inbox-item');
+            let hasVisible = false;
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(q)) {
+                    item.style.display = 'flex';
+                    hasVisible = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            let noMatchDiv = document.getElementById('inbox-search-no-match');
+            if (!hasVisible && q.length > 0) {
+                if (!noMatchDiv) {
+                    noMatchDiv = document.createElement('div');
+                    noMatchDiv.id = 'inbox-search-no-match';
+                    noMatchDiv.style.cssText = 'text-align: center; padding: 20px 10px; color: var(--text-muted); font-size: 0.85rem;';
+                    document.getElementById('conversations-inbox-list')?.appendChild(noMatchDiv);
+                }
+                noMatchDiv.innerHTML = `No chats found.<br><button style="margin-top: 8px; color: var(--accent-gold); background: none; border: none; font-weight: 700; cursor: pointer; text-decoration: underline;" onclick="if(window.openNewChatPanel) window.openNewChatPanel();">Search all users on Spotlite →</button>`;
+                noMatchDiv.style.display = 'block';
+            } else if (noMatchDiv) {
+                noMatchDiv.style.display = 'none';
+            }
+        });
     }
 
     // Load active conversation cards
@@ -6529,7 +7049,20 @@ window.handleProfileAvatarClick = async function() {
     }
 };
 
-window.openStoryViewerModal = function(stories) {
+window.openStoryViewerModal = function(arg1, arg2, arg3) {
+    let stories = [];
+    if (Array.isArray(arg1)) {
+        stories = arg1;
+    } else if (typeof arg1 === 'object' && arg1 !== null) {
+        stories = [arg1];
+    } else if (typeof arg1 === 'string') {
+        stories = [{
+            author: { username: arg1, avatar: arg2 || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${arg1}` },
+            image: arg2 || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+            caption: arg3 || ''
+        }];
+    }
+
     if (!stories || stories.length === 0) return;
 
     let existingModal = document.getElementById('story-viewer-modal');
@@ -6541,22 +7074,22 @@ window.openStoryViewerModal = function(stories) {
     const modal = document.createElement('div');
     modal.id = 'story-viewer-modal';
     modal.className = 'modal-overlay';
-    modal.style.cssText = 'display: flex !important; z-index: 999999; background: rgba(0,0,0,0.92);';
+    modal.style.cssText = 'display: flex !important; z-index: 999999; background: rgba(0,0,0,0.92); align-items: center; justify-content: center;';
 
     modal.innerHTML = `
-        <div style="position: relative; max-width: 420px; width: 90%; background: #12161c; border: 1.5px solid var(--accent-gold); border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.9); flex-direction: column;">
+        <div style="position: relative; max-width: 420px; width: 90%; background: #12161c; border: 1.5px solid var(--accent-gold); border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.9); display: flex; flex-direction: column;">
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(0,0,0,0.6); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <img id="sv-author-avatar" src="${currentStory.author?.avatar || 'spotlite.png'}" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--accent-gold); object-fit: cover;">
+                    <img id="sv-author-avatar" src="${currentStory.author?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentStory.author?.username || 'user'}`}" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--accent-gold); object-fit: cover;">
                     <span id="sv-author-name" style="color: #fff; font-weight: 700; font-size: 0.95rem;">@${currentStory.author?.username || 'user'}</span>
                 </div>
                 <button id="sv-close-btn" style="background: none; border: none; color: #fff; font-size: 1.8rem; cursor: pointer;">&times;</button>
             </div>
             
-            <div style="width: 100%; height: 500px; background: #000; display: flex; align-items: center; justify-content: center; position: relative;">
-                <img id="sv-story-img" src="${currentStory.image}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
-                <button id="sv-prev-btn" style="position: absolute; left: 10px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;">❮</button>
-                <button id="sv-next-btn" style="position: absolute; right: 10px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;">❯</button>
+            <div style="width: 100%; height: 480px; background: #000; display: flex; align-items: center; justify-content: center; position: relative;">
+                <img id="sv-story-img" src="${currentStory.image || currentStory.author?.avatar || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                ${stories.length > 1 ? `<button id="sv-prev-btn" style="position: absolute; left: 10px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;">❮</button>
+                <button id="sv-next-btn" style="position: absolute; right: 10px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;">❯</button>` : ''}
             </div>
 
             <div style="padding: 14px 18px; background: #12161c; text-align: center;">
@@ -6570,20 +7103,26 @@ window.openStoryViewerModal = function(stories) {
     const updateView = (index) => {
         const s = stories[index];
         if (!s) return;
-        document.getElementById('sv-author-avatar').src = s.author?.avatar || 'spotlite.png';
+        document.getElementById('sv-author-avatar').src = s.author?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${s.author?.username || 'user'}`;
         document.getElementById('sv-author-name').textContent = `@${s.author?.username || 'user'}`;
-        document.getElementById('sv-story-img').src = s.image;
+        document.getElementById('sv-story-img').src = s.image || s.author?.avatar || '';
         document.getElementById('sv-caption-text').textContent = s.caption || '';
     };
 
     document.getElementById('sv-close-btn').onclick = () => modal.remove();
-    document.getElementById('sv-prev-btn').onclick = () => {
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+    const prevBtn = document.getElementById('sv-prev-btn');
+    const nextBtn = document.getElementById('sv-next-btn');
+
+    if (prevBtn) prevBtn.onclick = () => {
         if (currentIndex > 0) {
             currentIndex--;
             updateView(currentIndex);
         }
     };
-    document.getElementById('sv-next-btn').onclick = () => {
+
+    if (nextBtn) nextBtn.onclick = () => {
         if (currentIndex < stories.length - 1) {
             currentIndex++;
             updateView(currentIndex);
@@ -6591,13 +7130,26 @@ window.openStoryViewerModal = function(stories) {
             modal.remove();
         }
     };
-};
+}
+
 
 document.addEventListener('DOMContentLoaded', () => {
     window.setupGlobalNavigationListeners();
     ensureCallModalsExist();
     bindCallModalButtons();
     setupGroupChatModal();
+
+    const inboxSearchInput = document.getElementById('inbox-search-input');
+    if (inboxSearchInput) {
+        inboxSearchInput.addEventListener('input', () => {
+            const query = inboxSearchInput.value.trim().toLowerCase();
+            const convItems = document.querySelectorAll('#conversations-inbox-list .conversation-item, #conversations-inbox-list .inbox-item, #conversations-inbox-list > div');
+            convItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(query) ? 'flex' : 'none';
+            });
+        });
+    }
 
     const startAudioBtn = document.getElementById('start-audio-call-btn');
     const startVideoBtn = document.getElementById('start-video-call-btn');
