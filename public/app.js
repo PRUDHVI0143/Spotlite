@@ -2302,7 +2302,7 @@ function setupAddStoryModal() {
 }
 
 // Load real dynamic user stories bar
-async function loadStoriesBar() {
+window.loadStories = async function() {
     const storiesContainer = document.getElementById('stories-container');
     if (!storiesContainer) return;
 
@@ -2314,113 +2314,61 @@ async function loadStoriesBar() {
         : `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentUser ? currentUser.username : 'me'}`;
     const userNoteText = currentUser.note ? currentUser.note.text : '';
 
-    let html = `
-        <div class="story-item" id="user-note-trigger" style="position: relative; cursor: pointer;" onclick="openAddStoryModal()" title="Click to Add Instagram Story">
-            ${userNoteText ? `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">${escapeHtml(userNoteText)}</div>` : `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">+ Note...</div>`}
-            <div class="story-avatar-wrapper user-story-add">
-                <img src="${userAvatar}" class="story-avatar-img" alt="Your story">
-                <div class="add-story-badge">+</div>
-            </div>
-            <span class="story-username" style="color: var(--accent-gold); font-weight: 700;">Your story</span>
-        </div>
-    `;
-
     try {
-        const response = await fetch(`${API_BASE}/stories`, { headers: getHeaders() });
+        const response = await fetch(`${API_BASE}/users/stories`, { headers: getHeaders() });
         const stories = await response.json();
-        if (Array.isArray(stories) && stories.length > 0) {
+        
+        const storyGroupMap = new Map();
+        if (Array.isArray(stories)) {
             stories.forEach(s => {
-                const u = s.author || {};
-                const noteText = s.caption || (u.note ? u.note.text : '');
-                html += `
-                    <div class="story-item" style="position: relative; cursor: pointer;" onclick="openStoryViewerModal('${u.username || 'user'}', '${s.image || u.avatar || ''}')">
-                        ${noteText ? `<div class="story-note-bubble">${escapeHtml(noteText)}</div>` : ''}
-                        <div class="story-avatar-wrapper">
-                            <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" class="story-avatar-img" alt="${u.username}">
-                        </div>
-                        <span class="story-username">${escapeHtml(u.username || 'user')}</span>
-                    </div>
-                `;
+                const u = s.author;
+                if (!u) return;
+                const authorId = String(u._id || u.id || u);
+                if (!storyGroupMap.has(authorId)) {
+                    storyGroupMap.set(authorId, { author: u, stories: [] });
+                }
+                storyGroupMap.get(authorId).stories.push(s);
             });
-        } else {
-            const fallbackRes = await fetch(`${API_BASE}/users/search?q=a`, { headers: getHeaders() });
-            const users = await fallbackRes.json();
-            if (Array.isArray(users)) {
-                users.slice(0, 10).forEach(u => {
-                    html += `
-                        <div class="story-item" style="position: relative; cursor: pointer;" onclick="openStoryViewerModal('${u.username}', '${u.avatar || ''}')">
-                            <div class="story-avatar-wrapper">
-                                <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" class="story-avatar-img" alt="${u.username}">
-                            </div>
-                            <span class="story-username">${escapeHtml(u.username)}</span>
-                        </div>
-                    `;
-                });
-            }
         }
+
+        const myId = String(currentUser._id || currentUser.id || '');
+        const myGroup = storyGroupMap.get(myId);
+        const myStories = myGroup ? myGroup.stories : [];
+
+        let html = `
+            <div class="story-item" id="user-note-trigger" style="position: relative; cursor: pointer;" onclick="openAddStoryModal()" title="Click to Add Instagram Story">
+                ${userNoteText ? `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">${escapeHtml(userNoteText)}</div>` : `<div class="story-note-bubble" onclick="event.stopPropagation(); openNoteModal();">+ Note...</div>`}
+                <div class="story-avatar-wrapper user-story-add" style="border: 2.5px solid ${myStories.length > 0 ? 'var(--accent-gold)' : 'var(--border-color)'};">
+                    <img src="${userAvatar}" class="story-avatar-img" alt="Your story">
+                    <div class="add-story-badge">+</div>
+                </div>
+                <span class="story-username" style="color: var(--accent-gold); font-weight: 700;">Your story</span>
+            </div>
+        `;
+
+        storyGroupMap.forEach((group, authorId) => {
+            if (authorId === myId) return;
+            const u = group.author || {};
+            const uAvatar = u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`;
+            const noteText = group.stories[0]?.caption || (u.note ? u.note.text : '');
+
+            html += `
+                <div class="story-item" style="position: relative; cursor: pointer;" onclick="openStoryGroupViewer('${authorId}')">
+                    ${noteText ? `<div class="story-note-bubble">${escapeHtml(noteText)}</div>` : ''}
+                    <div class="story-avatar-wrapper" style="border: 3px solid var(--accent-gold); box-shadow: 0 0 10px rgba(255,203,5,0.5);">
+                        <img src="${uAvatar}" class="story-avatar-img" alt="${u.username}">
+                    </div>
+                    <span class="story-username">@${escapeHtml(u.username || 'user')}</span>
+                </div>
+            `;
+        });
+
+        window._homeStoryGroups = storyGroupMap;
+        storiesContainer.innerHTML = html;
     } catch (e) {
         console.error('Stories load error:', e);
     }
-
-    storiesContainer.innerHTML = html;
-    setTimeout(setupAvatarViewerListeners, 300);
-}
-
-// Story Viewer Overlay Modal
-function openStoryViewerModal(username, avatar) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay story-viewer-overlay';
-    modal.style.display = 'flex';
-    modal.style.zIndex = '10005';
-    modal.style.background = 'rgba(0, 0, 0, 0.9)';
-
-    const userImg = avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${username}`;
-
-    modal.innerHTML = `
-        <div style="position: relative; width: 100%; max-width: 420px; height: 90vh; max-height: 720px; background: var(--bg-secondary); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; border: 1.5px solid var(--accent-gold);">
-            <!-- Progress Bar -->
-            <div style="height: 4px; background: rgba(255,255,255,0.2); width: 100%;">
-                <div id="story-progress-inner" style="height: 100%; width: 0%; background: var(--accent-gold); transition: width 0.05s linear;"></div>
-            </div>
-            <!-- Header -->
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <img src="${userImg}" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--accent-gold); object-fit: cover;">
-                    <span style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">${escapeHtml(username)}</span>
-                </div>
-                <button id="close-story-viewer-btn" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
-            </div>
-            <!-- Story Content Card -->
-            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; background: radial-gradient(circle, rgba(255,203,5,0.15) 0%, transparent 70%);">
-                <img src="${userImg}" style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--accent-gold); margin-bottom: 16px; object-fit: cover;">
-                <h3 style="color: var(--accent-gold); font-size: 1.3rem; margin-bottom: 8px;">✨ ${escapeHtml(username)}'s Spotlight Story</h3>
-                <p style="color: var(--text-secondary); font-size: 0.9rem;">Check out ${escapeHtml(username)}'s profile for recent posts and updates!</p>
-                <button onclick="window.location.href='profile.html?u=${username}'" style="margin-top: 20px; background: var(--spotlite-gradient); color: black; border: none; padding: 10px 24px; border-radius: 20px; font-weight: 700; cursor: pointer;">View Profile ✨</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    let progress = 0;
-    const innerBar = modal.querySelector('#story-progress-inner');
-    const interval = setInterval(() => {
-        progress += 1;
-        if (innerBar) innerBar.style.width = progress + '%';
-        if (progress >= 100) {
-            clearInterval(interval);
-            modal.remove();
-        }
-    }, 50);
-
-    const closeBtn = modal.querySelector('#close-story-viewer-btn');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            clearInterval(interval);
-            modal.remove();
-        });
-    }
-}
+};
 
 function setupCategoryFilterBar() {
     const filterBar = document.getElementById('category-filter-bar');
@@ -8541,11 +8489,24 @@ window.loadHomeStoriesTray = async function() {
 };
 
 window.openStoryGroupViewer = function(authorId) {
-    if (window._homeStoryGroups && window._homeStoryGroups.has(authorId)) {
-        const group = window._homeStoryGroups.get(authorId);
+    if (window._homeStoryGroups && window._homeStoryGroups.has(String(authorId))) {
+        const group = window._homeStoryGroups.get(String(authorId));
         if (group && group.stories && group.stories.length > 0) {
             openStoryViewerModal(group.stories);
+            return;
         }
+    }
+    if (authorId) {
+        fetch(`${API_BASE}/users/${authorId}/stories`, { headers: getHeaders() })
+            .then(res => res.json())
+            .then(stories => {
+                if (Array.isArray(stories) && stories.length > 0) {
+                    openStoryViewerModal(stories);
+                } else if (typeof showToast === 'function') {
+                    showToast('No active stories for this user.');
+                }
+            })
+            .catch(e => console.error('Fetch stories error:', e));
     }
 };
 
