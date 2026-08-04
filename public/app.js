@@ -5501,7 +5501,156 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadTrendingHashtags();
     initVoiceRecorder();
+    setupEditProfileModal();
 });
+
+// =============================================================
+// EDIT PROFILE MODAL INTERACTIVE CONTROLLER
+// =============================================================
+function setupEditProfileModal() {
+    const editBtn = document.getElementById('open-edit-profile-btn');
+    const modal = document.getElementById('edit-profile-modal-overlay');
+    const closeBtn = document.getElementById('close-edit-profile-btn');
+    const cancelBtn = document.getElementById('cancel-edit-profile-btn');
+    const saveBtn = document.getElementById('save-profile-btn');
+
+    const avatarFileInput = document.getElementById('edit-avatar-file-input');
+    const avatarPreviewWrapper = document.getElementById('edit-avatar-file-label');
+    const avatarPreviewImg = document.getElementById('edit-avatar-preview');
+    const avatarUrlInput = document.getElementById('edit-avatar-url');
+
+    const coverFileInput = document.getElementById('edit-cover-file-input');
+    const coverUrlInput = document.getElementById('edit-cover-photo-url');
+
+    const bioInput = document.getElementById('edit-bio');
+    const websiteInput = document.getElementById('edit-bio-link');
+    const githubInput = document.getElementById('edit-github-url');
+    const themeSelect = document.getElementById('edit-profile-theme');
+    const spotlightCheckbox = document.getElementById('edit-spotlight-mode');
+    const errorEl = document.getElementById('edit-profile-error');
+
+    if (!editBtn || !modal) return;
+
+    let pendingAvatarBase64 = null;
+    let pendingCoverBase64 = null;
+
+    if (avatarPreviewWrapper && avatarFileInput) {
+        avatarPreviewWrapper.onclick = () => avatarFileInput.click();
+        avatarFileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                if (typeof compressImage === 'function') {
+                    pendingAvatarBase64 = await compressImage(file, 400, 400, 0.85);
+                } else if (typeof fileToBase64 === 'function') {
+                    pendingAvatarBase64 = await fileToBase64(file);
+                }
+                if (avatarPreviewImg && pendingAvatarBase64) avatarPreviewImg.src = pendingAvatarBase64;
+                if (avatarUrlInput) avatarUrlInput.value = '';
+            } catch (err) {
+                console.error('Avatar image error:', err);
+            }
+        };
+    }
+
+    if (coverFileInput && coverUrlInput) {
+        coverFileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                if (typeof fileToBase64 === 'function') {
+                    pendingCoverBase64 = await fileToBase64(file);
+                    coverUrlInput.value = file.name;
+                }
+            } catch (err) {
+                console.error('Cover banner file error:', err);
+            }
+        };
+    }
+
+    editBtn.onclick = () => {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        pendingAvatarBase64 = null;
+        pendingCoverBase64 = null;
+        if (errorEl) errorEl.style.display = 'none';
+
+        if (bioInput) bioInput.value = currentUser.bio || '';
+        if (websiteInput) websiteInput.value = currentUser.website || currentUser.bioLink || '';
+        if (githubInput) githubInput.value = currentUser.github || currentUser.githubUrl || '';
+        if (avatarUrlInput) avatarUrlInput.value = currentUser.avatar || '';
+        if (avatarPreviewImg) avatarPreviewImg.src = currentUser.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentUser.username || 'user'}`;
+        if (coverUrlInput) coverUrlInput.value = currentUser.coverPhoto || '';
+        if (themeSelect) themeSelect.value = currentUser.profileTheme || currentUser.accentColor || 'gold';
+        if (spotlightCheckbox) spotlightCheckbox.checked = Boolean(currentUser.spotlightMode);
+
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+    };
+
+    function closeModal() {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
+
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+
+    modal.onclick = (e) => {
+        if (e.target === modal) closeModal();
+    };
+
+    if (saveBtn) {
+        saveBtn.onclick = async () => {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving... ✨';
+            if (errorEl) errorEl.style.display = 'none';
+
+            try {
+                const finalAvatar = pendingAvatarBase64 || (avatarUrlInput ? avatarUrlInput.value.trim() : '');
+                const finalCover = pendingCoverBase64 || (coverUrlInput ? coverUrlInput.value.trim() : '');
+
+                const payload = {
+                    bio: bioInput ? bioInput.value.trim() : '',
+                    website: websiteInput ? websiteInput.value.trim() : '',
+                    github: githubInput ? githubInput.value.trim() : '',
+                    profileTheme: themeSelect ? themeSelect.value : 'gold',
+                    spotlightMode: spotlightCheckbox ? spotlightCheckbox.checked : false
+                };
+
+                if (finalAvatar) payload.avatar = finalAvatar;
+                if (finalCover) payload.coverPhoto = finalCover;
+
+                const res = await fetch(`${API_BASE}/users/profile`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify(payload)
+                });
+
+                const updatedUser = await res.json();
+                if (!res.ok) throw new Error(updatedUser.error || 'Failed to update profile');
+
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+                if (typeof applyThemeClass === 'function') applyThemeClass(updatedUser.profileTheme);
+
+                closeModal();
+                if (typeof showToast === 'function') showToast('Profile updated successfully! ✨');
+
+                const uParam = new URLSearchParams(window.location.search).get('u');
+                if (!uParam || uParam.toLowerCase() === (updatedUser.username || '').toLowerCase()) {
+                    window.location.reload();
+                }
+            } catch (err) {
+                if (errorEl) {
+                    errorEl.textContent = err.message || 'Error updating profile.';
+                    errorEl.style.display = 'block';
+                }
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Changes ✨';
+            }
+        };
+    }
+}
 
 // =============================================================
 // NEW FEATURE HELPERS: THEMES, HASHTAGS, POLLS, REPOSTS & VOICE
@@ -6075,12 +6224,28 @@ function bindCallModalButtons() {
     }
 }
 
-// WhatsApp-style Ringtone Audio Feedback Synthesizer
+let activeRingtoneAudio = null;
+
 function playRingtone() {
+    stopRingtone();
     try {
-        stopRingtone();
+        activeRingtoneAudio = new Audio('/ringtone.mp3');
+        activeRingtoneAudio.loop = true;
+        const playPromise = activeRingtoneAudio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(err => {
+                console.warn('[Ringtone] ringtone.mp3 playback blocked/failed, using synth fallback:', err);
+                startSynthRingtoneFallback();
+            });
+        }
+    } catch (e) {
+        startSynthRingtoneFallback();
+    }
+}
+
+function startSynthRingtoneFallback() {
+    try {
         ringtoneAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
         const ringStep = () => {
             if (!ringtoneAudioContext) return;
             const osc = ringtoneAudioContext.createOscillator();
@@ -6095,15 +6260,19 @@ function playRingtone() {
             osc.start();
             osc.stop(ringtoneAudioContext.currentTime + 0.4);
         };
-
         ringStep();
         ringtoneInterval = setInterval(ringStep, 2000);
-    } catch (e) {
-        console.log('Ringtone sound error:', e);
-    }
+    } catch (e) {}
 }
 
 function stopRingtone() {
+    if (activeRingtoneAudio) {
+        try {
+            activeRingtoneAudio.pause();
+            activeRingtoneAudio.currentTime = 0;
+        } catch (e) {}
+        activeRingtoneAudio = null;
+    }
     if (ringtoneInterval) {
         clearInterval(ringtoneInterval);
         ringtoneInterval = null;

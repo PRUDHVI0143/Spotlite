@@ -4480,12 +4480,35 @@ body.mode-oled {
 
     .messages-layout {
         position: relative;
+        width: 100% !important;
+        max-width: 100% !important;
         height: calc(100vh - 120px) !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
         overflow: hidden;
     }
 
     .messages-inbox {
         width: 100% !important;
+        border-right: none !important;
+    }
+
+    .messages-chat-window {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    .chat-header {
+        padding: 10px 14px !important;
+    }
+
+    .chat-thread {
+        padding: 12px 14px !important;
+    }
+
+    .chat-input-wrapper {
+        padding: 8px 12px !important;
     }
 }
 
