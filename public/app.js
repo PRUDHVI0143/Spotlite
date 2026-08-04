@@ -7891,8 +7891,10 @@ window.checkUserProfileStories = async function(userId) {
             window.currentProfileStories = await res.json();
             if (window.currentProfileStories && window.currentProfileStories.length > 0) {
                 ring.classList.add('has-active-story');
+                ring.style.cssText = 'cursor: pointer; position: relative; display: inline-block; padding: 4px; border-radius: 50%; border: 3px solid var(--accent-gold); box-shadow: 0 0 16px rgba(255,203,5,0.7); transition: transform 0.2s;';
             } else {
                 ring.classList.remove('has-active-story');
+                ring.style.cssText = 'cursor: pointer; position: relative; display: inline-block; padding: 4px; border-radius: 50%; border: 3px solid transparent;';
             }
         }
     } catch (e) {
@@ -7907,97 +7909,318 @@ window.handleProfileAvatarClick = async function() {
     if (window.currentProfileStories && window.currentProfileStories.length > 0) {
         window.openStoryViewerModal(window.currentProfileStories);
     } else if (isOwnProfile) {
-        if (typeof window.openAddStoryModal === 'function') {
-            window.openAddStoryModal();
-        }
+        window.openAddStoryModal();
     } else {
-        alert('This user has no active stories.');
+        const avatarImg = document.getElementById('profile-user-avatar');
+        if (avatarImg && avatarImg.src && typeof window.openAvatarViewer === 'function') {
+            window.openAvatarViewer(avatarImg.src);
+        }
     }
 };
 
-window.openStoryViewerModal = function(arg1, arg2, arg3) {
-    let stories = [];
-    if (Array.isArray(arg1)) {
-        stories = arg1;
-    } else if (typeof arg1 === 'object' && arg1 !== null) {
-        stories = [arg1];
-    } else if (typeof arg1 === 'string') {
-        stories = [{
-            author: { username: arg1, avatar: arg2 || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${arg1}` },
-            image: arg2 || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
-            caption: arg3 || ''
-        }];
+window.openAddStoryModal = function() {
+    let modal = document.getElementById('add-story-modal-overlay');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'add-story-modal-overlay';
+        modal.className = 'modal-overlay active';
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 100000; display: flex; align-items: center; justify-content: center; font-family: "Inter", sans-serif;';
+        modal.innerHTML = `
+            <div style="background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: 24px; width: 90%; max-width: 440px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.8); display: flex; flex-direction: column;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-color); background: rgba(255,203,5,0.05);">
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--accent-gold);">Create Instagram Story ⚡</h3>
+                    <button id="close-add-story-btn" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">✕</button>
+                </div>
+                <div style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+                    <div id="story-media-preview-container" style="width: 100%; height: 240px; background: var(--bg-input); border: 2px dashed var(--border-color); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative;" title="Click to select photo or video">
+                        <div id="story-preview-placeholder" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                            <div style="font-size: 2.5rem; margin-bottom: 8px;">📸</div>
+                            <div style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">Select Photo or Video</div>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Click to upload (JPG, PNG, MP4, GIF)</div>
+                        </div>
+                        <img id="story-preview-img" style="display: none; width: 100%; height: 100%; object-fit: contain; background: #000;">
+                        <video id="story-preview-video" controls autoplay loop style="display: none; width: 100%; height: 100%; object-fit: contain; background: #000;"></video>
+                    </div>
+                    <input type="file" id="story-file-input" accept="image/*,video/*" style="display: none;">
+                    
+                    <div>
+                        <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">Or Direct Image / Video URL:</label>
+                        <input type="text" id="story-direct-url-input" placeholder="https://example.com/story.jpg" style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-size: 0.88rem; outline: none;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">Story Caption / Text Overlay:</label>
+                        <input type="text" id="story-caption-input" placeholder="Write something cool... ✨" maxlength="100" style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-size: 0.88rem; outline: none;">
+                    </div>
+
+                    <div id="story-upload-error" style="display: none; color: var(--accent-red); font-size: 0.82rem; text-align: center;"></div>
+                </div>
+
+                <div style="padding: 14px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-primary);">
+                    <button id="cancel-add-story-btn" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 20px; padding: 8px 18px; font-weight: 600; cursor: pointer;">Cancel</button>
+                    <button id="submit-add-story-btn" style="background: var(--spotlite-gradient); color: #000; border: none; border-radius: 20px; padding: 8px 22px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(255,203,5,0.3);">Share to Story ⚡</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } else {
+        modal.style.display = 'flex';
     }
 
-    if (!stories || stories.length === 0) return;
+    const previewContainer = document.getElementById('story-media-preview-container');
+    const fileInput = document.getElementById('story-file-input');
+    const placeholder = document.getElementById('story-preview-placeholder');
+    const previewImg = document.getElementById('story-preview-img');
+    const previewVid = document.getElementById('story-preview-video');
+    const directUrlInput = document.getElementById('story-direct-url-input');
+    const captionInput = document.getElementById('story-caption-input');
+    const errorEl = document.getElementById('story-upload-error');
+    const submitBtn = document.getElementById('submit-add-story-btn');
+    const closeBtn = document.getElementById('close-add-story-btn');
+    const cancelBtn = document.getElementById('cancel-add-story-btn');
+
+    let pendingMediaBase64 = null;
+
+    if (errorEl) errorEl.style.display = 'none';
+    if (captionInput) captionInput.value = '';
+    if (directUrlInput) directUrlInput.value = '';
+    if (fileInput) fileInput.value = '';
+    if (placeholder) placeholder.style.display = 'block';
+    if (previewImg) { previewImg.style.display = 'none'; previewImg.src = ''; }
+    if (previewVid) { previewVid.style.display = 'none'; previewVid.src = ''; }
+
+    if (previewContainer && fileInput) {
+        previewContainer.onclick = () => fileInput.click();
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                if (file.type.startsWith('video/')) {
+                    pendingMediaBase64 = await fileToBase64(file);
+                    if (previewVid) {
+                        previewVid.src = pendingMediaBase64;
+                        previewVid.style.display = 'block';
+                    }
+                    if (previewImg) previewImg.style.display = 'none';
+                    if (placeholder) placeholder.style.display = 'none';
+                } else {
+                    if (typeof compressImage === 'function') {
+                        pendingMediaBase64 = await compressImage(file, 800, 1200, 0.85);
+                    } else {
+                        pendingMediaBase64 = await fileToBase64(file);
+                    }
+                    if (previewImg) {
+                        previewImg.src = pendingMediaBase64;
+                        previewImg.style.display = 'block';
+                    }
+                    if (previewVid) previewVid.style.display = 'none';
+                    if (placeholder) placeholder.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Story media upload error:', err);
+            }
+        };
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+    if (submitBtn) {
+        submitBtn.onclick = async () => {
+            const mediaUrl = pendingMediaBase64 || (directUrlInput ? directUrlInput.value.trim() : '');
+            const caption = captionInput ? captionInput.value.trim() : '';
+
+            if (!mediaUrl && !caption) {
+                if (errorEl) {
+                    errorEl.textContent = 'Please select an image/video or enter a caption for your story.';
+                    errorEl.style.display = 'block';
+                }
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sharing... ⚡';
+
+            try {
+                const res = await fetch(`${API_BASE}/users/stories`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ image: mediaUrl, caption })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to share story');
+
+                closeModal();
+                if (typeof showToast === 'function') showToast('Story shared to your profile! 🌟');
+
+                const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const myId = currentUser._id || currentUser.id;
+                if (typeof checkUserProfileStories === 'function') {
+                    checkUserProfileStories(myId);
+                }
+            } catch (err) {
+                if (errorEl) {
+                    errorEl.textContent = err.message || 'Error sharing story.';
+                    errorEl.style.display = 'block';
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Share to Story ⚡';
+            }
+        };
+    }
+};
+
+window.openStoryViewerModal = function(stories, startIndex = 0) {
+    if (!stories || !Array.isArray(stories) || stories.length === 0) return;
 
     let existingModal = document.getElementById('story-viewer-modal');
     if (existingModal) existingModal.remove();
 
-    let currentIndex = 0;
-    const currentStory = stories[currentIndex];
+    let currentIndex = startIndex;
+    let storyTimer = null;
 
     const modal = document.createElement('div');
     modal.id = 'story-viewer-modal';
     modal.className = 'modal-overlay';
-    modal.style.cssText = 'display: flex !important; z-index: 999999; background: rgba(0,0,0,0.92); align-items: center; justify-content: center;';
+    modal.style.cssText = 'display: flex !important; z-index: 999999; background: rgba(0,0,0,0.94); align-items: center; justify-content: center; backdrop-filter: blur(16px);';
 
-    modal.innerHTML = `
-        <div style="position: relative; max-width: 420px; width: 90%; background: #12161c; border: 1.5px solid var(--accent-gold); border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.9); display: flex; flex-direction: column;">
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(0,0,0,0.6); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <img id="sv-author-avatar" src="${currentStory.author?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentStory.author?.username || 'user'}`}" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--accent-gold); object-fit: cover;">
-                    <span id="sv-author-name" style="color: #fff; font-weight: 700; font-size: 0.95rem;">@${currentStory.author?.username || 'user'}</span>
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const myId = String(currentUser._id || currentUser.id || '');
+
+    const renderViewer = () => {
+        const s = stories[currentIndex];
+        if (!s) { modal.remove(); return; }
+
+        const author = s.author || { username: 'user' };
+        const authorId = String(author._id || author.id || s.author || '');
+        const isOwner = (authorId === myId || currentUser.isAdmin);
+
+        const progressBarsHtml = stories.map((_, i) => `
+            <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;">
+                <div id="story-progress-bar-${i}" style="height: 100%; width: ${i < currentIndex ? '100%' : '0%'}; background: var(--accent-gold); transition: width ${i === currentIndex ? '5s linear' : '0s'};"></div>
+            </div>
+        `).join('');
+
+        const avatar = author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${author.username}`;
+        const timeAgo = s.createdAt ? formatTime(s.createdAt) : '';
+
+        modal.innerHTML = `
+            <div style="position: relative; max-width: 420px; width: 92%; height: 90vh; max-height: 720px; background: #000; border: 1.5px solid var(--accent-gold); border-radius: 24px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,0.95); display: flex; flex-direction: column;">
+                
+                <!-- Multi-segment Story Progress Bar -->
+                <div style="display: flex; gap: 4px; padding: 10px 14px 4px 14px; position: absolute; top: 0; left: 0; right: 0; z-index: 20; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);">
+                    ${progressBarsHtml}
                 </div>
-                <button id="sv-close-btn" style="background: none; border: none; color: #fff; font-size: 1.8rem; cursor: pointer;">&times;</button>
-            </div>
-            
-            <div style="width: 100%; height: 480px; background: #000; display: flex; align-items: center; justify-content: center; position: relative;">
-                <img id="sv-story-img" src="${currentStory.image || currentStory.author?.avatar || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
-                ${stories.length > 1 ? `<button id="sv-prev-btn" style="position: absolute; left: 10px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;">❮</button>
-                <button id="sv-next-btn" style="position: absolute; right: 10px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;">❯</button>` : ''}
-            </div>
 
-            <div style="padding: 14px 18px; background: #12161c; text-align: center;">
-                <p id="sv-caption-text" style="color: var(--text-primary); font-size: 0.95rem; margin: 0; font-weight: 600;">${currentStory.caption || ''}</p>
+                <!-- Story Author Info Header -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 16px 10px 16px; position: absolute; top: 12px; left: 0; right: 0; z-index: 20; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);">
+                    <div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="window.location.href='profile.html?u=${author.username}'">
+                        <img src="${avatar}" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent-gold); object-fit: cover;">
+                        <div>
+                            <span style="color: #fff; font-weight: 700; font-size: 0.95rem; display: block;">@${escapeHtml(author.username)}</span>
+                            <span style="color: rgba(255,255,255,0.7); font-size: 0.72rem; font-weight: 500;">${timeAgo}</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${isOwner ? `<button id="sv-delete-btn" style="background: rgba(234,0,56,0.3); color: #ff3838; border: 1px solid #ff3838; border-radius: 14px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">Delete 🗑️</button>` : ''}
+                        <button id="sv-close-btn" style="background: none; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; line-height: 1;">✕</button>
+                    </div>
+                </div>
+
+                <!-- Story Media Display -->
+                <div style="flex: 1; position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000;">
+                    ${(s.image && (s.image.startsWith('data:video') || s.image.match(/\.(mp4|webm)/i))) ? 
+                    `<video src="${s.image}" autoplay loop playsinline style="width: 100%; height: 100%; object-fit: contain;"></video>` :
+                    `<img src="${s.image || avatar}" style="width: 100%; height: 100%; object-fit: contain;">`}
+                    
+                    <!-- Left / Right Tap Controls -->
+                    <div id="sv-tap-left" style="position: absolute; top: 60px; left: 0; width: 40%; bottom: 60px; z-index: 15; cursor: pointer;"></div>
+                    <div id="sv-tap-right" style="position: absolute; top: 60px; right: 0; width: 40%; bottom: 60px; z-index: 15; cursor: pointer;"></div>
+                </div>
+
+                <!-- Story Caption Text Overlay -->
+                ${s.caption ? `
+                <div style="position: absolute; bottom: 16px; left: 16px; right: 16px; z-index: 20; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 10px 16px; text-align: center;">
+                    <p style="color: #fff; font-size: 0.92rem; font-weight: 600; margin: 0; font-family: 'Outfit', sans-serif;">${escapeHtml(s.caption)}</p>
+                </div>
+                ` : ''}
             </div>
-        </div>
-    `;
+        `;
+
+        clearTimeout(storyTimer);
+        setTimeout(() => {
+            const bar = document.getElementById(`story-progress-bar-${currentIndex}`);
+            if (bar) bar.style.width = '100%';
+        }, 50);
+
+        storyTimer = setTimeout(() => {
+            if (currentIndex < stories.length - 1) {
+                currentIndex++;
+                renderViewer();
+            } else {
+                modal.remove();
+            }
+        }, 5000);
+
+        document.getElementById('sv-close-btn').onclick = () => { clearTimeout(storyTimer); modal.remove(); };
+        
+        const tapLeft = document.getElementById('sv-tap-left');
+        const tapRight = document.getElementById('sv-tap-right');
+        if (tapLeft) tapLeft.onclick = () => {
+            clearTimeout(storyTimer);
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderViewer();
+            }
+        };
+        if (tapRight) tapRight.onclick = () => {
+            clearTimeout(storyTimer);
+            if (currentIndex < stories.length - 1) {
+                currentIndex++;
+                renderViewer();
+            } else {
+                modal.remove();
+            }
+        };
+
+        const deleteBtn = document.getElementById('sv-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.onclick = async () => {
+                if (confirm('Delete this story?')) {
+                    clearTimeout(storyTimer);
+                    try {
+                        const res = await fetch(`${API_BASE}/users/stories/${s._id}`, {
+                            method: 'DELETE',
+                            headers: getHeaders()
+                        });
+                        if (res.ok) {
+                            if (typeof showToast === 'function') showToast('Story deleted.');
+                            stories.splice(currentIndex, 1);
+                            if (stories.length > 0) {
+                                if (currentIndex >= stories.length) currentIndex = stories.length - 1;
+                                renderViewer();
+                            } else {
+                                modal.remove();
+                            }
+                        }
+                    } catch (e) {
+                        alert('Failed to delete story.');
+                    }
+                }
+            };
+        }
+    };
 
     document.body.appendChild(modal);
-
-    const updateView = (index) => {
-        const s = stories[index];
-        if (!s) return;
-        document.getElementById('sv-author-avatar').src = s.author?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${s.author?.username || 'user'}`;
-        document.getElementById('sv-author-name').textContent = `@${s.author?.username || 'user'}`;
-        document.getElementById('sv-story-img').src = s.image || s.author?.avatar || '';
-        document.getElementById('sv-caption-text').textContent = s.caption || '';
-    };
-
-    document.getElementById('sv-close-btn').onclick = () => modal.remove();
-    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-
-    const prevBtn = document.getElementById('sv-prev-btn');
-    const nextBtn = document.getElementById('sv-next-btn');
-
-    if (prevBtn) prevBtn.onclick = () => {
-        if (currentIndex > 0) {
-            currentIndex--;
-            updateView(currentIndex);
-        }
-    };
-
-    if (nextBtn) nextBtn.onclick = () => {
-        if (currentIndex < stories.length - 1) {
-            currentIndex++;
-            updateView(currentIndex);
-        } else {
-            modal.remove();
-        }
-    };
-}
-
+    renderViewer();
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     window.setupGlobalNavigationListeners();

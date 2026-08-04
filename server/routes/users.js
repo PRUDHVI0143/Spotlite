@@ -87,6 +87,25 @@ router.get('/:userId/stories', authenticateToken, async (req, res) => {
   }
 });
 
+// Delete a Story
+router.delete('/stories/:storyId', authenticateToken, async (req, res) => {
+  try {
+    const Story = require('../models/Story');
+    const story = await Story.findById(req.params.storyId);
+    if (!story) return res.status(404).json({ error: 'Story not found.' });
+
+    const userId = req.user.id || req.user._id;
+    if (String(story.author) !== String(userId) && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized to delete story.' });
+    }
+
+    await Story.findByIdAndDelete(req.params.storyId);
+    res.json({ success: true, message: 'Story deleted successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete story.' });
+  }
+});
+
 // Helper: Filter note if older than 24 hours
 function getActiveNote(note) {
   if (!note || !note.text || !note.updatedAt) return null;
