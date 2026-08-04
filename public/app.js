@@ -8375,22 +8375,57 @@ window.openStoryViewerModal = function(stories, startIndex = 0) {
         
         const tapLeft = document.getElementById('sv-tap-left');
         const tapRight = document.getElementById('sv-tap-right');
-        if (tapLeft) tapLeft.onclick = () => {
-            clearTimeout(storyTimer);
-            if (currentIndex > 0) {
-                currentIndex--;
-                renderViewer();
-            }
-        };
-        if (tapRight) tapRight.onclick = () => {
-            clearTimeout(storyTimer);
-            if (currentIndex < stories.length - 1) {
-                currentIndex++;
-                renderViewer();
-            } else {
-                modal.remove();
-            }
-        };
+        if (tapLeft) {
+            tapLeft.onclick = (e) => {
+                e.stopPropagation();
+                clearTimeout(storyTimer);
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    renderViewer();
+                }
+            };
+        }
+        if (tapRight) {
+            tapRight.onclick = (e) => {
+                e.stopPropagation();
+                clearTimeout(storyTimer);
+                if (currentIndex < stories.length - 1) {
+                    currentIndex++;
+                    renderViewer();
+                } else {
+                    modal.remove();
+                }
+            };
+        }
+
+        // Tap & Hold to Pause Story (Instagram Feature)
+        const storyCard = modal.querySelector('div');
+        if (storyCard) {
+            storyCard.onmousedown = () => clearTimeout(storyTimer);
+            storyCard.onmouseup = () => {
+                clearTimeout(storyTimer);
+                storyTimer = setTimeout(() => {
+                    if (currentIndex < stories.length - 1) {
+                        currentIndex++;
+                        renderViewer();
+                    } else {
+                        modal.remove();
+                    }
+                }, 3000);
+            };
+            storyCard.ontouchstart = () => clearTimeout(storyTimer);
+            storyCard.ontouchend = () => {
+                clearTimeout(storyTimer);
+                storyTimer = setTimeout(() => {
+                    if (currentIndex < stories.length - 1) {
+                        currentIndex++;
+                        renderViewer();
+                    } else {
+                        modal.remove();
+                    }
+                }, 3000);
+            };
+        }
 
         const deleteBtn = document.getElementById('sv-delete-btn');
         if (deleteBtn) {
