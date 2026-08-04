@@ -464,6 +464,38 @@ describe('Spotlite Modular API Tests', () => {
     expect(pollRes.statusCode).toBe(200);
     expect(Array.isArray(pollRes.body)).toBe(true);
   });
+
+  it('E2E Instagram Group Chat flow: creates group, fetches group messages, and sends group message', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    // 1. Create Group
+    const createRes = await request(app)
+      .post('/api/messages/groups/create')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Developers Team 🚀', memberIds: [] });
+    expect(createRes.statusCode).toBe(201);
+    expect(createRes.body.name).toBe('Developers Team 🚀');
+    const groupId = createRes.body._id;
+
+    // 2. Fetch Group Thread
+    const threadRes = await request(app)
+      .get(`/api/messages/group/${groupId}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(threadRes.statusCode).toBe(200);
+    expect(threadRes.body).toHaveProperty('group');
+    expect(threadRes.body).toHaveProperty('messages');
+
+    // 3. Send Message to Group
+    const msgRes = await request(app)
+      .post('/api/messages')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ groupId, text: 'Hello Developers Team! 💬' });
+    expect(msgRes.statusCode).toBe(201);
+    expect(msgRes.body.text).toBe('Hello Developers Team! 💬');
+  });
 });
 
 

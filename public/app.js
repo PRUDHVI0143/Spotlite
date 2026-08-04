@@ -7047,12 +7047,19 @@ async function loadAllCallHistory(containerId = 'call-history-list') {
 
 window.activeChatRecipient = null;
 window.activeChatReceiverId = null;
+window.activeGroupId = null;
+window.activeGroup = null;
 window.pendingChatAttachment = null;
 
 window.openChatWithUser = async function(user) {
     if (!user) return;
+    if (user.isGroup || user.members) {
+        return openChatWithGroup(user);
+    }
     window.activeChatRecipient = user;
     window.activeChatReceiverId = user._id || user.id;
+    window.activeGroupId = null;
+    window.activeGroup = null;
 
     const emptyState = document.getElementById('chat-empty-state');
     const activeWindow = document.getElementById('chat-window-active');
@@ -7075,7 +7082,116 @@ window.openChatWithUser = async function(user) {
     loadChatThread(window.activeChatReceiverId);
 };
 
+window.openChatWithGroup = async function(group) {
+    if (!group) return;
+    window.activeGroup = group;
+    window.activeGroupId = group._id || group.id;
+    window.activeChatReceiverId = null;
+    window.activeChatRecipient = null;
+
+    const emptyState = document.getElementById('chat-empty-state');
+    const activeWindow = document.getElementById('chat-window-active');
+    const avatarImg = document.getElementById('active-chat-avatar');
+    const usernameSpan = document.getElementById('active-chat-username');
+    const backBtn = document.getElementById('mobile-back-to-inbox-btn');
+
+    if (emptyState) emptyState.style.cssText = 'display: none !important;';
+    if (activeWindow) activeWindow.style.cssText = 'display: flex !important; flex-direction: column; height: 100%;';
+
+    const groupAvatar = group.avatar || `https://api.dicebear.com/7.x/shapes/svg?seed=${group.name || group.username || 'Group'}`;
+    if (avatarImg) avatarImg.src = groupAvatar;
+
+    const groupName = group.name || group.username || 'Group Chat';
+    const memberList = group.members || [];
+    const memberNames = memberList.map(m => m.username ? `@${m.username}` : '').filter(Boolean).join(', ');
+
+    if (usernameSpan) {
+        usernameSpan.innerHTML = `👥 ${escapeHtml(groupName)} <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 500; display: block; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${memberList.length} members: ${escapeHtml(memberNames)}</span>`;
+    }
+    if (backBtn) backBtn.style.display = 'inline-block';
+
+    if (window.innerWidth <= 768) {
+        const inboxPanel = document.querySelector('.messages-inbox');
+        if (inboxPanel) inboxPanel.style.display = 'none';
+    }
+
+    loadGroupChatThread(window.activeGroupId);
+};
+
+window.loadGroupChatThread = async function(groupId) {
+    if (!groupId) return;
+    const thread = document.getElementById('active-chat-thread');
+    if (!thread) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/messages/group/${groupId}`, { headers: getHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const messages = data.messages || [];
+        const group = data.group;
+        if (group) window.activeGroup = group;
+
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const myId = String(currentUser._id || currentUser.id || '');
+
+        thread.innerHTML = '';
+
+        if (!Array.isArray(messages) || messages.length === 0) {
+            thread.innerHTML = `
+                <div style="text-align:center; padding: 40px 20px; color: var(--text-muted); font-size: 0.88rem;">
+                    👋 Group chat <strong>${escapeHtml(group?.name || 'Group')}</strong> created! Say hi to the team.
+                </div>
+            `;
+            return;
+        }
+
+        messages.forEach(msg => {
+            const sender = msg.sender || {};
+            const senderId = String(sender._id || sender.id || msg.sender || '');
+            const isMe = senderId === myId;
+
+            const bubbleWrap = document.createElement('div');
+            bubbleWrap.style.cssText = `display: flex; flex-direction: column; margin-bottom: 14px; align-items: ${isMe ? 'flex-end' : 'flex-start'};`;
+
+            let mediaContent = '';
+            if (msg.fileUrl) {
+                if (msg.fileType && msg.fileType.startsWith('image/')) {
+                    mediaContent = `<img src="${msg.fileUrl}" style="max-width: 240px; max-height: 200px; border-radius: 12px; margin-bottom: 6px; display: block; cursor: pointer;" onclick="window.open('${msg.fileUrl}', '_blank')">`;
+                } else {
+                    mediaContent = `<a href="${msg.fileUrl}" target="_blank" style="color: var(--accent-gold); font-weight: 600; text-decoration: underline; font-size: 0.85rem; display: block; margin-bottom: 6px;">📎 ${escapeHtml(msg.fileName || 'Attachment')}</a>`;
+                }
+            }
+
+            const senderHeader = !isMe ? `
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 0.75rem; font-weight: 700; color: var(--accent-gold);">
+                    <img src="${sender.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${sender.username}`}" style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover;">
+                    @${escapeHtml(sender.username || 'user')}
+                </div>
+            ` : '';
+
+            const timeStr = new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            bubbleWrap.innerHTML = `
+                ${senderHeader}
+                <div style="max-width: 78%; padding: 10px 14px; border-radius: ${isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px'}; background: ${isMe ? 'var(--spotlite-gradient)' : 'var(--bg-card)'}; color: ${isMe ? '#000' : 'var(--text-primary)'}; border: ${isMe ? 'none' : '1px solid var(--border-color)'}; font-size: 0.92rem; font-weight: 500; word-break: break-word; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    ${mediaContent}
+                    ${escapeHtml(msg.text || '')}
+                    <div style="font-size: 0.7rem; color: ${isMe ? 'rgba(0,0,0,0.6)' : 'var(--text-muted)'}; margin-top: 4px; text-align: right;">${timeStr}</div>
+                </div>
+            `;
+            thread.appendChild(bubbleWrap);
+        });
+
+        thread.scrollTop = thread.scrollHeight;
+    } catch (err) {
+        console.error('Error loading group thread:', err);
+    }
+};
+
 window.loadChatThread = async function(receiverId) {
+    if (window.activeGroupId) {
+        return loadGroupChatThread(window.activeGroupId);
+    }
     if (!receiverId) return;
     const thread = document.getElementById('active-chat-thread');
     if (!thread) return;
@@ -7134,11 +7250,11 @@ window.loadChatThread = async function(receiverId) {
 };
 
 window.sendChatMessage = async function(customText) {
-    if (!window.activeChatReceiverId) {
+    if (!window.activeChatReceiverId && !window.activeGroupId) {
         if (typeof openNewChatPanel === 'function') {
             openNewChatPanel();
         } else {
-            alert('Please select or search for a user to message.');
+            alert('Please select or search for a user or group to message.');
         }
         return;
     }
@@ -7178,10 +7294,13 @@ window.sendChatMessage = async function(customText) {
     if (typeof playActionSound === 'function') playActionSound('comment');
 
     try {
-        const payload = {
-            receiverId: window.activeChatReceiverId,
-            text: text || ''
-        };
+        const payload = { text: text || '' };
+        if (window.activeGroupId) {
+            payload.groupId = window.activeGroupId;
+        } else {
+            payload.receiverId = window.activeChatReceiverId;
+        }
+
         if (attachment) {
             payload.fileUrl = attachment.fileUrl;
             payload.fileName = attachment.fileName;
@@ -7196,7 +7315,11 @@ window.sendChatMessage = async function(customText) {
 
         if (!res.ok) throw new Error('Failed to send message');
 
-        loadChatThread(window.activeChatReceiverId);
+        if (window.activeGroupId) {
+            loadGroupChatThread(window.activeGroupId);
+        } else {
+            loadChatThread(window.activeChatReceiverId);
+        }
         loadConversationsInbox();
     } catch (err) {
         console.error('Send message error:', err);
@@ -7223,27 +7346,50 @@ window.loadConversationsInbox = async function() {
 
         list.innerHTML = '';
         convs.forEach(c => {
-            const u = c.user;
-            if (!u) return;
+            if (c.isGroup && c.group) {
+                const g = c.group;
+                const row = document.createElement('div');
+                const isSelected = window.activeGroupId === (g._id || g.id);
+                row.style.cssText = `display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; background: ${isSelected ? 'rgba(255,203,5,0.1)' : 'transparent'}; transition: background 0.2s;`;
+                
+                const timeStr = c.updatedAt ? new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                const gAvatar = g.avatar || `https://api.dicebear.com/7.x/shapes/svg?seed=${g.name}`;
 
-            const row = document.createElement('div');
-            row.style.cssText = `display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; background: ${window.activeChatReceiverId === u._id ? 'rgba(255,203,5,0.1)' : 'transparent'}; transition: background 0.2s;`;
-            
-            const timeStr = c.updatedAt ? new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-
-            row.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 12px; overflow: hidden;">
-                    <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-gold);">
-                    <div style="min-width: 0;">
-                        <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary); display: block;">@${escapeHtml(u.username)}</span>
-                        <span style="font-size: 0.78rem; color: var(--text-muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${escapeHtml(c.lastMessage || 'Sent attachment')}</span>
+                row.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px; overflow: hidden;">
+                        <img src="${gAvatar}" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-gold);">
+                        <div style="min-width: 0;">
+                            <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary); display: block;">👥 ${escapeHtml(g.name)}</span>
+                            <span style="font-size: 0.78rem; color: var(--text-muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${escapeHtml(c.lastMessage || 'Group created')}</span>
+                        </div>
                     </div>
-                </div>
-                <span style="font-size: 0.72rem; color: var(--text-muted); flex-shrink: 0;">${timeStr}</span>
-            `;
+                    <span style="font-size: 0.72rem; color: var(--text-muted); flex-shrink: 0;">${timeStr}</span>
+                `;
 
-            row.onclick = () => openChatWithUser(u);
-            list.appendChild(row);
+                row.onclick = () => openChatWithGroup(g);
+                list.appendChild(row);
+            } else if (c.user) {
+                const u = c.user;
+                const row = document.createElement('div');
+                const isSelected = window.activeChatReceiverId === (u._id || u.id);
+                row.style.cssText = `display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; background: ${isSelected ? 'rgba(255,203,5,0.1)' : 'transparent'}; transition: background 0.2s;`;
+                
+                const timeStr = c.updatedAt ? new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+                row.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px; overflow: hidden;">
+                        <img src="${u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`}" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-gold);">
+                        <div style="min-width: 0;">
+                            <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary); display: block;">@${escapeHtml(u.username)}</span>
+                            <span style="font-size: 0.78rem; color: var(--text-muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${escapeHtml(c.lastMessage || 'Sent attachment')}</span>
+                        </div>
+                    </div>
+                    <span style="font-size: 0.72rem; color: var(--text-muted); flex-shrink: 0;">${timeStr}</span>
+                `;
+
+                row.onclick = () => openChatWithUser(u);
+                list.appendChild(row);
+            }
         });
     } catch (err) {
         console.error('Error loading conversations inbox:', err);
@@ -7561,21 +7707,23 @@ function setupGroupChatModal() {
             if (selectedUserIds.size === 0) return alert('Please select at least 1 member for your group.');
 
             try {
-                const res = await fetch(`${API_BASE}/messages`, {
+                const res = await fetch(`${API_BASE}/messages/groups/create`, {
                     method: 'POST',
                     headers: getHeaders(),
                     body: JSON.stringify({
-                        receiverIds: Array.from(selectedUserIds),
-                        groupName: groupName,
-                        text: `👥 Created group: ${groupName}`
+                        name: groupName,
+                        memberIds: Array.from(selectedUserIds)
                     })
                 });
-                if (!res.ok) throw new Error('Group creation failed');
+                const groupData = await res.json();
+                if (!res.ok) throw new Error(groupData.error || 'Group creation failed');
+
                 closeModal();
                 if (typeof showToast === 'function') showToast(`🎉 Group "${groupName}" created!`);
-                if (typeof loadConversationsInbox === 'function') loadConversationsInbox();
+                if (typeof loadConversationsInbox === 'function') await loadConversationsInbox();
+                if (typeof openChatWithGroup === 'function') openChatWithGroup(groupData);
             } catch (err) {
-                alert('Failed to create group chat.');
+                alert(err.message || 'Failed to create group chat.');
             }
         };
     }
