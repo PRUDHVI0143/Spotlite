@@ -496,6 +496,50 @@ describe('Spotlite Modular API Tests', () => {
     expect(msgRes.statusCode).toBe(201);
     expect(msgRes.body.text).toBe('Hello Developers Team! 💬');
   });
+
+  it('E2E Instagram Username Edit Rules & Story Reactions/Replies flow', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+
+    // 1. Story Posting
+    const storyRes = await request(app)
+      .post('/api/users/stories')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ image: 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131', caption: 'Sunset Vibes 🌅' });
+    expect(storyRes.statusCode).toBe(201);
+    const storyId = storyRes.body._id;
+
+    // 2. Story Like
+    const likeRes = await request(app)
+      .post(`/api/users/stories/${storyId}/like`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(likeRes.statusCode).toBe(200);
+    expect(likeRes.body.isLiked).toBe(true);
+
+    // 3. Story Emoji Reaction
+    const reactRes = await request(app)
+      .post(`/api/users/stories/${storyId}/react`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ emoji: '🔥' });
+    expect(reactRes.statusCode).toBe(200);
+
+    // 4. Story DM Reply
+    const replyRes = await request(app)
+      .post(`/api/users/stories/${storyId}/reply`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ text: 'Amazing photo! 📸' });
+    expect(replyRes.statusCode).toBe(200);
+
+    // 5. Username Edit Format Validation Failure
+    const invalidFormatRes = await request(app)
+      .put('/api/users/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ username: '.invalid.' });
+    expect(invalidFormatRes.statusCode).toBe(400);
+    expect(invalidFormatRes.body.error).toContain('Username must be');
+  });
 });
 
 

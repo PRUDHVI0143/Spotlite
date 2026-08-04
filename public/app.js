@@ -5522,6 +5522,7 @@ function setupEditProfileModal() {
     const coverFileInput = document.getElementById('edit-cover-file-input');
     const coverUrlInput = document.getElementById('edit-cover-photo-url');
 
+    const usernameInput = document.getElementById('edit-username');
     const bioInput = document.getElementById('edit-bio');
     const websiteInput = document.getElementById('edit-bio-link');
     const githubInput = document.getElementById('edit-github-url');
@@ -5574,6 +5575,7 @@ function setupEditProfileModal() {
         pendingCoverBase64 = null;
         if (errorEl) errorEl.style.display = 'none';
 
+        if (usernameInput) usernameInput.value = currentUser.username || '';
         if (bioInput) bioInput.value = currentUser.bio || '';
         if (websiteInput) websiteInput.value = currentUser.website || currentUser.bioLink || '';
         if (githubInput) githubInput.value = currentUser.github || currentUser.githubUrl || '';
@@ -5610,6 +5612,7 @@ function setupEditProfileModal() {
                 const finalCover = pendingCoverBase64 || (coverUrlInput ? coverUrlInput.value.trim() : '');
 
                 const payload = {
+                    username: usernameInput ? usernameInput.value.trim() : '',
                     bio: bioInput ? bioInput.value.trim() : '',
                     website: websiteInput ? websiteInput.value.trim() : '',
                     github: githubInput ? githubInput.value.trim() : '',
@@ -5626,19 +5629,20 @@ function setupEditProfileModal() {
                     body: JSON.stringify(payload)
                 });
 
-                const updatedUser = await res.json();
-                if (!res.ok) throw new Error(updatedUser.error || 'Failed to update profile');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to update profile');
 
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                }
+                const updatedUser = data.token ? data : data;
                 localStorage.setItem('user', JSON.stringify(updatedUser));
                 if (typeof applyThemeClass === 'function') applyThemeClass(updatedUser.profileTheme);
 
                 closeModal();
                 if (typeof showToast === 'function') showToast('Profile updated successfully! ✨');
 
-                const uParam = new URLSearchParams(window.location.search).get('u');
-                if (!uParam || uParam.toLowerCase() === (updatedUser.username || '').toLowerCase()) {
-                    window.location.reload();
-                }
+                window.location.reload();
             } catch (err) {
                 if (errorEl) {
                     errorEl.textContent = err.message || 'Error updating profile.';
@@ -8259,6 +8263,9 @@ window.openStoryViewerModal = function(stories, startIndex = 0) {
         const avatar = author.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${author.username}`;
         const timeAgo = s.createdAt ? formatTime(s.createdAt) : '';
 
+        const likesArr = s.likes || [];
+        const isLikedByMe = likesArr.some(id => String(id) === myId);
+
         modal.innerHTML = `
             <div style="position: relative; max-width: 420px; width: 92%; height: 90vh; max-height: 720px; background: #000; border: 1.5px solid var(--accent-gold); border-radius: 24px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,0.95); display: flex; flex-direction: column;">
                 
@@ -8289,16 +8296,38 @@ window.openStoryViewerModal = function(stories, startIndex = 0) {
                     `<img src="${s.image || avatar}" style="width: 100%; height: 100%; object-fit: contain;">`}
                     
                     <!-- Left / Right Tap Controls -->
-                    <div id="sv-tap-left" style="position: absolute; top: 60px; left: 0; width: 40%; bottom: 60px; z-index: 15; cursor: pointer;"></div>
-                    <div id="sv-tap-right" style="position: absolute; top: 60px; right: 0; width: 40%; bottom: 60px; z-index: 15; cursor: pointer;"></div>
+                    <div id="sv-tap-left" style="position: absolute; top: 60px; left: 0; width: 40%; bottom: 100px; z-index: 15; cursor: pointer;"></div>
+                    <div id="sv-tap-right" style="position: absolute; top: 60px; right: 0; width: 40%; bottom: 100px; z-index: 15; cursor: pointer;"></div>
+
+                    <!-- Story Caption Text Overlay -->
+                    ${s.caption ? `
+                    <div style="position: absolute; bottom: 95px; left: 16px; right: 16px; z-index: 20; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 10px 16px; text-align: center;">
+                        <p style="color: #fff; font-size: 0.92rem; font-weight: 600; margin: 0; font-family: 'Outfit', sans-serif;">${escapeHtml(s.caption)}</p>
+                    </div>
+                    ` : ''}
                 </div>
 
-                <!-- Story Caption Text Overlay -->
-                ${s.caption ? `
-                <div style="position: absolute; bottom: 16px; left: 16px; right: 16px; z-index: 20; background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 10px 16px; text-align: center;">
-                    <p style="color: #fff; font-size: 0.92rem; font-weight: 600; margin: 0; font-family: 'Outfit', sans-serif;">${escapeHtml(s.caption)}</p>
+                <!-- Instagram-style Quick Emoji Reactions & DM Reply Bar -->
+                <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 25; padding: 10px 14px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7)); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Quick Emoji Reactions -->
+                    <div style="display: flex; align-items: center; justify-content: space-around;">
+                        <span class="sv-emoji-btn" data-emoji="🔥" style="font-size: 1.35rem; cursor: pointer; transition: transform 0.15s;" title="React 🔥">🔥</span>
+                        <span class="sv-emoji-btn" data-emoji="😂" style="font-size: 1.35rem; cursor: pointer; transition: transform 0.15s;" title="React 😂">😂</span>
+                        <span class="sv-emoji-btn" data-emoji="😍" style="font-size: 1.35rem; cursor: pointer; transition: transform 0.15s;" title="React 😍">😍</span>
+                        <span class="sv-emoji-btn" data-emoji="👏" style="font-size: 1.35rem; cursor: pointer; transition: transform 0.15s;" title="React 👏">👏</span>
+                        <span class="sv-emoji-btn" data-emoji="😮" style="font-size: 1.35rem; cursor: pointer; transition: transform 0.15s;" title="React 😮">😮</span>
+                        <span class="sv-emoji-btn" data-emoji="💯" style="font-size: 1.35rem; cursor: pointer; transition: transform 0.15s;" title="React 💯">💯</span>
+                    </div>
+
+                    <!-- DM Reply & Like Controls -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="text" id="sv-reply-input" placeholder="Send message to @${escapeHtml(author.username)}..." style="flex: 1; padding: 8px 14px; border-radius: 24px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.12); color: #fff; font-size: 0.85rem; outline: none;">
+                        <button id="sv-reply-send-btn" style="background: var(--spotlite-gradient); color: #000; border: none; border-radius: 20px; padding: 6px 14px; font-weight: 700; font-size: 0.82rem; cursor: pointer; flex-shrink: 0;">Send</button>
+                        <button id="sv-like-btn" style="background: none; border: none; color: ${isLikedByMe ? '#ff3838' : '#ffffff'}; font-size: 1.4rem; cursor: pointer; transition: transform 0.2s;" title="Like Story">
+                            ${isLikedByMe ? '❤️' : '🤍'}
+                        </button>
+                    </div>
                 </div>
-                ` : ''}
             </div>
         `;
 
@@ -8318,6 +8347,83 @@ window.openStoryViewerModal = function(stories, startIndex = 0) {
         }, 5000);
 
         document.getElementById('sv-close-btn').onclick = () => { clearTimeout(storyTimer); modal.remove(); };
+
+        // Story Like Button Event
+        const likeBtn = document.getElementById('sv-like-btn');
+        if (likeBtn) {
+            likeBtn.onclick = async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/users/stories/${s._id}/like`, {
+                        method: 'POST',
+                        headers: getHeaders()
+                    });
+                    const resData = await res.json();
+                    if (res.ok) {
+                        likeBtn.textContent = resData.isLiked ? '❤️' : '🤍';
+                        likeBtn.style.color = resData.isLiked ? '#ff3838' : '#ffffff';
+                        if (typeof showToast === 'function') showToast(resData.isLiked ? 'Liked story ❤️' : 'Unliked story');
+                    }
+                } catch (e) {}
+            };
+        }
+
+        // Emoji Reaction Events
+        modal.querySelectorAll('.sv-emoji-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const emoji = btn.getAttribute('data-emoji');
+                btn.style.transform = 'scale(1.4)';
+                setTimeout(() => btn.style.transform = 'scale(1)', 200);
+
+                try {
+                    const res = await fetch(`${API_BASE}/users/stories/${s._id}/react`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ emoji })
+                    });
+                    if (res.ok) {
+                        if (typeof showToast === 'function') showToast(`Sent ${emoji} to @${author.username}! ✨`);
+                    }
+                } catch (e) {}
+            };
+        });
+
+        // Story DM Reply Event
+        const replyInput = document.getElementById('sv-reply-input');
+        const replySendBtn = document.getElementById('sv-reply-send-btn');
+        if (replySendBtn && replyInput) {
+            const sendReply = async () => {
+                const text = replyInput.value.trim();
+                if (!text) return;
+                replySendBtn.disabled = true;
+
+                try {
+                    const res = await fetch(`${API_BASE}/users/stories/${s._id}/reply`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ text })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        replyInput.value = '';
+                        if (typeof showToast === 'function') showToast(`Reply sent to @${author.username}! 💬`);
+                    } else {
+                        alert(data.error || 'Failed to send reply');
+                    }
+                } catch (e) {
+                    alert('Error sending story reply.');
+                } finally {
+                    replySendBtn.disabled = false;
+                }
+            };
+
+            replySendBtn.onclick = sendReply;
+            replyInput.onkeypress = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendReply();
+                }
+            };
+        }
         
         const tapLeft = document.getElementById('sv-tap-left');
         const tapRight = document.getElementById('sv-tap-right');
@@ -8370,11 +8476,87 @@ window.openStoryViewerModal = function(stories, startIndex = 0) {
     renderViewer();
 };
 
+window.loadHomeStoriesTray = async function() {
+    const container = document.getElementById('stories-container');
+    if (!container) return;
+
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const myId = String(currentUser._id || currentUser.id || '');
+        const myAvatar = currentUser.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${currentUser.username || 'me'}`;
+
+        const res = await fetch(`${API_BASE}/users/stories`, { headers: getHeaders() });
+        let storiesList = [];
+        if (res.ok) {
+            storiesList = await res.json();
+        }
+
+        const storyGroupMap = new Map();
+        (storiesList || []).forEach(s => {
+            const author = s.author;
+            if (!author) return;
+            const authorId = String(author._id || author.id || author);
+            if (!storyGroupMap.has(authorId)) {
+                storyGroupMap.set(authorId, { author, stories: [] });
+            }
+            storyGroupMap.get(authorId).stories.push(s);
+        });
+
+        const myGroup = storyGroupMap.get(myId);
+        const myStories = myGroup ? myGroup.stories : [];
+
+        let html = `
+            <div class="story-item" onclick="openAddStoryModal()" title="Add to your story" style="cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 72px;">
+                <div style="position: relative; width: 62px; height: 62px; border-radius: 50%; border: 2.5px solid ${myStories.length > 0 ? 'var(--accent-gold)' : 'var(--border-color)'}; padding: 2px;">
+                    <img src="${myAvatar}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                    <div style="position: absolute; bottom: 0; right: 0; background: var(--spotlite-gradient); color: #000; width: 22px; height: 22px; border-radius: 50%; font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; border: 2px solid #000; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">+</div>
+                </div>
+                <span style="font-size: 0.75rem; color: var(--text-primary); font-weight: 600; text-align: center;">Your Story</span>
+            </div>
+        `;
+
+        storyGroupMap.forEach((group, authorId) => {
+            if (authorId === myId) return;
+            const u = group.author;
+            const uAvatar = u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`;
+            const username = u.username || 'user';
+
+            html += `
+                <div class="story-item" onclick="openStoryGroupViewer('${authorId}')" style="cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 72px;">
+                    <div style="width: 62px; height: 62px; border-radius: 50%; border: 3px solid var(--accent-gold); padding: 2px; box-shadow: 0 0 12px rgba(255,203,5,0.6); transition: transform 0.2s;">
+                        <img src="${uAvatar}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-primary); font-weight: 600; text-align: center; max-width: 68px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@${escapeHtml(username)}</span>
+                </div>
+            `;
+        });
+
+        container.style.cssText = 'display: flex; gap: 16px; overflow-x: auto; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; margin-bottom: 20px; scrollbar-width: none;';
+        container.innerHTML = html;
+
+        window._homeStoryGroups = storyGroupMap;
+    } catch (e) {
+        console.error('Error loading stories tray:', e);
+    }
+};
+
+window.openStoryGroupViewer = function(authorId) {
+    if (window._homeStoryGroups && window._homeStoryGroups.has(authorId)) {
+        const group = window._homeStoryGroups.get(authorId);
+        if (group && group.stories && group.stories.length > 0) {
+            openStoryViewerModal(group.stories);
+        }
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     window.setupGlobalNavigationListeners();
     ensureCallModalsExist();
     bindCallModalButtons();
     setupGroupChatModal();
+    if (document.getElementById('stories-container')) {
+        loadHomeStoriesTray();
+    }
 
     const inboxSearchInput = document.getElementById('inbox-search-input');
     if (inboxSearchInput) {

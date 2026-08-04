@@ -295,17 +295,50 @@ router.get('/profile/:username', async (req, res) => {
   }
 });
 
-// 6. Update Current User Profile
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_spotlite_key';
+
+// 6. Update Current User Profile (with Instagram Username Rule)
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const { 
-      bio, avatar, coverPhoto, website, bioLink, 
+      username, bio, avatar, coverPhoto, website, bioLink, 
       github, githubUrl, linkedin, portfolioUrl, resumeUrl, 
       accentColor, profileTheme, themeMode, spotlightMode, isPrivate, techStack 
     } = req.body;
     
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    let usernameUpdated = false;
+    if (username && username.trim().toLowerCase() !== user.username) {
+      const newUsername = username.trim().toLowerCase();
+      
+      // Instagram Rule 1: Username format validation (3-30 chars, alphanumeric, _ and ., no leading/trailing dot)
+      const usernameRegex = /^[a-zA-Z0-9_.]{3,30}$/;
+      if (!usernameRegex.test(newUsername) || newUsername.startsWith('.') || newUsername.endsWith('.')) {
+        return res.status(400).json({ error: 'Username must be 3-30 characters long and can only contain letters, numbers, underscores, and non-consecutive dots.' });
+      }
+
+      // Instagram Rule 2: Uniqueness check
+      const existingUser = await User.findOne({ username: newUsername, _id: { $ne: user._id } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username is already taken by another account.' });
+      }
+
+      // Instagram Rule 3: 14-day cooldown rule
+      if (user.usernameLastChangedAt) {
+        const daysSinceChange = (Date.now() - new Date(user.usernameLastChangedAt).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceChange < 14) {
+          const daysRemaining = Math.ceil(14 - daysSinceChange);
+          return res.status(400).json({ error: `You can only change your username once every 14 days. Please wait ${daysRemaining} more day${daysRemaining !== 1 ? 's' : ''}.` });
+        }
+      }
+
+      user.username = newUsername;
+      user.usernameLastChangedAt = new Date();
+      usernameUpdated = true;
+    }
 
     if (bio !== undefined) user.bio = bio;
     if (avatar !== undefined) user.avatar = avatar;
@@ -333,11 +366,105 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 
     await user.save();
-    const updatedUser = await User.findById(user._id).select('-password -refreshToken');
+    const updatedUser = await User.findById(user._id).select('-password -refreshToken').lean();
 
-    res.json(updatedUser);
+    let newToken = null;
+    if (usernameUpdated) {
+      newToken = jwt.sign(
+        { id: user._id, username: user.username, isAdmin: user.isAdmin },
+        JWT_SECRET,
+        { expiresIn: '1d' }
+      );
+    }
+
+    res.json(newToken ? { ...updatedUser, token: newToken } : updatedUser);
   } catch (err) {
+    console.error('Update profile error:', err);
     res.status(500).json({ error: 'Failed to update profile.' });
+  }
+});
+
+// Like / Unlike Story
+router.post('/stories/:storyId/like', authenticateToken, async (req, res) => {
+  try {
+    const Story = require('../models/Story');
+    const story = await Story.findById(req.params.storyId);
+    if (!story) return res.status(404).json({ error: 'Story not found.' });
+
+    const userId = req.user.id;
+    const isLiked = story.likes.some(id => String(id) === String(userId));
+
+    if (isLiked) {
+      story.likes.pull(userId);
+    } else {
+      story.likes.push(userId);
+    }
+    await story.save();
+
+    res.json({ success: true, isLiked: !isLiked, likesCount: story.likes.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to toggle story like.' });
+  }
+});
+
+// React to Story (Emoji reaction)
+router.post('/stories/:storyId/react', authenticateToken, async (req, res) => {
+  try {
+    const { emoji } = req.body;
+    if (!emoji) return res.status(400).json({ error: 'Emoji is required.' });
+
+    const Story = require('../models/Story');
+    const story = await Story.findById(req.params.storyId).populate('author', 'username avatar');
+    if (!story) return res.status(404).json({ error: 'Story not found.' });
+
+    story.reactions.push({ user: req.user.id, emoji });
+    await story.save();
+
+    const Message = require('../models/Message');
+    const replyMsg = new Message({
+      sender: req.user.id,
+      receiver: story.author._id || story.author,
+      text: `Reacted ${emoji} to story 📸`,
+      fileUrl: story.image,
+      messageType: 'image'
+    });
+    await replyMsg.save();
+
+    const { sendDirectMessage } = require('../socket');
+    sendDirectMessage(String(story.author._id || story.author), replyMsg);
+
+    res.json({ success: true, reactionsCount: story.reactions.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to react to story.' });
+  }
+});
+
+// Reply to Story (Direct message reply)
+router.post('/stories/:storyId/reply', authenticateToken, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Reply text is required.' });
+
+    const Story = require('../models/Story');
+    const story = await Story.findById(req.params.storyId).populate('author', 'username avatar');
+    if (!story) return res.status(404).json({ error: 'Story not found.' });
+
+    const Message = require('../models/Message');
+    const replyMsg = new Message({
+      sender: req.user.id,
+      receiver: story.author._id || story.author,
+      text: `Replying to story: "${text.trim()}"`,
+      fileUrl: story.image,
+      messageType: 'image'
+    });
+    await replyMsg.save();
+
+    const { sendDirectMessage } = require('../socket');
+    sendDirectMessage(String(story.author._id || story.author), replyMsg);
+
+    res.json({ success: true, message: 'Story reply sent as direct message! 💬' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reply to story.' });
   }
 });
 

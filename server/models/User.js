@@ -44,7 +44,8 @@ const UserSchema = new mongoose.Schema({
   verificationCodeExpires: { type: Date, default: null },
   refreshToken: { type: String, default: '' },
   resetPasswordToken: { type: String, default: null },
-  resetPasswordExpires: { type: Date, default: null }
+  resetPasswordExpires: { type: Date, default: null },
+  usernameLastChangedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 module.exports = mongoose.models.User || mongoose.model('User', UserSchema);

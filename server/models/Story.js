@@ -5,6 +5,12 @@ const StorySchema = new mongoose.Schema({
   image: { type: String, required: true },
   caption: { type: String, default: '' },
   viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  reactions: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    emoji: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+  }],
   expiresAt: {
     type: Date,
     default: () => new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
