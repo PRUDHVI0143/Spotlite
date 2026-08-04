@@ -6244,8 +6244,57 @@ async function handleIncomingSignal(data) {
     }
 }
 
+function initSocketClient() {
+    if (window.socket) return window.socket;
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+
+    if (typeof io === 'function') {
+        try {
+            window.socket = io({ auth: { token } });
+            console.log('[Socket.io] Client initialized successfully.');
+
+            window.socket.on('new_message', (msg) => {
+                const senderId = String(msg.sender?._id || msg.sender?.id || msg.sender || '');
+                const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const myId = String(currentUser._id || currentUser.id || '');
+                if (window.activeChatReceiverId && (window.activeChatReceiverId === senderId || senderId === myId)) {
+                    if (typeof loadChatThread === 'function') {
+                        loadChatThread(window.activeChatReceiverId);
+                    }
+                }
+                if (typeof loadConversationsInbox === 'function') {
+                    loadConversationsInbox();
+                }
+            });
+        } catch (e) {
+            console.warn('[Socket.io] Initialization failed:', e);
+        }
+    }
+    return window.socket;
+}
+
+(function loadSocketIoScript() {
+    if (typeof io === 'undefined') {
+        const script = document.createElement('script');
+        script.src = '/socket.io/socket.io.js';
+        script.onload = () => {
+            initSocketClient();
+            if (typeof initWebRTCEvents === 'function') initWebRTCEvents();
+        };
+        script.onerror = () => {
+            console.warn('Socket.io script unavailable, using REST fallback.');
+        };
+        document.head.appendChild(script);
+    } else {
+        initSocketClient();
+    }
+})();
+
 function initWebRTCEvents() {
     ensureCallModalsExist();
+    bindCallModalButtons();
+    initSocketClient();
 
     const socket = window.socket;
     if (socket) {
@@ -6259,6 +6308,25 @@ function initWebRTCEvents() {
     // Start background REST poller every 1 second globally for fast serverless signaling
     if (!signalPollingInterval) {
         signalPollingInterval = setInterval(pollCallSignals, 1000);
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const peerId = urlParams.get('peerId');
+    const callType = urlParams.get('type');
+
+    if (peerId) {
+        fetch(`${API_BASE}/users/all`, { headers: getHeaders() })
+            .then(res => res.json())
+            .then(users => {
+                const userList = Array.isArray(users) ? users : (Array.isArray(users?.users) ? users.users : []);
+                const peer = userList.find(u => (u._id === peerId || u.id === peerId));
+                if (peer) {
+                    window.activeChatRecipient = peer;
+                    window.activeChatReceiverId = peer._id || peer.id;
+                    startWebRTCCall(callType === 'audio');
+                }
+            })
+            .catch(e => console.error('Failed to load peer user for call:', e));
     }
 }
 
@@ -6527,6 +6595,24 @@ function cleanupCallUI() {
     if (banner) banner.style.display = 'none';
 }
 
+function startCallWithPeer(peerId, username, avatar) {
+    if (!peerId) return;
+    window.activeChatRecipient = { _id: peerId, username: username || 'user', avatar: avatar || '' };
+    window.activeChatReceiverId = peerId;
+    startWebRTCCall(false);
+}
+
+// Expose call functions globally on window
+window.startWebRTCCall = startWebRTCCall;
+window.endWebRTCCall = endActiveCall;
+window.endActiveCall = endActiveCall;
+window.acceptIncomingCall = acceptIncomingCall;
+window.declineIncomingCall = declineIncomingCall;
+window.ensureCallModalsExist = ensureCallModalsExist;
+window.bindCallModalButtons = bindCallModalButtons;
+window.initWebRTCEvents = initWebRTCEvents;
+window.startCallWithPeer = startCallWithPeer;
+
 // Append a call record bubble into the active chat thread
 function appendCallRecordToChat(direction, durationSec, callType) {
     const thread = document.getElementById('active-chat-thread');
@@ -6790,224 +6876,6 @@ async function loadAllCallHistory(containerId = 'call-history-list') {
     }
 }
 
-let localStream = null;
-let peerConnection = null;
-let callTimerInterval = null;
-let callDurationSeconds = 0;
-
-window.ensureCallModalsExist = function() {
-    let callModal = document.getElementById('webrtc-call-modal');
-    if (!callModal) {
-        callModal = document.createElement('div');
-        callModal.id = 'webrtc-call-modal';
-        callModal.className = 'modal-overlay';
-        callModal.style.cssText = 'display: none; position: fixed; inset: 0; z-index: 999999; background: rgba(0,0,0,0.92); align-items: center; justify-content: center; backdrop-filter: blur(12px);';
-        callModal.innerHTML = `
-            <div style="position: relative; width: 90%; max-width: 720px; height: 82vh; max-height: 600px; background: #0f141c; border: 1.5px solid var(--accent-gold); border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.9);">
-                <!-- Call Header -->
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: rgba(0,0,0,0.6); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span id="call-type-icon" style="font-size: 1.2rem;">📹</span>
-                        <span id="call-peer-username" style="color: #fff; font-weight: 700; font-size: 1rem;">@user</span>
-                    </div>
-                    <span id="call-status-timer" style="color: var(--accent-gold); font-weight: 700; font-size: 0.95rem; font-family: monospace;">00:00</span>
-                </div>
-
-                <!-- Video / Audio Stream Display Box -->
-                <div style="flex: 1; position: relative; background: #05070a; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                    <!-- Remote Video Stream -->
-                    <video id="remote-video-element" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-                    
-                    <!-- Audio-Only Avatar Display -->
-                    <div id="call-audio-avatar-container" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;">
-                        <div style="position: relative; padding: 12px; border-radius: 50%; background: rgba(255,203,5,0.15); border: 2px solid var(--accent-gold);">
-                            <img id="call-audio-avatar" src="" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;">
-                        </div>
-                        <span id="call-audio-username" style="color: #fff; font-weight: 700; font-size: 1.1rem;">@user</span>
-                        <span style="color: var(--text-muted); font-size: 0.85rem;">🔒 End-to-End Encrypted Audio Call</span>
-                    </div>
-
-                    <!-- Local Camera PIP Preview -->
-                    <div id="local-video-pip" style="position: absolute; bottom: 20px; right: 20px; width: 140px; height: 100px; border-radius: 12px; overflow: hidden; border: 2px solid var(--accent-gold); box-shadow: 0 8px 24px rgba(0,0,0,0.6); background: #000;">
-                        <video id="local-video-element" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
-                    </div>
-                </div>
-
-                <!-- Action Controls Bar -->
-                <div style="display: flex; align-items: center; justify-content: center; gap: 20px; padding: 16px 20px; background: rgba(15,20,28,0.95); border-top: 1px solid var(--border-color);">
-                    <button id="call-toggle-mic-btn" title="Toggle Microphone 🎤" style="width: 48px; height: 48px; border-radius: 50%; border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 1.2rem; cursor: pointer; transition: background 0.2s;">🎤</button>
-                    <button id="call-toggle-cam-btn" title="Toggle Camera 📹" style="width: 48px; height: 48px; border-radius: 50%; border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 1.2rem; cursor: pointer; transition: background 0.2s;">📹</button>
-                    <button id="call-toggle-screen-btn" title="Share Screen 🖥️" style="width: 48px; height: 48px; border-radius: 50%; border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 1.2rem; cursor: pointer; transition: background 0.2s;">🖥️</button>
-                    <button id="call-end-btn" title="End Call 🛑" style="width: 54px; height: 54px; border-radius: 50%; border: none; background: #ea0038; color: #fff; font-size: 1.4rem; cursor: pointer; box-shadow: 0 4px 16px rgba(234,0,56,0.4);">📞</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(callModal);
-    }
-};
-
-window.bindCallModalButtons = function() {
-    ensureCallModalsExist();
-    const endBtn = document.getElementById('call-end-btn');
-    const micBtn = document.getElementById('call-toggle-mic-btn');
-    const camBtn = document.getElementById('call-toggle-cam-btn');
-    const screenBtn = document.getElementById('call-toggle-screen-btn');
-
-    if (endBtn) endBtn.onclick = () => endWebRTCCall();
-    if (micBtn) micBtn.onclick = () => {
-        if (localStream) {
-            const audioTrack = localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                micBtn.style.background = audioTrack.enabled ? 'rgba(255,255,255,0.1)' : '#ea0038';
-                micBtn.textContent = audioTrack.enabled ? '🎤' : '🎙️';
-            }
-        }
-    };
-    if (camBtn) camBtn.onclick = () => {
-        if (localStream) {
-            const videoTrack = localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                camBtn.style.background = videoTrack.enabled ? 'rgba(255,255,255,0.1)' : '#ea0038';
-            }
-        }
-    };
-    if (screenBtn) screenBtn.onclick = () => {
-        if (typeof toggleScreenShare === 'function') toggleScreenShare();
-    };
-};
-
-window.startCallWithPeer = function(peerId, username, avatar) {
-    if (!peerId) return;
-    window.activeChatRecipient = { _id: peerId, username, avatar };
-    window.activeChatReceiverId = peerId;
-    startWebRTCCall(false);
-};
-
-window.startWebRTCCall = function(isAudioOnly = false) {
-    const peer = window.activeChatRecipient || window.currentProfileUser;
-    const peerId = (peer && (peer._id || peer.id)) || window.activeChatReceiverId;
-
-    if (!peerId) {
-        alert('Please select a user to start an audio or video call.');
-        return;
-    }
-
-    const peerUsername = (peer && peer.username) ? peer.username : 'user';
-    const peerAvatar = (peer && peer.avatar) ? peer.avatar : `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${peerUsername}`;
-
-    ensureCallModalsExist();
-    bindCallModalButtons();
-    openActiveCallModal(peerUsername, peerAvatar, isAudioOnly);
-    startLocalWebRTCStream(isAudioOnly);
-};
-
-window.openActiveCallModal = function(username, avatar, isAudioOnly) {
-    const modal = document.getElementById('webrtc-call-modal');
-    if (!modal) return;
-
-    modal.style.cssText = 'display: flex !important; position: fixed; inset: 0; z-index: 999999; background: rgba(0,0,0,0.92); align-items: center; justify-content: center; backdrop-filter: blur(12px);';
-    
-    const nameEl = document.getElementById('call-peer-username');
-    const typeIconEl = document.getElementById('call-type-icon');
-    if (nameEl) nameEl.textContent = `@${username}`;
-    if (typeIconEl) typeIconEl.textContent = isAudioOnly ? '📞' : '📹';
-
-    const audioAvatarContainer = document.getElementById('call-audio-avatar-container');
-    const remoteVid = document.getElementById('remote-video-element');
-    const localPip = document.getElementById('local-video-pip');
-
-    if (isAudioOnly) {
-        if (audioAvatarContainer) audioAvatarContainer.style.display = 'flex';
-        if (remoteVid) remoteVid.style.display = 'none';
-        if (localPip) localPip.style.display = 'none';
-        const avatarEl = document.getElementById('call-audio-avatar');
-        const userEl = document.getElementById('call-audio-username');
-        if (avatarEl) avatarEl.src = avatar;
-        if (userEl) userEl.textContent = `@${username}`;
-    } else {
-        if (audioAvatarContainer) audioAvatarContainer.style.display = 'none';
-        if (remoteVid) remoteVid.style.display = 'block';
-        if (localPip) localPip.style.display = 'block';
-    }
-
-    // Call Timer Start
-    callDurationSeconds = 0;
-    const timerEl = document.getElementById('call-status-timer');
-    if (timerEl) timerEl.textContent = '00:00';
-    if (callTimerInterval) clearInterval(callTimerInterval);
-    callTimerInterval = setInterval(() => {
-        callDurationSeconds++;
-        const mins = String(Math.floor(callDurationSeconds / 60)).padStart(2, '0');
-        const secs = String(callDurationSeconds % 60).padStart(2, '0');
-        if (timerEl) timerEl.textContent = `${mins}:${secs}`;
-    }, 1000);
-};
-
-window.startLocalWebRTCStream = async function(isAudioOnly) {
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: !isAudioOnly,
-            audio: true
-        });
-        const localVid = document.getElementById('local-video-element');
-        if (localVid) localVid.srcObject = localStream;
-        if (typeof showSpotliteToast === 'function') showSpotliteToast(isAudioOnly ? '📞 Audio Call Connected!' : '📹 Video Call Connected!');
-    } catch (err) {
-        console.warn('Full media stream failed, falling back to audio only:', err);
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            if (typeof showSpotliteToast === 'function') showSpotliteToast('📞 Audio Call Connected!');
-        } catch (audioErr) {
-            if (typeof showSpotliteToast === 'function') showSpotliteToast(isAudioOnly ? '📞 Audio Call Connecting...' : '📹 Video Call Connecting...');
-        }
-    }
-};
-
-window.endWebRTCCall = function() {
-    if (callTimerInterval) {
-        clearInterval(callTimerInterval);
-        callTimerInterval = null;
-    }
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    const modal = document.getElementById('webrtc-call-modal');
-    if (modal) modal.style.cssText = 'display: none !important;';
-
-    if (window.activeChatReceiverId && typeof appendCallRecordToChat === 'function') {
-        appendCallRecordToChat('outgoing', callDurationSeconds, window._lastCallType || 'video');
-    }
-
-    if (typeof showSpotliteToast === 'function') showSpotliteToast('Call Ended 🛑');
-};
-
-window.initWebRTCEvents = function() {
-    ensureCallModalsExist();
-    bindCallModalButtons();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const peerId = urlParams.get('peerId');
-    const callType = urlParams.get('type');
-
-    if (peerId) {
-        fetch(`${API_BASE}/users/all`, { headers: getHeaders() })
-            .then(res => res.json())
-            .then(users => {
-                const userList = Array.isArray(users) ? users : (Array.isArray(users?.users) ? users.users : []);
-                const peer = userList.find(u => (u._id === peerId || u.id === peerId));
-                if (peer) {
-                    window.activeChatRecipient = peer;
-                    window.activeChatReceiverId = peer._id || peer.id;
-                    startWebRTCCall(callType === 'audio');
-                }
-            })
-            .catch(e => console.error('Failed to load peer user for call:', e));
-    }
-};
-
 window.activeChatRecipient = null;
 window.activeChatReceiverId = null;
 window.pendingChatAttachment = null;
@@ -7213,6 +7081,124 @@ window.loadConversationsInbox = async function() {
     }
 };
 
+window.openNewChatPanel = async function() {
+    let overlay = document.getElementById('new-chat-modal-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'new-chat-modal-overlay';
+        overlay.className = 'modal-overlay active';
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 100000; display: flex; align-items: center; justify-content: center; font-family: "Inter", sans-serif;';
+        overlay.innerHTML = `
+            <div style="background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: 20px; width: 90%; max-width: 440px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.6);">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">Start New Chat 💬</h3>
+                    <button onclick="document.getElementById('new-chat-modal-overlay').style.display='none'" style="background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer;">✕</button>
+                </div>
+                <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">
+                    <input type="text" id="new-chat-search-input" placeholder="🔍 Search user by username..." style="width: 100%; padding: 10px 14px; border-radius: 24px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-size: 0.9rem; outline: none;">
+                </div>
+                <div id="new-chat-users-list" style="flex: 1; overflow-y: auto; padding: 10px 0; max-height: 380px;">
+                    <div style="text-align: center; padding: 20px; color: var(--text-muted);">Loading users...</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.onclick = (e) => {
+            if (e.target === overlay) overlay.style.display = 'none';
+        };
+    } else {
+        overlay.style.display = 'flex';
+    }
+
+    const searchInput = document.getElementById('new-chat-search-input');
+    const usersList = document.getElementById('new-chat-users-list');
+    if (searchInput) searchInput.value = '';
+
+    try {
+        const res = await fetch(`${API_BASE}/users/all`, { headers: getHeaders() });
+        if (!res.ok) throw new Error('Failed');
+        const users = await res.json();
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const myId = String(currentUser._id || currentUser.id || '');
+        const otherUsers = (Array.isArray(users) ? users : []).filter(u => String(u._id || u.id) !== myId);
+
+        const renderUsers = (filter = '') => {
+            const filtered = otherUsers.filter(u => (u.username || '').toLowerCase().includes(filter.toLowerCase()));
+            if (filtered.length === 0) {
+                usersList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.85rem;">No users found</div>';
+                return;
+            }
+            usersList.innerHTML = filtered.map(u => {
+                const avatar = u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`;
+                return `
+                    <div class="new-chat-user-row" data-id="${u._id || u.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; cursor: pointer; border-bottom: 1px solid var(--border-color); transition: background 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <img src="${avatar}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-gold);">
+                            <div>
+                                <div style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">@${escapeHtml(u.username)}</div>
+                                <div style="font-size: 0.78rem; color: var(--text-muted);">${escapeHtml(u.bio || 'Spotlite User')}</div>
+                            </div>
+                        </div>
+                        <button style="background: var(--spotlite-gradient); color: #000; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Chat</button>
+                    </div>
+                `;
+            }).join('');
+
+            usersList.querySelectorAll('.new-chat-user-row').forEach(row => {
+                row.onclick = () => {
+                    const id = row.getAttribute('data-id');
+                    const targetUser = otherUsers.find(u => (u._id || u.id) === id);
+                    if (targetUser) {
+                        overlay.style.display = 'none';
+                        openChatWithUser(targetUser);
+                    }
+                };
+            });
+        };
+
+        renderUsers('');
+        if (searchInput) {
+            searchInput.oninput = () => renderUsers(searchInput.value.trim());
+        }
+    } catch (err) {
+        if (usersList) usersList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--accent-red); font-size: 0.85rem;">Failed to load users</div>';
+    }
+};
+
+window.openGroupChatModal = function() {
+    let modal = document.getElementById('group-chat-modal-overlay');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'group-chat-modal-overlay';
+        modal.className = 'modal-overlay active';
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 100000; display: flex; align-items: center; justify-content: center; font-family: "Inter", sans-serif;';
+        modal.innerHTML = `
+            <div style="background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: 20px; width: 90%; max-width: 440px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.6);">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">Create Group Chat 👥</h3>
+                    <button id="close-group-modal-btn" onclick="document.getElementById('group-chat-modal-overlay').style.display='none'" style="background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer;">✕</button>
+                </div>
+                <div style="padding: 14px 20px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px;">
+                    <input type="text" id="group-name-input" placeholder="Group Name (e.g. Project Team)..." style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-size: 0.9rem; outline: none;">
+                    <input type="text" id="group-search-user-input" placeholder="🔍 Search members..." style="width: 100%; padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-size: 0.85rem; outline: none;">
+                </div>
+                <div id="group-user-selection-list" style="flex: 1; overflow-y: auto; padding: 10px 16px; max-height: 300px;">
+                    <div style="text-align: center; padding: 20px; color: var(--text-muted);">Loading users...</div>
+                </div>
+                <div style="padding: 14px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px;">
+                    <button id="cancel-group-modal-btn" onclick="document.getElementById('group-chat-modal-overlay').style.display='none'" style="background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 20px; padding: 8px 18px; font-weight: 600; cursor: pointer;">Cancel</button>
+                    <button id="submit-create-group-btn" style="background: var(--spotlite-gradient); color: #000; border: none; border-radius: 20px; padding: 8px 22px; font-weight: 700; cursor: pointer;">Create Group ✨</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } else {
+        modal.style.display = 'flex';
+    }
+    setupGroupChatModal();
+};
+
 window.initMessagesPage = function() {
     loadConversationsInbox();
 
@@ -7234,6 +7220,18 @@ window.initMessagesPage = function() {
     const fileInput = document.getElementById('chat-file-input');
     const removeAttachBtn = document.getElementById('chat-attachment-remove-btn');
     const backBtn = document.getElementById('mobile-back-to-inbox-btn');
+
+    const startAudioBtn = document.getElementById('start-audio-call-btn');
+    const startVideoBtn = document.getElementById('start-video-call-btn');
+    const emptyNewChatBtn = document.getElementById('empty-state-new-chat-btn');
+    const inboxNewChatBtn = document.getElementById('inbox-new-chat-btn');
+    const inboxNewGroupBtn = document.getElementById('inbox-new-group-btn');
+
+    if (startAudioBtn) startAudioBtn.onclick = () => { window._lastCallType = 'audio'; if (typeof startWebRTCCall === 'function') startWebRTCCall(true); };
+    if (startVideoBtn) startVideoBtn.onclick = () => { window._lastCallType = 'video'; if (typeof startWebRTCCall === 'function') startWebRTCCall(false); };
+    if (emptyNewChatBtn) emptyNewChatBtn.onclick = () => openNewChatPanel();
+    if (inboxNewChatBtn) inboxNewChatBtn.onclick = () => openNewChatPanel();
+    if (inboxNewGroupBtn) inboxNewGroupBtn.onclick = () => openGroupChatModal();
 
     if (sendBtn) sendBtn.onclick = () => sendChatMessage();
     if (textInput) {
@@ -7305,7 +7303,7 @@ function setupGroupChatModal() {
     const nameInput = document.getElementById('group-name-input');
     const filterInput = document.getElementById('group-search-user-input');
 
-    if (!openBtn || !modal) return;
+    if (!modal) return;
 
     let availableUsers = [];
     const selectedUserIds = new Set();
@@ -7351,16 +7349,13 @@ function setupGroupChatModal() {
     }
 
     if (filterInput) {
-        filterInput.addEventListener('input', (e) => renderUserSelection(e.target.value.trim()));
+        filterInput.oninput = (e) => renderUserSelection(e.target.value.trim());
     }
 
-    openBtn.onclick = () => {
-        modal.style.display = 'flex';
-        selectedUserIds.clear();
-        if (nameInput) nameInput.value = '';
-        if (filterInput) filterInput.value = '';
-        loadUsersForGroup();
-    };
+    selectedUserIds.clear();
+    if (nameInput) nameInput.value = '';
+    if (filterInput) filterInput.value = '';
+    loadUsersForGroup();
 
     function closeModal() {
         modal.style.display = 'none';
@@ -7375,9 +7370,23 @@ function setupGroupChatModal() {
             if (!groupName) return alert('Please enter a group name.');
             if (selectedUserIds.size === 0) return alert('Please select at least 1 member for your group.');
 
-            alert(`🎉 Group "${groupName}" created with ${selectedUserIds.size} members!`);
-            closeModal();
-            if (typeof loadConversationsInbox === 'function') loadConversationsInbox();
+            try {
+                const res = await fetch(`${API_BASE}/messages`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        receiverIds: Array.from(selectedUserIds),
+                        groupName: groupName,
+                        text: `👥 Created group: ${groupName}`
+                    })
+                });
+                if (!res.ok) throw new Error('Group creation failed');
+                closeModal();
+                if (typeof showToast === 'function') showToast(`🎉 Group "${groupName}" created!`);
+                if (typeof loadConversationsInbox === 'function') loadConversationsInbox();
+            } catch (err) {
+                alert('Failed to create group chat.');
+            }
         };
     }
 }

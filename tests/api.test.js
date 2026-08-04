@@ -420,6 +420,50 @@ describe('Spotlite Modular API Tests', () => {
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
+
+  it('E2E Messaging & Calling integration flow: sends message, fetches thread, creates call signal, and fetches call signals', async () => {
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'prudhvi' });
+    const token = loginRes.body.token;
+    const adminId = loginRes.body.user._id || loginRes.body.user.id;
+
+    // 1. Send Direct Message
+    const msgRes = await request(app)
+      .post('/api/messages')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ receiverId: adminId, text: 'Testing real-time message and call integration! 🚀' });
+    expect(msgRes.statusCode).toBe(201);
+    expect(msgRes.body.text).toContain('Testing real-time message and call integration');
+
+    // 2. Fetch Chat Thread
+    const threadRes = await request(app)
+      .get(`/api/messages/${adminId}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(threadRes.statusCode).toBe(200);
+    expect(Array.isArray(threadRes.body)).toBe(true);
+    expect(threadRes.body.length).toBeGreaterThan(0);
+
+    // 3. Send WebRTC Call Signal
+    const signalRes = await request(app)
+      .post('/api/calls/signal')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        recipientId: adminId,
+        type: 'offer',
+        offer: { type: 'offer', sdp: 'v=0...' },
+        callType: 'video'
+      });
+    expect(signalRes.statusCode).toBe(200);
+    expect(signalRes.body.success).toBe(true);
+
+    // 4. Poll WebRTC Signals
+    const pollRes = await request(app)
+      .get('/api/calls/signals')
+      .set('Authorization', `Bearer ${token}`);
+    expect(pollRes.statusCode).toBe(200);
+    expect(Array.isArray(pollRes.body)).toBe(true);
+  });
 });
 
 
