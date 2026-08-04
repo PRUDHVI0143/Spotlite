@@ -7118,18 +7118,34 @@ window.openNewChatPanel = async function() {
     try {
         const res = await fetch(`${API_BASE}/users/all`, { headers: getHeaders() });
         if (!res.ok) throw new Error('Failed');
-        const users = await res.json();
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-        const myId = String(currentUser._id || currentUser.id || '');
-        const otherUsers = (Array.isArray(users) ? users : []).filter(u => String(u._id || u.id) !== myId);
+        const data = await res.json();
+        const allUsers = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : (data?.users || []));
 
-        const renderUsers = (filter = '') => {
-            const filtered = otherUsers.filter(u => (u.username || '').toLowerCase().includes(filter.toLowerCase()));
-            if (filtered.length === 0) {
+        const renderUsers = async (filter = '') => {
+            let listToDisplay = allUsers;
+
+            if (filter.trim()) {
+                try {
+                    const searchRes = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(filter.trim())}`, { headers: getHeaders() });
+                    if (searchRes.ok) {
+                        const searchData = await searchRes.json();
+                        if (Array.isArray(searchData) && searchData.length > 0) {
+                            listToDisplay = searchData;
+                        } else {
+                            listToDisplay = allUsers.filter(u => (u.username || '').toLowerCase().includes(filter.toLowerCase()));
+                        }
+                    }
+                } catch (e) {
+                    listToDisplay = allUsers.filter(u => (u.username || '').toLowerCase().includes(filter.toLowerCase()));
+                }
+            }
+
+            if (!listToDisplay || listToDisplay.length === 0) {
                 usersList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.85rem;">No users found</div>';
                 return;
             }
-            usersList.innerHTML = filtered.map(u => {
+
+            usersList.innerHTML = listToDisplay.map(u => {
                 const avatar = u.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${u.username}`;
                 return `
                     <div class="new-chat-user-row" data-id="${u._id || u.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; cursor: pointer; border-bottom: 1px solid var(--border-color); transition: background 0.2s;">
@@ -7148,7 +7164,7 @@ window.openNewChatPanel = async function() {
             usersList.querySelectorAll('.new-chat-user-row').forEach(row => {
                 row.onclick = () => {
                     const id = row.getAttribute('data-id');
-                    const targetUser = otherUsers.find(u => (u._id || u.id) === id);
+                    const targetUser = listToDisplay.find(u => (u._id || u.id) === id);
                     if (targetUser) {
                         overlay.style.display = 'none';
                         openChatWithUser(targetUser);
@@ -7159,7 +7175,11 @@ window.openNewChatPanel = async function() {
 
         renderUsers('');
         if (searchInput) {
-            searchInput.oninput = () => renderUsers(searchInput.value.trim());
+            let debounceTimer = null;
+            searchInput.oninput = () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => renderUsers(searchInput.value), 250);
+            };
         }
     } catch (err) {
         if (usersList) usersList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--accent-red); font-size: 0.85rem;">Failed to load users</div>';
@@ -7313,7 +7333,8 @@ function setupGroupChatModal() {
         selectionList.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding:12px;">Loading users...</p>';
         try {
             const res = await fetch(`${API_BASE}/users/all`, { headers: getHeaders() });
-            availableUsers = await res.json();
+            const data = await res.json();
+            availableUsers = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : (data?.users || []));
             renderUserSelection('');
         } catch (err) {
             selectionList.innerHTML = '<p style="color:var(--accent-red); text-align:center; padding:12px;">Failed to load users.</p>';
